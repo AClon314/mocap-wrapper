@@ -1,0 +1,34 @@
+services:
+  app:
+    build:
+      dockerfile: docker/Dockerfile
+      context: ..
+    # Edit image name to match your project
+    image: your-name/project-name:latest
+
+    volumes:
+      # Update paths to mount models and output paths to your custom paths like this, e.g:
+      # - path/your-local/volume-dir:/project-name/volume-dir
+      - /project-name/volume-dir
+
+    ports:
+      - "7860:7860"
+
+    # This will enable terminal debugging in the container
+    stdin_open: true
+    tty: true
+
+    # Update entrypoint what to do when the container starts
+    entrypoint: ["python", "app.py"]
+
+
+    # This is only needed if the project requires GPU. If you're not using Nvidia GPU, Update device to match yours.
+    # See more info at : https://docs.docker.com/compose/compose-file/deploy/#driver
+    # You can remove this if you think it's not necessary.
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [ gpu ]

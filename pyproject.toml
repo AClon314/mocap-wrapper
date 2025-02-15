@@ -1,0 +1,45 @@
+# Edit every `package-name`, `author-name` and other settings to match your project.
+
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "package-name"
+version = "0.1.0"
+description = "Python package"
+readme = "A Python package"
+authors = [
+  { name = "author-name", email = "author-email" }
+]
+license = { file = "LICENSE" }
+keywords = ["keyword1", "keyword2"]
+
+classifiers = [
+  "License :: OSI Approved :: MIT License",
+  "Programming Language :: Python",
+  "Development Status :: 3 - Alpha",
+  "Intended Audience :: Developers",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.7",
+  "Programming Language :: Python :: 3.8",
+  "Programming Language :: Python :: 3.9",
+  "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12"
+]
+
+requires-python = ">=3.7"
+dependencies = [
+  # "numpy>=1.0"
+]
+
+[project.urls]
+Homepage = "http://github.com/author-name/package-name"
+Download = "http://github.com/author-name/package-name/releases"
+
+[project.optional-dependencies]
+tests = [
+  "pytest"
+]
+
