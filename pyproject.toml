@@ -1,19 +1,19 @@
 # Edit every `package-name`, `author-name` and other settings to match your project.
 
 [build-system]
-requires = ["setuptools>=61.0", "wheel"]
 build-backend = "setuptools.build_meta"
+requires = ["setuptools>=61.0", "wheel"]
 
 [project]
-name = "package-name"
-version = "0.1.0"
-description = "Python package"
-readme = "A Python package"
 authors = [
-  { name = "author-name", email = "author-email" }
+  {name = "nolca", email = "nolca@qq.com"},
 ]
-license = { file = "LICENSE" }
-keywords = ["keyword1", "keyword2"]
+description = "GVHMR, TRAM, WiLoR...mocap install/run with blender/unreal in one command"
+keywords = ["mocap", "pose estimate", "blender", "unreal"]
+license = {file = "LICENSE"}
+name = "mocap-wrapper"
+readme = "A Python package"
+version = "0.1.0"
 
 classifiers = [
   "License :: OSI Approved :: MIT License",
@@ -26,20 +26,19 @@ classifiers = [
   "Programming Language :: Python :: 3.9",
   "Programming Language :: Python :: 3.10",
   "Programming Language :: Python :: 3.11",
-  "Programming Language :: Python :: 3.12"
+  "Programming Language :: Python :: 3.12",
 ]
 
-requires-python = ">=3.7"
 dependencies = [
   # "numpy>=1.0"
 ]
+requires-python = ">=3.7"
 
 [project.urls]
-Homepage = "http://github.com/author-name/package-name"
-Download = "http://github.com/author-name/package-name/releases"
+Download = "http://github.com/AClon314/mocap-wrapper/releases"
+Homepage = "http://github.com/AClon314/mocap-wrapper"
 
 [project.optional-dependencies]
 tests = [
-  "pytest"
+  "pytest",
 ]
-

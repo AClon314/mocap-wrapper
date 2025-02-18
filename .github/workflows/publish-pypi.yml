@@ -19,7 +19,7 @@ jobs:
     environment:
       name: pypi
       #  Update URL with your package name
-      url: https://pypi.org/p/package-name
+      url: https://pypi.org/p/mocap-wrapper/
     permissions:
       id-token: write  # IMPORTANT: this permission is mandatory for trusted publishing
 
