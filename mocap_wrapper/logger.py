@@ -1,12 +1,15 @@
 from os import environ
-import logging
+from rich.logging import RichHandler
+from logging import basicConfig, getLogger
 
-LOGLEVEL = environ.get('LOGLEVEL', 'DEBUG').upper()
-logging.basicConfig(
-    level=LOGLEVEL,
-    format='%(levelname)s %(asctime)s\t%(filename)s:%(lineno)d\t%(funcName)s:\t%(message)s',
-    datefmt='%H:%M:%S',
-    # filename=f'{__file__}.log'
-)
 
-Log = logging.getLogger(__name__)
+def getLog(name=__name__):
+    LOGLEVEL = environ.get('LOGLEVEL', 'INFO').upper()
+    basicConfig(
+        level=LOGLEVEL,
+        format='%(funcName)s: %(message)s',
+        datefmt='%H:%M:%S',
+        # filename=f'{__file__}.log',
+        handlers=[RichHandler()]
+    )
+    return getLogger(name)

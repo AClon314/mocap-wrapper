@@ -2,96 +2,102 @@ import aria2p
 import subprocess as sp
 import asyncio as aio
 import os
+from rich import print
+from rich.progress import Progress
 from sys import platform
 from shutil import which
-from time import time
+from time import sleep, time
 from datetime import timedelta
-from mocap_wrapper.logger import Log
+from regex import sub
+from mocap_wrapper.logger import getLog
 from types import SimpleNamespace
-from typing import Dict, Literal, Union
-# editable variables:
-PACKAGES = [('aria2', 'aria2c'), 'git', 'unzip']
-ARIA_PORTS = [6800, 16800]
-ARIA_OPTIONS = {
-    "dir": "~",
-    "max-connection-per-server": "5",
-    "split": "5",
-    "min-split-size": "1M",
-    "continue": "true",
-}
-PKG_MGR = None
+from typing import Dict, Literal, Union, get_args, overload
+Log = getLog(__name__)
 
+ARIA_PORTS = [6800, 16800]
+OPT = {
+    'dir': os.path.expanduser('~'),
+    # 'out': 'filename',
+    'continue': True,
+    'split': 5,
+    'max_connection_per_server': 5,
+    'min_split_size': 20  # don't split if file size < 40M
+}
+PACKAGES = [('aria2', 'aria2c'), 'git', 'unzip']
 BINS = [p[1] if isinstance(p, tuple) else p for p in PACKAGES]
 PACKAGES = [p[0] if isinstance(p, tuple) else p for p in PACKAGES]
-aria: aria2p.API = None
+TYPE_SHELLS = Literal['zsh', 'bash', 'ps', 'cmd']
+SHELLS = get_args(TYPE_SHELLS)
+PY_MGR = 'mamba'
 is_linux = platform == 'linux'
 is_win = platform == 'win32'
 is_mac = platform == 'darwin'
-su = '' if is_win or os.geteuid() == 0 else 'sudo '
-Type_pkg_act = Union[None, Literal['install', 'remove', 'update']]
-pkg_mgrs: Dict[str, Dict[Type_pkg_act, str]] = {
+SU = '' if is_win or os.geteuid() == 0 else 'sudo '
+TYPE_PKG_ACT = Union[None, Literal['install', 'remove', 'update']]
+PKG_MGRS: Dict[str, Dict[TYPE_PKG_ACT, str]] = {
     'winget': {
         # windows
-        'update': 'upgrade --all',
-        'install': 'install',
+        'update': 'upgrade --all --silent',
+        'install': 'install --silent',
         'remove': 'uninstall'
     },
     'apt': {
         # debian
-        'update': 'update',
-        'install': 'install',
+        'update': 'update -y',
+        'install': 'install -y',
         'remove': 'remove'
     },
     'pacman': {
         # arch
         'update': '-Sy',
-        'install': '-S',
+        'install': '-S --noconfirm',
         'remove': '-R'
     },
     'dnf': {
         # fedora
-        'update': 'check-update',
-        'install': 'install',
+        'update': 'check-update -y',
+        'install': 'install -y',
         'remove': 'remove'
     },
     'zypper': {
         # suse
         'update': 'refresh',
-        'install': 'install',
+        'install': 'install -n',
         'remove': 'remove'
     },
     'emerge': {
         # gentoo
         'update': '--sync',
-        'install': '',
+        'install': '--ask=n',
         'remove': '--unmerge'
     },
 }
-pkg_mgrs['brew'] = pkg_mgrs['apt']  # macos
-pkg_mgrs['yum'] = pkg_mgrs['dnf']   # rhel
+PKG_MGRS['brew'] = PKG_MGRS['apt']  # macos
+PKG_MGRS['yum'] = PKG_MGRS['dnf']   # rhel
 
 
 def Popen(cmd='aria2c --enable-rpc --rpc-listen-port=6800',
-          wait=True, Raise=True, dry_run=False, **kwargs):
-    """default: run cmd in background"""
+          timeout=300., Raise=True, dry_run=False, **kwargs):
+    """Used on long running commands
+    set `timeout` to -1 to run in background
+    """
     Log.info(cmd)
     if dry_run:
         return
     p = sp.Popen(cmd, shell=True, **kwargs)
-    if wait:
-        p.wait()
-    if p.returncode != 0:
-        if Raise:
-            raise Exception(f"Failed: {cmd}")
-        else:
-            Log.error(f"Failed: {cmd}")
+    if timeout is None or timeout >= 0:
+        p.wait(timeout=timeout)
+        if p.returncode != 0:
+            if Raise:
+                raise Exception(f"Failed: {cmd}")
+            else:
+                Log.error(f"Failed: {cmd}")
     return p
 
 
-def Exec(cmd, timeout=10.0, Print=True, dry_run=False, **kwargs) -> Union[str, bytes, None]:
+def Exec(cmd, timeout=10.0, Print=True, **kwargs) -> Union[str, bytes, None]:
+    """Only used on instantly returning commands"""
     Log.info(cmd)
-    if dry_run:
-        return
     s = sp.check_output(cmd, shell=True, timeout=timeout, **kwargs).decode().strip()
     if Print:
         print(s)
@@ -106,19 +112,17 @@ def version(cmd: str):
 
 
 def get_pkg_mgr():
-    global PKG_MGR
-    for mgr in pkg_mgrs.keys():
-        if version(mgr):
-            PKG_MGR = mgr
+    MGR = None
+    for mgr in PKG_MGRS.keys():
+        if which(mgr):
+            MGR = mgr
             break
-    return PKG_MGR
+    return MGR
 
 
-def pkg(action: Type_pkg_act, package: list[str], **kwargs):
-    if not PKG_MGR:
-        get_pkg_mgr()
-    p = cmd = f"{su}{PKG_MGR} {pkg_mgrs[action]} {' '.join(package)}"
-    p = Popen(cmd, wait=True, **kwargs)
+def pkg(action: TYPE_PKG_ACT, package: list[str], **kwargs):
+    p = f"{SU}{PKG_MGR} {PKG_MGRS[action]} {' '.join(package)}"
+    p = Popen(p, timeout=True, **kwargs)
     return p
 
 
@@ -140,38 +144,54 @@ def try_aria_port():
 
 
 def i_pkgs(**kwargs):
-    """aria2"""
-    if is_linux:
-        cmd = [
-            su + "apt-get update",
-            su + f"apt-get install {' '.join(PACKAGES)} -y"
-        ]
-        for c in cmd:
-            Popen(c, **kwargs)
-    elif is_win:
-        ...
-    elif is_mac:
-        ...
+    pkg('update', **kwargs)
+    pkg('install', PACKAGES, **kwargs)
     return True
 
 
-async def download(url: str, options=ARIA_OPTIONS,
-                   duration=1, max_eta=timedelta(minutes=30).total_seconds(),
-                   dry_run=False):
-    """check if download is complete every `duration` seconds"""
+def rich_finish(task: int):
+    P.update(task, completed=100)
+    P.start_task(task)
+
+
+async def download(url: str, duration=0.5, dry_run=False, **kwargs: aria2p.Options):
+    """check if download is complete every `duration` seconds
+
+    `**kwargs` for `aria2p.API.add_uris(...)`:
+    - `dir`: download directory
+    - `out`: output filename
+    - `max-connection-per-server`: `-x`
+    - `split`: `-s`
+    """
     # start = time()
-    d = SimpleNamespace()
-    d.dir = '~'
-    Log.info(f"{url} -> {d.dir}")
+    options = {**OPT, **kwargs}
+    max_speed = 0
+
     if dry_run:
+        d = SimpleNamespace()
+        d.dir = options['dir']
         return d
+
     d = aria.add_uris([url], options=options)
-    if d.eta >= timedelta.max:
-        Log.warning(f"No ETA for {url}")
-    while True:
+    await aio.sleep(1.0)
+    d = aria.get_download(d.gid)
+    url = d.files[0].uris[0]['uri']
+    filename = os.path.basename(url)
+    d.path = path = os.path.join(d.dir, filename)
+    if d.is_complete:
+        Log.info(f"{d.path} already downloaded")
+        return d
+
+    has_eta = d.eta < timedelta.max
+    Log.warning(f"No ETA for {url}") if not has_eta else None
+
+    task = P.add_task(f"⬇️ Download {filename}", total=d.total_length, start=True)
+    Log.debug(f"{d.__dict__}")
+    while not d.is_complete:
         await aio.sleep(duration)
-        if d.is_complete():
-            break
+        d = aria.get_download(d.gid)
+        P.update(task, completed=d.completed_length)
+    d.path = path
     return d
 
 
@@ -186,7 +206,7 @@ async def i_mamba(**kwargs):
     else:
         raise Exception("Unsupported platform")
     url += setup
-    d = await download(url, **kwargs)
+    d = await download(url)
     setup = d.dir + '/' + setup
     p = None
     if is_win:
@@ -196,9 +216,9 @@ async def i_mamba(**kwargs):
     return p
 
 
-def env_list(mgr='mamba', **kwargs):
+def get_envs(manager='mamba', **kwargs):
     """return a list of conda envs, with current env at the first"""
-    s = Exec(f'{mgr} env list', **kwargs)
+    s = Exec(f'{manager} env list', **kwargs)
     s = [l.split()[0] for l in s.split('\n') if l and not l.startswith('#')]
     now = os.getenv('CONDA_DEFAULT_ENV')
     if now in s:
@@ -207,62 +227,111 @@ def env_list(mgr='mamba', **kwargs):
     return s
 
 
-def requirements_to_list(requirements_txt='requirements.txt'):
-    with open(requirements_txt) as f:
-        return f.read().splitlines()
+def get_shell():
+    SHELL = None
+    for s in SHELLS:
+        if which(s):
+            SHELL = s
+            break
+    return SHELL
 
 
-def mamba(*pkgs: str, env: str = None, python: str = None,
-          requirements_txt='requirements.txt', **kwargs):
-    """By default do 3 things:
-    - create if no exist
-    - activate env  
-    - install from `...` and `requirements.txt`
+def mamba(cmd: str = None, env: str = None, python: str = None,
+          txt='requirements.txt', *pkgs: str, **kwargs):
+    """By default do 2 things:
+    1. create env if no exist
+    2. install from `pkgs` and `requirements.txt`
+    - if `cmd` then, run `cmd` in the env
 
     `**kwargs` for `subprocess.Popen(...)`
     """
-    mgr = 'mamba'
-    envs = env_list(mgr, **kwargs)
-    p = None
-    if env in envs:
-        p = Popen(f"{mgr} activate {env}", **kwargs)
+    failed = []
+    envs = get_envs(PY_MGR)
+    pkgs = list(pkgs)
+    python = f'python={python}' if python else ''
+    if env and env not in envs:
+        p = Popen(f"{PY_MGR} create -y -n {env} {python}", **kwargs)
+        failed.append(p) if p.returncode != 0 else None
+
+    if txt and os.path.exists(txt):
+        txt = '--file ' + txt
     else:
-        p = Popen(f"{mgr} create -y -n {env} python={python}", **kwargs)
+        Log.warning(f"{txt} not found requirements.txt")
+        txt = ''
+    if pkgs or txt:
+        p = Popen(f"{PY_MGR} install -y -n {env} {txt} {' '.join(pkgs)}", **kwargs)
+        failed.append(p) if p.returncode != 0 else None
 
-    if requirements_txt:
-        pkgs += requirements_to_list(requirements_txt)
-    return p
+    if cmd:
+        cmd = sub(r"'(['\"])", r"\\\1", cmd)
+        if is_win:
+            _c = '/c'
+        else:
+            _c = '-c'
+        cmd = f"{PY_MGR} run -n {env} {SHELL} {_c} '{cmd}'"
+        p = Popen(cmd, **kwargs)
+        failed.append(p) if p.returncode != 0 else None
+
+    return failed
 
 
-def i_gvhmr(dir='~', **kwargs):
-    os.chdir(os.path.expanduser(dir))
+class ExistsPathList(list):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        super().insert(0, os.getcwd())
+
+    def append(self, object):
+        if os.path.exists(object):
+            super().append(object)
+        else:
+            Log.warning(f"{object} not exists")
+
+    @overload
+    def chdir(self, path: str) -> None: ...
+
+    @overload
+    def chdir(self, index: int) -> None: ...
+
+    def chdir(self, arg):
+        if isinstance(arg, int):
+            os.chdir(self[arg])
+        else:
+            self.append(arg)
+            os.chdir(arg)
+
+    def pushd(self, path: str):
+        self.chdir(path)
+
+    def popd(self) -> str:
+        p = self.pop()
+        os.chdir(p)
+        return p
+
+
+async def i_gvhmr(dir='~', **kwargs):
+    env = 'gvhmr'
+    d = ExistsPathList()
+    d.chdir(os.path.expanduser(dir))
     p = Popen('git clone https://github.com/zju3dv/GVHMR --recursive', **kwargs)
-    os.chdir('GVHMR')
-    cmd = """conda create -y -n gvhmr python=3.10
-conda activate gvhmr
-pip install -r requirements.txt
-pip install -e .
-# to install gvhmr in other repo as editable, try adding "python.analysis.extraPaths": ["path/to/your/package"] to settings.json
-
-# DPVO
-cd third-party/DPVO
-wget https://gitlab.com/libeigen/eigen/-/archive/3.4.0/eigen-3.4.0.zip
-unzip eigen-3.4.0.zip -d thirdparty && rm -rf eigen-3.4.0.zip
-pip install torch-scatter -f "https://data.pyg.org/whl/torch-2.3.0+cu121.html"
-pip install numba pypose
-export CUDA_HOME=/usr/local/cuda-12.1/
-export PATH=$PATH:/usr/local/cuda-12.1/bin/
-pip install -e ."""
-    p = mamba(env='gvhmr', python='3.10', **kwargs)
+    d.chdir('GVHMR')
+    p = mamba(env=env, python='3.10', **kwargs)
+    p = mamba('pip install -e .', env=env, **kwargs)
+    d.pushd('third-party/DPVO')
+    f = await download('https://gitlab.com/libeigen/eigen/-/archive/3.4.0/eigen-3.4.0.zip')
+    p = Popen(f'unzip {f.path}', **kwargs)
 
 
 def check_install(**kwargs):
+    global aria
+    failed = []
     pkgs = [which(p) for p in BINS]
     Log.debug(pkgs)
-    if any(p is None for p in pkgs):
+    pkgs = [p is None for p in pkgs]
+    if any(pkgs):
+        task = P.add_task("Install packages", start=False)
         i_pkgs()
+        rich_finish(task)
 
-    aria = try_aria_port()
     if aria is None:
         # try to start aria2c
         Popen(**kwargs)
@@ -274,12 +343,18 @@ def check_install(**kwargs):
     p = which('mamba')
     Log.debug(p)
     if not p:
+        task = P.add_task("Install Mamba", start=False)
         aio.run(i_mamba(**kwargs))
+        rich_finish(task)
 
-    i_gvhmr(**kwargs)
+    task = P.add_task("Install GVHMR", start=False)
+    aio.run(i_gvhmr(**kwargs))
+    rich_finish(task)
 
 
-if __name__ == '__main__':
-    p = mamba(env='gvhmr', python='3.10')
-
-    # check_install(dry_run=True)
+SHELL: str = get_shell()
+PKG_MGR: str = get_pkg_mgr()
+aria: aria2p.API = try_aria_port()
+with Progress() as P:
+    if __name__ == '__main__':
+        check_install(dry_run=True)

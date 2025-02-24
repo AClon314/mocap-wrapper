@@ -1,1 +1,3 @@
-# "numpy>=1.0"
+aria2p
+regex
+rich

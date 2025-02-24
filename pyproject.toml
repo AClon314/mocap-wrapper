@@ -30,7 +30,9 @@ classifiers = [
 ]
 
 dependencies = [
-  # "numpy>=1.0"
+  "aria2p",
+  "regex",
+  "rich",
 ]
 requires-python = ">=3.7"
 
