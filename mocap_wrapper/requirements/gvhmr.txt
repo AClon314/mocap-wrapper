@@ -1,7 +1,6 @@
 # chumpy  #3D-Vision
 # smplx
 # wis3d
-# pytorch3d @ https://dl.fbaipublicfiles.com/pytorch3d/packaging/wheels/py310_cu121_pyt230/pytorch3d-0.7.6-cp310-cp310-linux_x86_64.whl
 
 # cython_bbox #2D-Pose, YOLO
 # lapx
@@ -36,6 +35,7 @@ av  # imageio[pyav], improved performance over imageio[ffmpeg]
 joblib
 
 trimesh # 3D-Vision
+pytorch3d #@ https://dl.fbaipublicfiles.com/pytorch3d/packaging/wheels/py310_cu121_pyt230/pytorch3d-0.7.6-cp310-cp310-linux_x86_64.whl
 ## open3d>=0.17.0
 
 ultralytics>=8.2.42  # 2D-Pose, YOLO

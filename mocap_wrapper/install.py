@@ -2,15 +2,16 @@ import subprocess as sp
 import asyncio as aio
 import os
 from sys import platform, path as PATH
-from shutil import which, copy as cp
+from shutil import which, copy as cp, move as mv
 from time import sleep, time
 from datetime import timedelta
 from mocap_wrapper.logger import getLog
 from types import SimpleNamespace
-from typing import Dict, Literal, Union, get_args, overload
+from typing import Dict, List, Literal, Union, get_args, overload
 Log = getLog(__name__)
 
 MODS = ['wilor', 'gvhmr']
+ENV = 'mocap'
 ARIA_PORTS = [6800, 16800]
 OPT = {
     'dir': '~',
@@ -20,10 +21,10 @@ OPT = {
     'max_connection_per_server': 5,
     'min_split_size': 20  # don't split if file size < 40M
 }
-PACKAGES = [('aria2', 'aria2c'), 'git', 'unzip', 'execstack']
+PACKAGES = [('aria2', 'aria2c'), 'git', 'unzip']
 BINS = [p[1] if isinstance(p, tuple) else p for p in PACKAGES]
 PACKAGES = [p[0] if isinstance(p, tuple) else p for p in PACKAGES]
-TYPE_SHELLS = Literal['zsh', 'bash', 'ps', 'cmd']
+TYPE_SHELLS = Literal['zsh', 'bash', 'ps']
 SHELLS: TYPE_SHELLS = get_args(TYPE_SHELLS)
 TYPE_PY_MGRS = Literal['mamba', 'conda', 'pip']
 PY_MGRS: TYPE_PY_MGRS = get_args(TYPE_PY_MGRS)
@@ -74,6 +75,20 @@ PKG_MGRS['brew'] = PKG_MGRS['apt']  # macos
 PKG_MGRS['yum'] = PKG_MGRS['dnf']   # rhel
 
 
+# def if_fail(fails: list, progress: Union[sp.Popen, List[sp.Popen]]):
+#     if isinstance(progress, list):
+#         fails += progress
+#     else:
+#         fails.append(progress) if progress.returncode != 0 else None
+
+
+def unzip(zip_path: str, to: str, **kwargs):
+    if is_win:
+        p = Popen(f'Expand-Archive -Path "{zip_path}" -DestinationPath "{to}"')
+    else:
+        p = Popen(f'unzip {zip_path} -d {to}', **kwargs)
+
+
 def Popen(cmd='aria2c --enable-rpc --rpc-listen-port=6800',
           timeout=300., Raise=True, dry_run=False, **kwargs):
     """Used on long running commands
@@ -120,7 +135,7 @@ def get_py_mgr() -> Union[TYPE_PY_MGRS, None]:
     aio.run(i_mamba())
 
 
-def get_pkg_mgr() -> Union[TYPE_PY_MGRS, None]:
+def get_pkg_mgr() -> Union[str, None]:
     for mgr in PKG_MGRS.keys():
         if which(mgr):
             return mgr
@@ -153,7 +168,9 @@ def try_aria_port():
 
 
 def i_pkgs(**kwargs):
-    pkg('update', **kwargs)
+    # dnf/yum will update before each install
+    if PKG_MGR not in ['dnf', 'yum']:
+        pkg('update', **kwargs)
     pkg('install', PACKAGES, **kwargs)
     return True
 
@@ -233,7 +250,7 @@ async def aria(url: str, duration=0.5, dry_run=False, **kwargs: 'aria2p.Options'
 
 
 async def i_mamba(require_restart=True, **kwargs):
-    Log.info("Install Mamba")
+    Log.info("📦 Install Mamba")
     url = "https://github.com/conda-forge/miniforge/releases/latest/download/"
     setup = ''
     if is_linux or is_mac:
@@ -258,7 +275,7 @@ async def i_mamba(require_restart=True, **kwargs):
         os.remove(setup)
 
     if require_restart:
-        Log.info(f"re-open new terminal and run me again to refresh shell env!")
+        Log.info(f"✔ re-open new terminal and run me again to refresh shell env!")
         exit(0)
 
     return p
@@ -281,7 +298,7 @@ def get_shell() -> Union[TYPE_SHELLS, None]:
 
 def mamba(cmd: str = None,
           py_mgr: TYPE_PY_MGRS = None,
-          env='default',
+          env=ENV,
           python: str = None,
           txt: Literal['requirements.txt'] = None,
           pkgs=[], **kwargs):
@@ -292,8 +309,6 @@ def mamba(cmd: str = None,
 
     `**kwargs` for `subprocess.Popen(...)`
     """
-    def if_fail(): failed.append(p) if p.returncode != 0 else None
-    failed = []
     envs = {}
     python = f'python={python}' if python else ''
     if py_mgr is None:
@@ -305,7 +320,6 @@ def mamba(cmd: str = None,
         envs, _ = get_envs(py_mgr)
         if env and env not in envs:
             p = Popen(f"{py_mgr} create -y -n {env} {python}", **kwargs)
-            if_fail()
 
     if txt:
         if os.path.exists(os.path.abspath(txt)):
@@ -325,7 +339,6 @@ def mamba(cmd: str = None,
             p = Popen(f"{pip} install {txt} {' '.join(pkgs)}", **kwargs)
         else:
             p = Popen(f"{py_mgr} install -y -n {env} {txt} {' '.join(pkgs)}", **kwargs)
-        if_fail()
 
     if cmd:
         cmd = sub(r"'(['])", r"\\\1", cmd)
@@ -343,15 +356,16 @@ def mamba(cmd: str = None,
         else:
             cmd = f"{py_mgr} run -n {env} '{cmd}'"
         p = Popen(cmd, **kwargs)
-        failed.append(p) if p.returncode != 0 else None
 
-    return failed
+    return p
 
 
 class ExistsPathList(list):
-    def __init__(self, *args, **kwargs):
+    def __init__(self, chdir: str = None, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        super().insert(0, os.getcwd())
+        self.append(os.getcwd())
+        if chdir:
+            self.chdir(chdir)
 
     def append(self, object):
         if os.path.exists(object):
@@ -381,53 +395,94 @@ class ExistsPathList(list):
         return p
 
 
-def txt_pip_complete(txt: str, tmp='~', env='mocap'):
+def txt_from_self(filename='requirements.txt'):
+    path = os.path.join(os.path.dirname(__file__), 'requirements', filename)
+    return path
+
+
+def txt_pip_retry(txt: str, tmp_dir='~', env=ENV):
     """
     1. remove installed
     2. install package that start with `# ` (not like `##...`or`# #...`)
     """
     filename = os.path.basename(txt)
     txt = path_expand(txt)
-    tmp = os.path.join(path_expand(tmp), filename)
+    tmp_dir = os.path.join(path_expand(tmp_dir), filename)
     if not os.path.exists(txt):
         raise FileNotFoundError(f"{txt} not found")
-    cp(txt, tmp)
-    with open(tmp, 'r', encoding='UTF-8') as f:
+    cp(txt, tmp_dir)
+    with open(tmp_dir, 'r', encoding='UTF-8') as f:
         raw = f.read()
     raw = sub(r'^(?!#).*', '', raw, flags=MULTILINE)
     raw = sub(r'^# ', '', raw, flags=MULTILINE)
-    with open(tmp, 'w', encoding='UTF-8') as f:
+    with open(tmp_dir, 'w', encoding='UTF-8') as f:
         f.write(raw)
-    p = mamba(py_mgr='pip', txt=tmp, env=env)
-    os.remove(tmp)
+    p = mamba(py_mgr='pip', txt=tmp_dir, env=env)
+    os.remove(tmp_dir)
     return p
 
 
-async def i_gvhmr(dir='~', env='gvhmr', **kwargs):
-    Log.info("Install GVHMR")
-    pkgs = ['numba', 'pypose']
-    d = ExistsPathList()
-    d.chdir(os.path.expanduser(dir))
-    p = Popen('git clone https://github.com/zju3dv/GVHMR --recursive', Raise=False, **kwargs)
-    d.chdir('GVHMR')
-    p = mamba(env=env, python='3.10', pkgs=pkgs, **kwargs)
-    p = mamba('pip install -e .', env=env, **kwargs)
-    d.pushd('third-party/DPVO')
+async def i_smplx(dir='~', env=ENV, **kwargs):
+    Log.info("📦 Install SMPL && SMPLX")
+    dir = path_expand(dir)
+    d = ExistsPathList(dir)
+    f = await aria('https://download.is.tue.mpg.de/download.php?domain=smpl&sfile=SMPL_python_v.1.1.0.zip')
+
+    f = await aria('https://download.is.tue.mpg.de/download.php?domain=smplx&sfile=models_smplx_v1_1.zip')
+
+
+async def i_dpvo(dir='~', env=ENV, **kwargs):
+    Log.info("📦 Install DPVO")
+    dir = path_expand(dir)
+    unzip_to = os.path.join(dir, 'thirdparty')
     f = await aria('https://gitlab.com/libeigen/eigen/-/archive/3.4.0/eigen-3.4.0.zip')
-    file = os.path.basename(f.path)
-    p = Popen(f'unzip {file} -d thirdparty', **kwargs)
-    os.remove(file) if p.returncode == 0 else None
-    p = mamba('pip install torch-scatter -f "https://data.pyg.org/whl/torch-2.3.0+cu121.html"', env=env, **kwargs)
-    CUDA = os.path.join('/usr/local/cuda-12.1/'.split('/'))
-    os.environ['CUDA_HOME'] = CUDA
-    PATH.append(os.path.join(CUDA, 'bin'))
+    p = None
+    p = unzip(f.path, to=unzip_to, **kwargs)
+
+    os.remove(f.path) if p.returncode == 0 and os.path.exists(f.path) else None
+
+    if is_win:
+        Log.warning("`export` not supported windows yet")
+    else:
+        CUDA = os.path.join('/usr/local/cuda-12.1/'.split('/'))
+        PATH.append(os.path.join(CUDA, 'bin'))
+        os.environ['CUDA_HOME'] = CUDA
+    p = mamba(f'pip install -e {dir}', env=env, **kwargs)
+
+    Log.info("✔ Installed DPVO")
+    return p
 
 
-async def i_wilor_mini(env='wilor', **kwargs):
-    txt = os.path.join(os.path.dirname(__file__), 'requirements', 'wilor-mini.txt')
+async def i_gvhmr(dir='~', env=ENV, **kwargs):
+    Log.info("📦 Install GVHMR")
+    dir = path_expand(dir)
+    d = ExistsPathList(dir)
+
+    async def i_dpvo_before():
+        p = Popen('git clone https://github.com/zju3dv/GVHMR --recursive', Raise=False, **kwargs)
+        d.chdir('GVHMR')
+        p = mamba(env=env, python='3.10', txt=txt_from_self('gvhmr.txt'), **kwargs)
+        p = mamba(f'pip install -e {os.getcwd()}', env=env, **kwargs)
+        return p
+
+    tasks = [i_dpvo_before(), i_dpvo(dir=dir, env=env, **kwargs)]
+    tasks = [aio.create_task(t) for t in tasks]
+    tasks = await aio.gather(*tasks)
+
+    d.pushd('third-party/DPVO')
+    mv()
+    d.popd()
+
+    Log.info("✔ Installed GVHMR")
+
+
+async def i_wilor_mini(env=ENV, **kwargs):
+    Log.info("📦 Install WiLoR-mini")
+    txt = txt_from_self('wilor-mini.txt')
     p = mamba(txt=txt, env=env, python='3.10', **kwargs)
-    p = txt_pip_complete(txt, env=env)
+    p = txt_pip_retry(txt, env=env)
     p = mamba(py_mgr='pip', pkgs=['git+https://github.com/warmshao/WiLoR-mini'], env=env, **kwargs)
+    Log.info("✔ Installed WiLoR-mini")
     return p
 
 
@@ -452,12 +507,12 @@ async def install(mods, **kwargs):
     if 'mamba' in mods:
         aio.run(i_mamba(**kwargs))
 
-    if len(mods) > 1:
-        kwargs.update({'env': 'mocap'})
+    # if len(mods) > 1:
+    #     kwargs.update({'env': 'mocap'})
     if 'gvhmr' in mods:
         tasks.append(aio.create_task(i_gvhmr(**kwargs)))
     if 'wilor' in mods:
-        tasks.append(aio.create_task(i_wilor_mini(env='mocap', **kwargs)))
+        tasks.append(aio.create_task(i_wilor_mini(**kwargs)))
 
     Log.debug(f"task={tasks}")
     tasks = await aio.gather(*tasks)
@@ -465,12 +520,8 @@ async def install(mods, **kwargs):
 
 
 def clean():
-    failed = []
-    def if_fail(): failed.append(p) if p.returncode != 0 else None
     p = Popen('pip cache purge')
-    if_fail()
     p = Popen('conda clean --all')
-    if_fail()
 
 
 SHELL = get_shell()
@@ -495,6 +546,6 @@ try:
                 return Text("")
     with Progress(*Progress.get_default_columns(), SpeedColumn('')) as P:
         if __name__ == '__main__':
-            aio.run(install(mods=['wilor', ]))
+            aio.run(install(mods=['gvhmr', ]))
 except ImportError as e:
     Log.error(f"⚠️ detect missing packages, please check your current conda environment")
