@@ -44,3 +44,6 @@ Homepage = "http://github.com/AClon314/mocap-wrapper"
 tests = [
   "pytest",
 ]
+
+[scripts]
+mocap = "mocap_wrapper:main:main"

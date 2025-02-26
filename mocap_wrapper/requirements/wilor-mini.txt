@@ -1,0 +1,15 @@
+# smplx==0.1.28
+# roma
+# chumpy @ git+https://github.com/mattloper/chumpy
+
+pytorch==2.3.0
+torchvision>=0.15.1
+timm
+einops
+ultralytics>=8.1.34
+opencv
+huggingface_hub
+scikit-image
+
+trimesh # these 2 takes up 38MB
+pyrender

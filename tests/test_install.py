@@ -8,14 +8,14 @@ DRY_RUN = False
 ENV = 'test'
 
 
-@pytest.mark.skip(reason='ok')
 @pytest.mark.parametrize(
     "mgr",
     [('mamba'), ('conda'),]
 )
-def test_env_list(mgr: int):
-    envs = get_envs(mgr)
-    assert 'base' in envs, envs
+def test_env_list(mgr: str):
+    envs, now = get_envs(mgr)
+    Log.debug(f'{now}, {envs}')
+    assert 'base' in envs.keys(), envs
 
 
 @pytest.mark.parametrize(
@@ -24,6 +24,7 @@ def test_env_list(mgr: int):
 )
 def test_mamba(pkgs, env, cmd):
     fail = mamba(*pkgs, env=env, txt=None, cmd=cmd, dry_run=DRY_RUN)
+    cleanup = Popen(f"{PY_MGR} env remove -y -n {ENV}")
     assert not fail, fail
 
 
@@ -39,11 +40,6 @@ URLS = [
     [(URLS[0], {'dir': CWD})]
 )
 async def test_download(url, kwargs):
-    d = await download(url, dry_run=DRY_RUN, kwargs=kwargs)
+    d = await aria(url, dry_run=DRY_RUN, kwargs=kwargs)
     assert d.is_complete, d
     os.remove(d.path)
-
-
-@pytest.hookimpl(tryfirst=True)
-def pytest_end(session, exitstatus):
-    cleanup = Popen(f"mamba env remove -y -n {ENV}")
