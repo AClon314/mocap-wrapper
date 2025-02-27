@@ -1,7 +1,7 @@
 # It has two separate stages, with Builder Stage & Runtime Stage, because it's helpful to reduce the image size.
 
 # Edit `PROJECT_NAME` with your project name.
-ARG PROJECT_NAME=your-project-name
+ARG PROJECT_NAME=mocap_wrapper
 
 
 # 1. Builder Stage
@@ -38,7 +38,7 @@ COPY . .
 COPY --from=builder /${PROJECT_NAME}/venv /${PROJECT_NAME}/venv
 
 # Uncomment this and add VOLUME if needed.
-# VOLUME [ "/$PROJECT_NAME/volume-directory" ]
+VOLUME [ "/$PROJECT_NAME/mnt" ]
 
 # Edit ENTRYPOINT what the container should run when it starts.
-ENTRYPOINT [ "python", "app.py" ]
+ENTRYPOINT [ "python", "app.py", "-I" ]

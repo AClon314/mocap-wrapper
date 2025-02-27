@@ -42,7 +42,7 @@ jobs:
           file: ./docker/Dockerfile
           push: true
           #  Update with your image name
-          tags: ${{ secrets.DOCKER_USERNAME }}/image-name:latest
+          tags: ${{ secrets.DOCKER_USERNAME }}/mocap_wrapper:latest
 
       - name: Log out of Docker Hub
         run: docker logout
