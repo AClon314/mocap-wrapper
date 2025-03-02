@@ -1,36 +1,22 @@
-import subprocess as sp
-import asyncio as aio
 import os
-from sys import platform, path as PATH
-from shutil import which, copy as cp, move as mv
-from time import sleep, time
-from datetime import timedelta
+import asyncio as aio
+import subprocess as sp
+from sys import path as PATH
+from shutil import which, copy as cp
 from mocap_wrapper.logger import getLog
-from types import SimpleNamespace
-from typing import Dict, List, Literal, Union, get_args, overload
+from mocap_wrapper.lib import *
+from typing import Dict, List, Literal, Union, get_args
 Log = getLog(__name__)
 
 MODS = ['wilor', 'gvhmr']
 ENV = 'mocap'
-ARIA_PORTS = [6800, 16800]
-OPT = {
-    'dir': '~',
-    # 'out': 'filename',
-    'continue': True,
-    'split': 5,
-    'max_connection_per_server': 5,
-    'min_split_size': 20  # don't split if file size < 40M
-}
-PACKAGES = [('aria2', 'aria2c'), 'git', 'unzip']
+PACKAGES = [('aria2', 'aria2c'), 'git', '7z']
 BINS = [p[1] if isinstance(p, tuple) else p for p in PACKAGES]
 PACKAGES = [p[0] if isinstance(p, tuple) else p for p in PACKAGES]
 TYPE_SHELLS = Literal['zsh', 'bash', 'ps']
 SHELLS: TYPE_SHELLS = get_args(TYPE_SHELLS)
 TYPE_PY_MGRS = Literal['mamba', 'conda', 'pip']
 PY_MGRS: TYPE_PY_MGRS = get_args(TYPE_PY_MGRS)
-is_linux = platform == 'linux'
-is_win = platform == 'win32'
-is_mac = platform == 'darwin'
 SU = '' if is_win or os.geteuid() == 0 else 'sudo '
 TYPE_PKG_ACT = Union[None, Literal['install', 'remove', 'update']]
 PKG_MGRS: Dict[str, Dict[TYPE_PKG_ACT, str]] = {
@@ -75,64 +61,21 @@ PKG_MGRS['brew'] = PKG_MGRS['apt']  # macos
 PKG_MGRS['yum'] = PKG_MGRS['dnf']   # rhel
 
 
-# def if_fail(fails: list, progress: Union[sp.Popen, List[sp.Popen]]):
-#     if isinstance(progress, list):
-#         fails += progress
-#     else:
-#         fails.append(progress) if progress.returncode != 0 else None
-
-
-def unzip(zip_path: str, to: str, **kwargs):
-    if is_win:
-        p = Popen(f'Expand-Archive -Path "{zip_path}" -DestinationPath "{to}"')
-    else:
-        p = Popen(f'unzip {zip_path} -d {to}', **kwargs)
-
-
-def Popen(cmd='aria2c --enable-rpc --rpc-listen-port=6800',
-          timeout=300., Raise=True, dry_run=False, **kwargs):
-    """Used on long running commands
-    set `timeout` to -1 to run in background
-    """
-    Log.info(cmd)
-    if dry_run:
-        return
-    p = sp.Popen(cmd, shell=True, env=os.environ, **kwargs)
-    if timeout is None or timeout >= 0:
-        p.wait(timeout=timeout)
-        if p.returncode != 0:
-            if Raise:
-                raise Exception(f"{cmd}")
-            else:
-                Log.error(f"{cmd}")
-    return p
-
-
-def Exec(cmd, timeout=60.0, Print=True, **kwargs) -> Union[str, bytes, None]:
-    """Only used on instantly returning commands"""
-    Log.info(cmd)
-    s = sp.check_output(cmd, shell=True, timeout=timeout, **kwargs).decode().strip()
-    if Print:
-        print(s)
-    return s
-
-
-def version(cmd: str):
-    """use `cmd --version` to check if a program is installed"""
-    cmd += ' --version'
-    p = Popen(cmd)
-    return p.returncode == 0
+def remove_if_p(path: str, progress: sp.Popen):
+    os.remove(path) if progress.returncode == 0 and os.path.exists(path) else None
 
 
 def get_py_mgr() -> Union[TYPE_PY_MGRS, None]:
+    mgr = ''
     for mgr in PY_MGRS:
         if which(mgr):
             if mgr == 'pip':
+                mgr = 'mamba'
+                aio.run(i_mamba())  # TODO
                 break
             elif mgr == 'conda':
                 Log.warning(f"Use `mamba` for faster install")
-            return mgr
-    aio.run(i_mamba())
+    return mgr
 
 
 def get_pkg_mgr() -> Union[str, None]:
@@ -141,30 +84,10 @@ def get_pkg_mgr() -> Union[str, None]:
             return mgr
 
 
-def pkg(action: TYPE_PKG_ACT, package: list[str], **kwargs):
-    p = f"{SU}{PKG_MGR} {PKG_MGRS[action]} {' '.join(package)}"
-    p = Popen(p, timeout=True, **kwargs)
+def pkg(action: TYPE_PKG_ACT, package: list[str] = [], **kwargs):
+    p = f"{SU}{PKG_MGR} {PKG_MGRS[PKG_MGR][action]} {' '.join(package)}"
+    p = Popen(p, **kwargs)
     return p
-
-
-def try_aria_port():
-    for port in ARIA_PORTS:
-        try:
-            aria2 = aria2p.API(
-                aria2p.Client(
-                    host="http://localhost",
-                    port=port,
-                    secret=""
-                )
-            )
-            aria2.get_stats()
-            return aria2
-        except ImportError:
-            Log.warning(f"Failed to import aria2p")
-            return None
-        except Exception as e:
-            Log.warning(f"Failed to connect to aria2 on port {port}: {e}")
-            return None
 
 
 def i_pkgs(**kwargs):
@@ -178,10 +101,6 @@ def i_pkgs(**kwargs):
 def rich_finish(task: int):
     P.update(task, completed=100)
     P.start_task(task)
-
-
-def path_expand(path: str):
-    return os.path.expandvars(os.path.expanduser(path))
 
 
 def opt_expand(url: str, **kwargs):
@@ -205,51 +124,17 @@ def curl(url: str, dry_run=False, **kwargs):
     return p
 
 
-async def aria(url: str, duration=0.5, dry_run=False, **kwargs: 'aria2p.Options'):
-    """check if download is complete every `duration` seconds
-
-    `**kwargs` for `aria2p.API.add_uris(...)`:
-    - `dir`: download directory
-    - `out`: output filename
-    - `max-connection-per-server`: `-x`
-    - `split`: `-s`
+def google_drive(ID: str):
+    # TODO
     """
-    # start = time()
-    options = {**OPT, **kwargs}
-    max_speed = 0
-
-    if dry_run:
-        d = SimpleNamespace()
-        d.dir = options['dir']
-        return d
-
-    Log.debug(options)
-    d = Aria.add_uris([url], options=options)
-    await aio.sleep(1.0)
-    d = Aria.get_download(d.gid)
-    url = d.files[0].uris[0]['uri']
-    filename = os.path.basename(url)
-    d.path = path = os.path.join(d.dir, filename)
-    if d.is_complete:
-        Log.info(f"{d.path} already downloaded")
-        return d
-
-    has_eta = d.eta < timedelta.max
-    Log.warning(f"No ETA for {url}") if not has_eta else None
-    if d.total_length == 0:
-        raise Exception(f'length=0 for GID={d.gid}, detail: {d.__dict__}')
-
-    task = P.add_task(f"⬇️ Download {filename}", total=d.total_length, start=has_eta)
-    Log.debug(f"{d.__dict__}")
-    while not d.is_complete:
-        await aio.sleep(duration)
-        d = Aria.get_download(d.gid)
-        P.update(task, completed=d.completed_length, download_status=f'{d.completed_length_string()}/{d.total_length_string()} @ {d.download_speed_string()}')
-    d.path = path
-    return d
+    - ID: shared file url. Example: `https://drive.google.com/file/d/1DE5G***********************K0nr0/view?...`, then `1DE5G***********************K0nr0` is the ID
+    """
+    uuid = 'da72c1d0-7076-45c9-9b2f-312c8edae741'
+    # return 'https://drive.google.com/uc?export=download&id=' + ID
+    return f'https://drive.usercontent.google.com/download?id={ID}&export=download&authuser=0&confirm=t&uuid={uuid}&at=AEz70l5ReyqrF6PqljBUTBLj5yqr:1740753223630'
 
 
-async def i_mamba(require_restart=True, **kwargs):
+def i_mamba(require_restart=True, **kwargs):
     Log.info("📦 Install Mamba")
     url = "https://github.com/conda-forge/miniforge/releases/latest/download/"
     setup = ''
@@ -262,23 +147,28 @@ async def i_mamba(require_restart=True, **kwargs):
         raise Exception("Unsupported platform")
     url += setup
     if Aria:
-        d = await aria(url)
+        d = aria(url)   # TODO
     else:
         d = curl(url)
-    setup = d.dir + '/' + setup
-    p = None
-    if is_win:
-        p = Popen(f'start /wait "" {setup} /InstallationType=JustMe /RegisterPython=0 /S /D=%UserProfile%\\Miniforge3', **kwargs)
-    else:
-        p = Popen(f'bash "{setup}" -b', **kwargs)
-    if p.returncode == 0:
-        os.remove(setup)
 
-    if require_restart:
-        Log.info(f"✔ re-open new terminal and run me again to refresh shell env!")
-        exit(0)
+    def i_mamba_post():
+        setup = d.dir + '/' + setup
+        p = None
+        if is_win:
+            p = Popen(f'start /wait "" {setup} /InstallationType=JustMe /RegisterPython=0 /S /D=%UserProfile%\\Miniforge3', **kwargs)
+        else:
+            p = Popen(f'bash "{setup}" -b', **kwargs)
+        remove_if_p(setup, p)
 
-    return p
+        p = mamba(env='nogil', txt=txt_from_self(), pkgs=['python-freethreading'], **kwargs)
+        p = Popen("conda config --set env_prompt '({default_env})'", **kwargs)
+
+        if require_restart:
+            Log.info(f"✔ re-open new terminal and run me again to refresh shell env!")
+            exit(0)  # TODO: find a way not to exit
+        return p
+
+    return  # p
 
 
 def get_envs(manager='mamba', **kwargs):
@@ -342,11 +232,10 @@ def mamba(cmd: str = None,
 
     if cmd:
         cmd = sub(r"'(['])", r"\\\1", cmd)
-        # when need sheel env: {SHELL} {_c}
-        # if is_win:
-        #     _c = '/c'
-        # else:
-        #     _c = '-c'
+        if is_win:
+            _c = '/c'
+        else:
+            _c = '-c'
         if py_mgr == 'pip':
             cmd = sub(r'^pip ', pip, cmd)
             cmd = sub(r'^python ', python, cmd)
@@ -354,45 +243,10 @@ def mamba(cmd: str = None,
                 if word in cmd:
                     Log.warning(f"Detected suspicious untranslated executable: {word}. If you encounter errors, you may want to modify the source code :)")
         else:
-            cmd = f"{py_mgr} run -n {env} '{cmd}'"
+            cmd = f"{py_mgr} run -n {env} {SHELL} {_c} '{cmd}'"
         p = Popen(cmd, **kwargs)
 
     return p
-
-
-class ExistsPathList(list):
-    def __init__(self, chdir: str = None, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.append(os.getcwd())
-        if chdir:
-            self.chdir(chdir)
-
-    def append(self, object):
-        if os.path.exists(object):
-            super().append(object)
-        else:
-            Log.warning(f"{object} not exists")
-
-    @overload
-    def chdir(self, path: str) -> None: ...
-
-    @overload
-    def chdir(self, index: int) -> None: ...
-
-    def chdir(self, arg):
-        if isinstance(arg, int):
-            os.chdir(self[arg])
-        else:
-            self.append(arg)
-            os.chdir(arg)
-
-    def pushd(self, path: str):
-        self.chdir(path)
-
-    def popd(self) -> str:
-        p = self.pop()
-        os.chdir(p)
-        return p
 
 
 def txt_from_self(filename='requirements.txt'):
@@ -402,44 +256,95 @@ def txt_from_self(filename='requirements.txt'):
 
 def txt_pip_retry(txt: str, tmp_dir='~', env=ENV):
     """
-    1. remove installed
+    1. remove installed lines
     2. install package that start with `# ` (not like `##...`or`# #...`)
     """
     filename = os.path.basename(txt)
     txt = path_expand(txt)
-    tmp_dir = os.path.join(path_expand(tmp_dir), filename)
+    tmp = os.path.join(path_expand(tmp_dir), filename)
     if not os.path.exists(txt):
         raise FileNotFoundError(f"{txt} not found")
-    cp(txt, tmp_dir)
-    with open(tmp_dir, 'r', encoding='UTF-8') as f:
+    cp(txt, tmp)
+    with open(tmp, 'r', encoding='UTF-8') as f:
         raw = f.read()
     raw = sub(r'^(?!#).*', '', raw, flags=MULTILINE)
     raw = sub(r'^# ', '', raw, flags=MULTILINE)
-    with open(tmp_dir, 'w', encoding='UTF-8') as f:
+    with open(tmp, 'w', encoding='UTF-8') as f:
         f.write(raw)
-    p = mamba(py_mgr='pip', txt=tmp_dir, env=env)
-    os.remove(tmp_dir)
+    p = mamba(py_mgr='pip', txt=tmp, env=env)
+    remove_if_p(tmp, p)
     return p
 
 
-async def i_smplx(dir='~', env=ENV, **kwargs):
-    Log.info("📦 Install SMPL && SMPLX")
+def smpl_task(dir='~',
+              download='https://download.is.tue.mpg.de/download.php?domain=smpl&sfile=SMPL_python_v.1.1.0.zip',
+              referer='https://smpl.is.tue.mpg.de/',
+              PHPSESSID='26-digits_123456789_123456',
+              user_agent='Transmission/2.77',
+              **kwargs):
+    """
+    - dir: download to which temp dir
+    - download: file url
+    - referer: main domain
+    - PHPSESSID: from your logged-in cookie🍪, **expires after next login**
+    - user_agent: from your browser🌐
+    """
     dir = path_expand(dir)
-    d = ExistsPathList(dir)
-    f = await aria('https://download.is.tue.mpg.de/download.php?domain=smpl&sfile=SMPL_python_v.1.1.0.zip')
 
-    f = await aria('https://download.is.tue.mpg.de/download.php?domain=smplx&sfile=models_smplx_v1_1.zip')
+    cookie = os.path.join(dir, 'cookies.txt')
+    cookies = [{
+        'domain': '.' + referer.split('/')[2],  # MAYBE BUGGY
+        'name': 'PHPSESSID',
+        'value': PHPSESSID,
+    }]
+    save_cookies_to_file(cookies, cookie)
+    options = {
+        'load-cookies': cookie,
+        'user-agent': user_agent,
+        'referer': referer,
+    }
+    options = {**options, **kwargs}
+    return aria(download, **options)
 
 
-async def i_dpvo(dir='~', env=ENV, **kwargs):
+def i_smpl(dir='~',
+           PHPSESSIDs: dict = {'smpl': '', 'smplx': ''},
+           user_agent='Transmission/2.77',
+           **kwargs) -> List['aria2p.Download']:
+    """
+    - PHPSESSIDs: {'smpl': '26-digits_123456789_123456', 'smplx': '26-digits_123456789_123456'}
+    """
+    Log.info("⬇️ Download SMPL && SMPLX (📝 By downloading, you agree to SMPL/SMPL-X corresponding licences)")
+
+    for k, v in PHPSESSIDs.items():
+        if not (v and isinstance(v, str)):
+            Log.warning(f"🍪 cookies: PHPSESSID for {k}={v} could cause download failure")
+
+    tasks = [
+        smpl_task(dir=dir, PHPSESSID=PHPSESSIDs['smpl'], user_agent=user_agent, **kwargs),
+        smpl_task(download='https://download.is.tue.mpg.de/download.php?domain=smplx&sfile=models_smplx_v1_1.zip',
+                  referer='https://smpl-x.is.tue.mpg.de/',
+                  dir=dir, PHPSESSID=PHPSESSIDs['smplx'], user_agent=user_agent, **kwargs)
+    ]
+    tasks = aio.gather(*tasks)  # TODO
+
+    for t in tasks:
+        if t.is_complete:
+            unzip(t.path, to=dir, **kwargs)
+
+    if any([not t.is_complete for t in tasks]):
+        Log.error("❌ please check your cookies:PHPSESSID if it's expired, or change your IP address by VPN")
+    else:
+        Log.info("✔ Downloaded SMPL && SMPLX")
+    return tasks
+
+
+def i_dpvo(dir='~', env=ENV, **kwargs):
     Log.info("📦 Install DPVO")
     dir = path_expand(dir)
-    unzip_to = os.path.join(dir, 'thirdparty')
-    f = await aria('https://gitlab.com/libeigen/eigen/-/archive/3.4.0/eigen-3.4.0.zip')
-    p = None
-    p = unzip(f.path, to=unzip_to, **kwargs)
-
-    os.remove(f.path) if p.returncode == 0 and os.path.exists(f.path) else None
+    f = aria('https://gitlab.com/libeigen/eigen/-/archive/3.4.0/eigen-3.4.0.zip')   # TODO
+    p = unzip(f.path, to=dir, **kwargs)
+    remove_if_p(f.path, p)
 
     if is_win:
         Log.warning("`export` not supported windows yet")
@@ -453,30 +358,57 @@ async def i_dpvo(dir='~', env=ENV, **kwargs):
     return p
 
 
-async def i_gvhmr(dir='~', env=ENV, **kwargs):
+def i_gvhmr_models(dir='~', **kwargs):
+    Log.info("📦 Download GVHMR pretrained models (📝 By downloading, you agree to the GVHMR's corresponding licences)")
+    dir = path_expand(dir)
+    os.chdir(dir)
+    G_drive = {
+        'dpvo/dpvo.pth': '1DE5GVftRCfZOTMp8YWF0xkGudDxK0nr0',
+        'gvhmr/gvhmr_siga24_release.ckpt': '1c9iCeKFN4Kr6cMPJ9Ss6Jdc3SZFnO5NP',
+        'hmr2/epoch=10-step=25000.ckpt': '1X5hvVqvqI9tvjUCb2oAlZxtgIKD9kvsc',
+        'vitpose/vitpose-h-multi-coco.pth': '1sR8xZD9wrZczdDVo6zKscNLwvarIRhP5',
+        'yolo/yolov8x.pt': '1_HGm-lqIH83-M1ML4bAXaqhm_eT2FKo5',
+    }
+
+    G_drive = {os.path.join(dir, k): google_drive(v) for k, v in G_drive.items()}
+    Log.debug(G_drive)
+    tasks = [aria(url=url, out=out) for out, url in G_drive.items()]
+    tasks = [aio.create_task(t) for t in tasks]
+    tasks = aio.gather(*tasks)  # TODO
+    Log.info("✔ Download GVHMR pretrained models")
+    return tasks
+
+
+def i_gvhmr(dir='~', env=ENV, **kwargs):
     Log.info("📦 Install GVHMR")
     dir = path_expand(dir)
-    d = ExistsPathList(dir)
+    d = ExistsPathList(chdir=dir)
+    dir = os.path.join(dir, 'GVHMR')
+    if not os.path.exists(dir):
+        p = Popen('git clone https://github.com/zju3dv/GVHMR', Raise=False, **kwargs)
+    d.chdir('GVHMR')
+    os.makedirs('inputs/checkpoints', exist_ok=True)
+    dir_checkpoints = os.path.join(dir, 'inputs/checkpoints')
 
-    async def i_dpvo_before():
-        p = Popen('git clone https://github.com/zju3dv/GVHMR --recursive', Raise=False, **kwargs)
-        d.chdir('GVHMR')
+    def i_gvhmr_post():
+        p = Popen('git submodule update --init --recursive', **kwargs)
         p = mamba(env=env, python='3.10', txt=txt_from_self('gvhmr.txt'), **kwargs)
         p = mamba(f'pip install -e {os.getcwd()}', env=env, **kwargs)
         return p
 
-    tasks = [i_dpvo_before(), i_dpvo(dir=dir, env=env, **kwargs)]
+    tasks = [
+        i_gvhmr_post(),
+        i_dpvo(dir=os.path.join(dir, 'third-party/DPVO'), env=env, **kwargs),
+        i_smpl(dir=dir_checkpoints, **kwargs),
+        i_gvhmr_models(dir=dir_checkpoints, **kwargs)
+    ]
     tasks = [aio.create_task(t) for t in tasks]
-    tasks = await aio.gather(*tasks)
-
-    d.pushd('third-party/DPVO')
-    mv()
-    d.popd()
+    tasks = aio.gather(*tasks)  # TODO
 
     Log.info("✔ Installed GVHMR")
 
 
-async def i_wilor_mini(env=ENV, **kwargs):
+def i_wilor_mini(env=ENV, **kwargs):
     Log.info("📦 Install WiLoR-mini")
     txt = txt_from_self('wilor-mini.txt')
     p = mamba(txt=txt, env=env, python='3.10', **kwargs)
@@ -486,7 +418,7 @@ async def i_wilor_mini(env=ENV, **kwargs):
     return p
 
 
-async def install(mods, **kwargs):
+def install(mods, **kwargs):
     global Aria
     tasks = []
 
@@ -498,7 +430,7 @@ async def install(mods, **kwargs):
 
     if Aria is None:
         # try to start aria2c
-        Popen(**kwargs)
+        Popen(timeout=False, **kwargs)
         Aria = try_aria_port()
         if Aria is None:
             raise Exception("Failed to connect rpc to aria2, is aria2c/Motrix running?")
@@ -507,15 +439,13 @@ async def install(mods, **kwargs):
     if 'mamba' in mods:
         aio.run(i_mamba(**kwargs))
 
-    # if len(mods) > 1:
-    #     kwargs.update({'env': 'mocap'})
     if 'gvhmr' in mods:
         tasks.append(aio.create_task(i_gvhmr(**kwargs)))
     if 'wilor' in mods:
         tasks.append(aio.create_task(i_wilor_mini(**kwargs)))
 
     Log.debug(f"task={tasks}")
-    tasks = await aio.gather(*tasks)
+    tasks = aio.gather(*tasks)  # TODO
     return tasks
 
 
@@ -528,24 +458,10 @@ SHELL = get_shell()
 PKG_MGR = get_pkg_mgr()
 PY_MGR = get_py_mgr()
 try:
-    import aria2p
-    from rich import print
-    from rich.text import Text
-    from rich.progress import Progress, TextColumn
     from regex import sub, MULTILINE
-
-    Aria: 'aria2p.API' = try_aria_port()
-
-    class SpeedColumn(TextColumn):
-        def render(self, task):
-            if 'download_status' in task.fields.keys():
-                return Text(task.fields['download_status'])
-            elif task.speed:
-                return Text(f"{task.speed:.3f} steps/s")
-            else:
-                return Text("")
-    with Progress(*Progress.get_default_columns(), SpeedColumn('')) as P:
-        if __name__ == '__main__':
-            aio.run(install(mods=['gvhmr', ]))
+    from netscape_cookies import save_cookies_to_file
+    if __name__ == '__main__':
+        with Progress(*Progress.get_default_columns(), SpeedColumn('')) as P:
+            run(install(mods=['gvhmr', ]))
 except ImportError as e:
-    Log.error(f"⚠️ detect missing packages, please check your current conda environment")
+    Log.error(f"⚠️ detect missing packages, please check your current conda environment. {e}")

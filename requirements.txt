@@ -1,3 +1,5 @@
-aria2p
-regex
 rich
+aria2p  # mamba failed:
+python-worker
+regex
+netscape-cookies

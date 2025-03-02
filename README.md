@@ -86,3 +86,9 @@
 ```
 mocap -I -i input.mp4 output.mp4
 ```
+
+## dev
+```sh
+# docker build -t mocap -f docker/Dockerfile .
+podman build -t mocap -f docker/Dockerfile . --security-opt label=disable
+```

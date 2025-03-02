@@ -38,7 +38,7 @@ COPY . .
 COPY --from=builder /${PROJECT_NAME}/venv /${PROJECT_NAME}/venv
 
 # Uncomment this and add VOLUME if needed.
-VOLUME [ "/$PROJECT_NAME/mnt" ]
+# VOLUME [ "/$PROJECT_NAME/mnt" ]
 
 # Edit ENTRYPOINT what the container should run when it starts.
-ENTRYPOINT [ "python", "app.py", "-I" ]
+ENTRYPOINT [ "python3", "-m", "mocap_wrapper.app","-I" ]
