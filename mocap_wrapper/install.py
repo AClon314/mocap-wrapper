@@ -92,32 +92,6 @@ def i_pkgs(**kwargs):
     return True
 
 
-def rich_finish(task: int):
-    P.update(task, completed=100)
-    P.start_task(task)
-
-
-def opt_expand(url: str, **kwargs):
-    options = {**OPT, **kwargs}
-    options['dir'] = path_expand(options['dir'])
-    if 'out' in options.keys():
-        options['out'] = path_expand(options['out'])
-    else:
-        options['out'] = os.path.basename(url)
-    return options
-
-
-def curl(url: str, dry_run=False, **kwargs):
-    options = opt_expand(url, **kwargs)
-    out = os.path.join(options['dir'], options['out'])
-    if is_win:
-        p = Popen(f'bitsadmin /transfer MocapWrapperJob /download /priority normal {url} {out}', **kwargs)
-    else:
-        p = Popen(f'curl -L -C - -o {out} {url}', **kwargs)
-    p.dir = options['dir']
-    return p
-
-
 def i_mamba(require_restart=True, **kwargs):
     Log.info("📦 Install Mamba")
     url = "https://github.com/conda-forge/miniforge/releases/latest/download/"
@@ -236,7 +210,7 @@ def txt_from_self(filename='requirements.txt'):
     return path
 
 
-def txt_pip_retry(txt: str, tmp_dir='~', env=ENV):
+def txt_pip_retry(txt: str, tmp_dir='.', env=ENV):
     """
     1. remove installed lines
     2. install package that start with `# ` (not like `##...`or`# #...`)
@@ -258,7 +232,7 @@ def txt_pip_retry(txt: str, tmp_dir='~', env=ENV):
     return p
 
 
-def smpl_task(dir='~',
+def smpl_task(dir='.',
               download='https://download.is.tue.mpg.de/download.php?domain=smpl&sfile=SMPL_python_v.1.1.0.zip',
               referer='https://smpl.is.tue.mpg.de/',
               PHPSESSID='26-digits_123456789_123456',
@@ -290,7 +264,7 @@ def smpl_task(dir='~',
 
 
 @async_worker
-async def i_smpl(dir='~',
+async def i_smpl(dir='.',
                  PHPSESSIDs: dict = {'smpl': '', 'smplx': ''},
                  user_agent='Transmission/2.77',
                  **kwargs) -> List['aria2p.Download']:
@@ -323,7 +297,7 @@ async def i_smpl(dir='~',
 
 
 @async_worker
-async def i_dpvo(dir='~', env=ENV, **kwargs):
+async def i_dpvo(dir='.', env=ENV, **kwargs):
     Log.info("📦 Install DPVO")
     dir = path_expand(dir)
     f = await aria('https://gitlab.com/libeigen/eigen/-/archive/3.4.0/eigen-3.4.0.zip')
@@ -333,28 +307,29 @@ async def i_dpvo(dir='~', env=ENV, **kwargs):
     if is_win:
         Log.warning("`export` not supported windows yet")
     else:
-        CUDA = os.path.join('/usr/local/cuda-12.1/'.split('/'))
-        PATH.append(os.path.join(CUDA, 'bin'))
-        os.environ['CUDA_HOME'] = CUDA
+        CUDA = '/usr/local/cuda-12.1/'.split('/')
+        CUDA = os.path.join(*CUDA)
+        if os.path.exists(CUDA):
+            PATH.append(os.path.join(CUDA, 'bin'))
+            os.environ['CUDA_HOME'] = CUDA
+        else:
+            Log.warning(f"❌ CUDA not found in {CUDA}")
     p = mamba(f'pip install -e {dir}', env=env, **kwargs)
 
     Log.info("✔ Installed DPVO")
     return p
 
 
+@async_worker
 async def Gdown(ID, out):
-    """
-    """
-    url = google_drive(id=ID)
-    f = await aria(url, out=out)
+    f = await aria(google_drive(id=ID), out=out)
     return f
 
 
 @async_worker
-async def i_gvhmr_models(dir='~', **kwargs):
+async def i_gvhmr_models(dir='.'):
     Log.info("📦 Download GVHMR pretrained models (📝 By downloading, you agree to the GVHMR's corresponding licences)")
     dir = path_expand(dir)
-    os.chdir(dir)
     G_drive = {
         ('dpvo', 'dpvo.pth'): '1DE5GVftRCfZOTMp8YWF0xkGudDxK0nr0',
         ('gvhmr', 'gvhmr_siga24_release.ckpt'): '1c9iCeKFN4Kr6cMPJ9Ss6Jdc3SZFnO5NP',
@@ -365,15 +340,14 @@ async def i_gvhmr_models(dir='~', **kwargs):
     tasks = []
     for out, url in G_drive.items():
         tasks.append(Gdown(url, os.path.join(dir, *out)))
-
-    for t in tasks:
-        t.ret
+    tasks = [await t for t in tasks]
+    ThreadWorkerManager.await_workers(*tasks)
 
     Log.info("✔ Download GVHMR pretrained models")
 
 
 @async_worker
-async def i_gvhmr(dir='~', env=ENV, **kwargs):
+async def i_gvhmr(dir='.', env=ENV, **kwargs):
     Log.info("📦 Install GVHMR")
     dir = path_expand(dir)
     d = ExistsPathList(chdir=dir)
@@ -385,20 +359,19 @@ async def i_gvhmr(dir='~', env=ENV, **kwargs):
     dir_checkpoints = os.path.join(dir, 'inputs/checkpoints')
 
     async def i_gvhmr_post():
-        p = await Popen('git submodule update --init --recursive', **kwargs)
+        p = Popen('git submodule update --init --recursive', **kwargs)
         p = mamba(env=env, python='3.10', txt=txt_from_self('gvhmr.txt'), **kwargs)
         p = mamba(f'pip install -e {os.getcwd()}', env=env, **kwargs)
         return p
 
     tasks = [
-        i_gvhmr_post(),
-        i_dpvo(dir=os.path.join(dir, 'third-party/DPVO'), env=env, **kwargs),
-        i_smpl(dir=dir_checkpoints, **kwargs),
+        # i_gvhmr_post(),
+        # i_dpvo(dir=os.path.join(dir, 'third-party/DPVO'), env=env, **kwargs),
+        # i_smpl(dir=dir_checkpoints, **kwargs),
         i_gvhmr_models(dir=dir_checkpoints, **kwargs)
     ]
-    tasks = [aio.create_task(t) for t in tasks]
-    tasks = await aio.gather(*tasks)
-
+    tasks = [await t for t in tasks]
+    ThreadWorkerManager.await_workers(*tasks)
     Log.info("✔ Installed GVHMR")
 
 
@@ -434,12 +407,13 @@ async def install(mods, **kwargs):
         run_async(i_mamba())
 
     if 'gvhmr' in mods:
-        tasks.append(aio.create_task(i_gvhmr(**kwargs)))
+        tasks.append(i_gvhmr(**kwargs))
     if 'wilor' in mods:
-        tasks.append(aio.create_task(i_wilor_mini(**kwargs)))
+        tasks.append(i_wilor_mini(**kwargs))
 
     Log.debug(f"task={tasks}")
-    tasks = await aio.gather(*tasks)
+    tasks = [await t for t in tasks]
+    ThreadWorkerManager.await_workers(*tasks)
     return tasks
 
 
@@ -456,8 +430,7 @@ try:
     from regex import sub, MULTILINE
     from netscape_cookies import save_cookies_to_file
     if __name__ == '__main__':
-        with Progress(*Progress.get_default_columns(), SpeedColumn('')) as PG:
-            aio.run(install(mods=['gvhmr', ]))
+        aio.run(install(mods=['gvhmr', ]))
 except ImportError:
     Log.error(f"⚠️ detect missing packages, please check your current conda environment.")
     raise

@@ -10,13 +10,15 @@ TIMEOUT = timedelta(minutes=15).seconds
 CHECK_KWARGS = True
 ARIA_PORTS = [6800, 16800]
 OPT = {
-    'dir': '~',
+    'dir': '.',
     # 'out': 'filename',
     'continue': True,
     'split': 5,
     'max_connection_per_server': 5,
-    # 'max-concurrent-downloads': 5,
-    'min_split_size': 20  # don't split if file size < 40M
+    'max-concurrent-downloads': 2,
+    'min_split_size': 20,  # don't split if file size < 40M
+    'retry-wait': 5,
+    'max-tries': 5,
 }
 is_linux = platform == 'linux'
 is_win = platform == 'win32'
@@ -29,6 +31,11 @@ def path_expand(path: str):
 
 def run_async(func: Coroutine, timeout=TIMEOUT, loop=aio.get_event_loop()):
     return aio.run_coroutine_threadsafe(func, loop).result(timeout)
+
+
+def rich_finish(task: int):
+    PG.update(task, completed=100)
+    PG.start_task(task)
 
 
 def Kwargs(funcs: List[Union[Callable, object]], kwargs, check=CHECK_KWARGS):
@@ -57,7 +64,7 @@ def Kwargs(funcs: List[Union[Callable, object]], kwargs, check=CHECK_KWARGS):
             params = signature(f).parameters
         else:
             raise TypeError(f"Invalid type: {type(f)}")
-        Log.info(f"{funcs[0]} {params}")
+        # Log.debug(f"{funcs[0]} {params}")
         for k, v in kwargs.items():
             if k in params:
                 d[k] = v
@@ -166,7 +173,7 @@ def try_aria_port():
             return None
 
 
-async def aria(url: str, duration=0.5, dry_run=False, P: 'Progress' = None, **kwargs: 'aria2p.Options'):
+async def aria(url: Union[str, Callable], duration=0.5, dry_run=False, P: 'Progress' = None, **kwargs: 'aria2p.Options'):
     """check if download is complete every `duration` seconds
 
     `**kwargs` for `aria2p.API.add_uris(...)`:
@@ -185,22 +192,17 @@ async def aria(url: str, duration=0.5, dry_run=False, P: 'Progress' = None, **kw
         P = PG
     options = {**OPT, **kwargs}
     Log.debug(f"options before: {options}")
-    options['dir'] = path_expand(options['dir'])
-    if 'retry-wait' not in options.keys():
-        options['retry-wait'] = '10'
-
-    path = options['dir']
-    max_tries = 5
+    # if options.get('out'):
+    #     options['dir'] = ''
 
     async def add_download():
-        nonlocal url, path, max_tries
-
+        nonlocal url
+        url = url() if callable(url) else url
         dl = Aria.add_uris([url], options=options)
         dl = Aria.get_download(dl.gid)
         def Url(): return dl.files[0].uris[0]['uri']     # get redirected url
         def Path(): return dl.files[0].path
         def Filename(): return os.path.basename(Path())
-        max_tries = int(dl.options.get('max-tries'))
         if dl.is_complete:
             Log.info(f"{Path()} already downloaded")
             return dl
@@ -210,10 +212,6 @@ async def aria(url: str, duration=0.5, dry_run=False, P: 'Progress' = None, **kw
         while not dl.is_complete:
             Log.debug(f"current: {dl.__dict__}")
             if dry_run and dl.completed_length > 1024 ** 2 * 5:
-                max_tries = 0
-                break
-            if dl.status == 'error':
-                Log.error(f"retry {Filename()} after {options['retry-wait']} sec, ❌ {dl.error_message} from {Url()}")
                 break
 
             await aio.sleep(duration)
@@ -229,15 +227,18 @@ async def aria(url: str, duration=0.5, dry_run=False, P: 'Progress' = None, **kw
                          status=status)
             else:
                 Log.info(status)
-        max_tries -= 1
+
+        P.remove_task(task) if P else None
         Aria.remove([dl])
-        # P.remove_task(task) if P else None
         dl.path = Path()
-        dl.url = Url
+        dl.url = Url()
         return dl
 
+    Try = options['max-tries']
     dl = await add_download()
-    while dl.is_complete == False and max_tries > 0:
+    while dl.status == 'error' and Try > 0:
+        Try -= 1
+        Log.error(f"{Try} retry {dl.path} after {options['retry-wait']} sec, ❌ {dl.error_message} from '{dl.url}'")
         await aio.sleep(int(options['retry-wait']))
         dl = await add_download()
 
@@ -285,7 +286,7 @@ class ExistsPathList(list):
 Aria = None
 try:
     import aria2p
-    from worker import worker, async_worker
+    from worker import worker, async_worker, ThreadWorkerManager
     from rich import print
     from rich.text import Text
     from rich.progress import Progress, TextColumn
@@ -299,11 +300,11 @@ try:
             else:
                 return Text("")
     Aria: 'aria2p.API' = try_aria_port()
-
+    PG = Progress(*Progress.get_default_columns(), SpeedColumn(''))
+    PG.start()
     if __name__ == '__main__':
-        with Progress(*Progress.get_default_columns(), SpeedColumn('')) as PG:
-            ...
-            # aio.run()
+        ...
+        # aio.run()
 
 except ImportError as e:
     Log.error(f"⚠️ detect missing packages, please check your current conda environment. {e}")
