@@ -166,7 +166,7 @@ def try_aria_port():
             return None
 
 
-async def aria(url: str, duration=0.5, dry_run=False, **kwargs: 'aria2p.Options'):
+async def aria(url: str, duration=0.5, dry_run=False, P: 'Progress' = None, **kwargs: 'aria2p.Options'):
     """check if download is complete every `duration` seconds
 
     `**kwargs` for `aria2p.API.add_uris(...)`:
@@ -181,7 +181,8 @@ async def aria(url: str, duration=0.5, dry_run=False, **kwargs: 'aria2p.Options'
 
     [⚙️for more options](https://aria2.github.io/manual/en/html/aria2c.html#input-file)
     """
-    # start = time()
+    if not P:
+        P = PG
     options = {**OPT, **kwargs}
     Log.debug(f"options before: {options}")
     options['dir'] = path_expand(options['dir'])
@@ -195,36 +196,44 @@ async def aria(url: str, duration=0.5, dry_run=False, **kwargs: 'aria2p.Options'
         nonlocal url, path, max_tries
 
         dl = Aria.add_uris([url], options=options)
-        await aio.sleep(1.0)
         dl = Aria.get_download(dl.gid)
-        url = dl.files[0].uris[0]['uri']     # get redirected url
-        path = dl.files[0].path
-        filename = os.path.basename(path)
+        def Url(): return dl.files[0].uris[0]['uri']     # get redirected url
+        def Path(): return dl.files[0].path
+        def Filename(): return os.path.basename(Path())
         max_tries = int(dl.options.get('max-tries'))
         if dl.is_complete:
-            Log.info(f"{path} already downloaded")
+            Log.info(f"{Path()} already downloaded")
             return dl
-        Log.info(f"options after: {dl.options.get_struct()}")
+        Log.debug(f"options after: {dl.options.get_struct()}")
 
-        has_eta = dl.eta < timedelta.max
-        Log.warning(f"No ETA for {url}") if not has_eta else None
-        task = P.add_task(f"⬇️ Download {filename}", total=dl.total_length, start=has_eta)
+        task = P.add_task(f"⬇️ Download {Filename()}", start=False) if P else None
         while not dl.is_complete:
             Log.debug(f"current: {dl.__dict__}")
-            if dry_run and dl.completed_length > 1:
+            if dry_run and dl.completed_length > 1024 ** 2 * 5:
                 max_tries = 0
-                return dl
+                break
             if dl.status == 'error':
-                Log.error(f"retry {filename} after {options['retry-wait']} sec, ❌ {dl.error_message} from {url}")
+                Log.error(f"retry {Filename()} after {options['retry-wait']} sec, ❌ {dl.error_message} from {Url()}")
                 break
 
             await aio.sleep(duration)
             dl = Aria.get_download(dl.gid)
-            P.update(task, completed=dl.completed_length,
-                     status=f'{dl.completed_length_string()}/{dl.total_length_string()} @ {dl.download_speed_string()}')
+
+            status = f'{dl.completed_length_string()}/{dl.total_length_string()} @ {dl.download_speed_string()}'
+            if P:
+                if dl.total_length > 0:
+                    P.start_task(task)
+                P.update(task, description=f"⬇️ {Filename()}",
+                         total=dl.total_length,
+                         completed=dl.completed_length,
+                         status=status)
+            else:
+                Log.info(status)
         max_tries -= 1
         Aria.remove([dl])
-        P.remove_task(task)
+        # P.remove_task(task) if P else None
+        dl.path = Path()
+        dl.url = Url
         return dl
 
     dl = await add_download()
@@ -235,8 +244,6 @@ async def aria(url: str, duration=0.5, dry_run=False, **kwargs: 'aria2p.Options'
     if dl.completed_length < 1:
         Log.warning(f"Download failed: {url}")
 
-    dl.path = path
-    dl.url = url
     return dl
 
 
@@ -294,7 +301,7 @@ try:
     Aria: 'aria2p.API' = try_aria_port()
 
     if __name__ == '__main__':
-        with Progress(*Progress.get_default_columns(), SpeedColumn('')) as P:
+        with Progress(*Progress.get_default_columns(), SpeedColumn('')) as PG:
             ...
             # aio.run()
 

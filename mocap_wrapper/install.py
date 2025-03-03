@@ -64,18 +64,12 @@ def remove_if_p(path: str, progress: sp.Popen):
 
 
 def get_py_mgr() -> Union[TYPE_PY_MGRS, None]:
-    mgr = ''
     for mgr in PY_MGRS:
         if which(mgr):
-            if mgr == 'mamba':
-                break
-            elif mgr == 'pip':
-                mgr = 'mamba'
-                run_async(i_mamba())
-                break
-            elif mgr == 'conda':
+            if mgr == 'conda':
                 Log.warning(f"Use `mamba` for faster install")
-    return mgr
+            return mgr
+    raise Exception(f"Not found any of {PY_MGRS}")
 
 
 def get_pkg_mgr() -> Union[str, None]:
@@ -139,7 +133,7 @@ def i_mamba(require_restart=True, **kwargs):
     if Aria:
         d = run_async(aria(url, **kwargs))
     else:
-        d = curl(url)
+        raise Exception("Aria2c not found")
 
     setup = d.dir + '/' + setup
     p = None
@@ -348,14 +342,12 @@ async def i_dpvo(dir='~', env=ENV, **kwargs):
     return p
 
 
-@worker
-def Gdown(url, out):
+async def Gdown(ID, out):
     """
-    because gdown is not async, which will block the main thread  
-    we use `@worker` to run it in a new **thread**, not elegant but works :P
     """
-    filename = gdown.download(url, out)
-    return filename
+    url = google_drive(id=ID)
+    f = await aria(url, out=out)
+    return f
 
 
 @async_worker
@@ -372,7 +364,6 @@ async def i_gvhmr_models(dir='~', **kwargs):
     }
     tasks = []
     for out, url in G_drive.items():
-        # task = Gdown(url, os.path.join(dir, *out))
         tasks.append(Gdown(url, os.path.join(dir, *out)))
 
     for t in tasks:
@@ -425,9 +416,9 @@ async def install(mods, **kwargs):
     global Aria
     tasks = []
 
-    pkgs = [which(p) for p in BINS]
+    pkgs = {p: which(p) for p in BINS}
     Log.debug(pkgs)
-    pkgs = [p is None for p in pkgs]
+    pkgs = [p for p, v in pkgs.items() if not v]
     if any(pkgs):
         i_pkgs()
 
@@ -439,8 +430,8 @@ async def install(mods, **kwargs):
             raise Exception("Failed to connect rpc to aria2, is aria2c/Motrix running?")
     Log.debug(Aria)
 
-    if 'mamba' in mods:
-        aio.run(i_mamba(**kwargs))
+    if PY_MGR == 'pip':
+        run_async(i_mamba())
 
     if 'gvhmr' in mods:
         tasks.append(aio.create_task(i_gvhmr(**kwargs)))
@@ -461,11 +452,11 @@ SHELL = get_shell()
 PKG_MGR = get_pkg_mgr()
 PY_MGR = get_py_mgr()
 try:
-    import gdown
+    from mocap_wrapper.Gdown import google_drive
     from regex import sub, MULTILINE
     from netscape_cookies import save_cookies_to_file
     if __name__ == '__main__':
-        with Progress(*Progress.get_default_columns(), SpeedColumn('')) as P:
+        with Progress(*Progress.get_default_columns(), SpeedColumn('')) as PG:
             aio.run(install(mods=['gvhmr', ]))
 except ImportError:
     Log.error(f"⚠️ detect missing packages, please check your current conda environment.")

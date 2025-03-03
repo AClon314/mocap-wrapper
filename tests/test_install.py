@@ -5,7 +5,7 @@ CWD = getcwd()
 PATH.append(CWD)
 from mocap_wrapper.install import *
 from mocap_wrapper.Gdown import google_drive
-DRY_RUN = False
+DRY_RUN = True
 ENV = 'test'
 
 
@@ -39,13 +39,16 @@ URLS = [
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
-    "url, kwargs",
-    [(URLS[0], {'dir': CWD})]
+    "urls, kwargs",
+    [(URLS, {'dir': os.path.join(CWD, 'output')})]
 )
-async def test_download(url, kwargs):
-    d = await aria(url, dry_run=DRY_RUN, kwargs=kwargs)
-    assert d.completed_length > 1, d
-    os.remove(d.path)
+async def test_download(urls, kwargs):
+    with Progress(*Progress.get_default_columns(), SpeedColumn('')) as PG:
+        tasks = [aria(url, dry_run=DRY_RUN, P=PG, **kwargs) for url in urls]
+        dls = await aio.gather(*tasks)
+        for d in dls:
+            assert d.completed_length > 1, d
+            os.remove(d.path)
 
 
 @pytest.mark.skip(reason="403 Forbidden")
@@ -101,4 +104,10 @@ async def test_Gdrive(ID):
     url = google_drive(id=ID)
     Log.info(url)
     assert url, url
-    await aio.sleep(5)
+
+
+@pytest.fixture(scope="function", autouse=True)
+def setup_progress():
+    ...
+    yield
+    # clean()
