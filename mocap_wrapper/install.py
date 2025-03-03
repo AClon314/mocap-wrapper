@@ -1,6 +1,4 @@
 import os
-import asyncio as aio
-import subprocess as sp
 from sys import path as PATH
 from shutil import which, copy as cp
 from mocap_wrapper.logger import getLog
@@ -69,9 +67,11 @@ def get_py_mgr() -> Union[TYPE_PY_MGRS, None]:
     mgr = ''
     for mgr in PY_MGRS:
         if which(mgr):
-            if mgr == 'pip':
+            if mgr == 'mamba':
+                break
+            elif mgr == 'pip':
                 mgr = 'mamba'
-                aio.run(i_mamba())  # TODO
+                run_async(i_mamba())
                 break
             elif mgr == 'conda':
                 Log.warning(f"Use `mamba` for faster install")
@@ -124,16 +124,6 @@ def curl(url: str, dry_run=False, **kwargs):
     return p
 
 
-def google_drive(ID: str):
-    # TODO
-    """
-    - ID: shared file url. Example: `https://drive.google.com/file/d/1DE5G***********************K0nr0/view?...`, then `1DE5G***********************K0nr0` is the ID
-    """
-    uuid = 'da72c1d0-7076-45c9-9b2f-312c8edae741'
-    # return 'https://drive.google.com/uc?export=download&id=' + ID
-    return f'https://drive.usercontent.google.com/download?id={ID}&export=download&authuser=0&confirm=t&uuid={uuid}&at=AEz70l5ReyqrF6PqljBUTBLj5yqr:1740753223630'
-
-
 def i_mamba(require_restart=True, **kwargs):
     Log.info("📦 Install Mamba")
     url = "https://github.com/conda-forge/miniforge/releases/latest/download/"
@@ -147,28 +137,24 @@ def i_mamba(require_restart=True, **kwargs):
         raise Exception("Unsupported platform")
     url += setup
     if Aria:
-        d = aria(url)   # TODO
+        d = run_async(aria(url, **kwargs))
     else:
         d = curl(url)
 
-    def i_mamba_post():
-        setup = d.dir + '/' + setup
-        p = None
-        if is_win:
-            p = Popen(f'start /wait "" {setup} /InstallationType=JustMe /RegisterPython=0 /S /D=%UserProfile%\\Miniforge3', **kwargs)
-        else:
-            p = Popen(f'bash "{setup}" -b', **kwargs)
-        remove_if_p(setup, p)
+    setup = d.dir + '/' + setup
+    p = None
+    if is_win:
+        p = Popen(f'start /wait "" {setup} /InstallationType=JustMe /RegisterPython=0 /S /D=%UserProfile%\\Miniforge3', **kwargs)
+    else:
+        p = Popen(f'bash "{setup}" -b', **kwargs)
+    remove_if_p(setup, p)
 
-        p = mamba(env='nogil', txt=txt_from_self(), pkgs=['python-freethreading'], **kwargs)
-        p = Popen("conda config --set env_prompt '({default_env})'", **kwargs)
+    p = mamba(env='nogil', txt=txt_from_self(), pkgs=['python-freethreading'], **kwargs)
+    p = Popen("conda config --set env_prompt '({default_env})'", **kwargs)  # TODO: need test
 
-        if require_restart:
-            Log.info(f"✔ re-open new terminal and run me again to refresh shell env!")
-            exit(0)  # TODO: find a way not to exit
-        return p
-
-    return  # p
+    if require_restart:
+        Log.info(f"✔ re-open new terminal and run me again to refresh shell env!")
+        exit(0)  # TODO: find a way not to exit
 
 
 def get_envs(manager='mamba', **kwargs):
@@ -186,12 +172,14 @@ def get_shell() -> Union[TYPE_SHELLS, None]:
             return s
 
 
-def mamba(cmd: str = None,
-          py_mgr: TYPE_PY_MGRS = None,
-          env=ENV,
-          python: str = None,
-          txt: Literal['requirements.txt'] = None,
-          pkgs=[], **kwargs):
+async def mamba(
+    cmd: str = None,
+    py_mgr: TYPE_PY_MGRS = None,
+    env=ENV,
+    python: str = None,
+    txt: Literal['requirements.txt'] = None,
+    pkgs=[], **kwargs
+):
     """By default do 2 things:
     1. create env if no exist
     2. install from `pkgs`
@@ -307,10 +295,11 @@ def smpl_task(dir='~',
     return aria(download, **options)
 
 
-def i_smpl(dir='~',
-           PHPSESSIDs: dict = {'smpl': '', 'smplx': ''},
-           user_agent='Transmission/2.77',
-           **kwargs) -> List['aria2p.Download']:
+@async_worker
+async def i_smpl(dir='~',
+                 PHPSESSIDs: dict = {'smpl': '', 'smplx': ''},
+                 user_agent='Transmission/2.77',
+                 **kwargs) -> List['aria2p.Download']:
     """
     - PHPSESSIDs: {'smpl': '26-digits_123456789_123456', 'smplx': '26-digits_123456789_123456'}
     """
@@ -326,7 +315,7 @@ def i_smpl(dir='~',
                   referer='https://smpl-x.is.tue.mpg.de/',
                   dir=dir, PHPSESSID=PHPSESSIDs['smplx'], user_agent=user_agent, **kwargs)
     ]
-    tasks = aio.gather(*tasks)  # TODO
+    tasks = await aio.gather(*tasks)  # TODO: test @worker
 
     for t in tasks:
         if t.is_complete:
@@ -339,10 +328,11 @@ def i_smpl(dir='~',
     return tasks
 
 
-def i_dpvo(dir='~', env=ENV, **kwargs):
+@async_worker
+async def i_dpvo(dir='~', env=ENV, **kwargs):
     Log.info("📦 Install DPVO")
     dir = path_expand(dir)
-    f = aria('https://gitlab.com/libeigen/eigen/-/archive/3.4.0/eigen-3.4.0.zip')   # TODO
+    f = await aria('https://gitlab.com/libeigen/eigen/-/archive/3.4.0/eigen-3.4.0.zip')
     p = unzip(f.path, to=dir, **kwargs)
     remove_if_p(f.path, p)
 
@@ -358,28 +348,41 @@ def i_dpvo(dir='~', env=ENV, **kwargs):
     return p
 
 
-def i_gvhmr_models(dir='~', **kwargs):
+@worker
+def Gdown(url, out):
+    """
+    because gdown is not async, which will block the main thread  
+    we use `@worker` to run it in a new **thread**, not elegant but works :P
+    """
+    filename = gdown.download(url, out)
+    return filename
+
+
+@async_worker
+async def i_gvhmr_models(dir='~', **kwargs):
     Log.info("📦 Download GVHMR pretrained models (📝 By downloading, you agree to the GVHMR's corresponding licences)")
     dir = path_expand(dir)
     os.chdir(dir)
     G_drive = {
-        'dpvo/dpvo.pth': '1DE5GVftRCfZOTMp8YWF0xkGudDxK0nr0',
-        'gvhmr/gvhmr_siga24_release.ckpt': '1c9iCeKFN4Kr6cMPJ9Ss6Jdc3SZFnO5NP',
-        'hmr2/epoch=10-step=25000.ckpt': '1X5hvVqvqI9tvjUCb2oAlZxtgIKD9kvsc',
-        'vitpose/vitpose-h-multi-coco.pth': '1sR8xZD9wrZczdDVo6zKscNLwvarIRhP5',
-        'yolo/yolov8x.pt': '1_HGm-lqIH83-M1ML4bAXaqhm_eT2FKo5',
+        ('dpvo', 'dpvo.pth'): '1DE5GVftRCfZOTMp8YWF0xkGudDxK0nr0',
+        ('gvhmr', 'gvhmr_siga24_release.ckpt'): '1c9iCeKFN4Kr6cMPJ9Ss6Jdc3SZFnO5NP',
+        ('hmr2', 'epoch=10-step=25000.ckpt'): '1X5hvVqvqI9tvjUCb2oAlZxtgIKD9kvsc',
+        ('vitpose', 'vitpose-h-multi-coco.pth'): '1sR8xZD9wrZczdDVo6zKscNLwvarIRhP5',
+        ('yolo', 'yolov8x.pt'): '1_HGm-lqIH83-M1ML4bAXaqhm_eT2FKo5',
     }
+    tasks = []
+    for out, url in G_drive.items():
+        # task = Gdown(url, os.path.join(dir, *out))
+        tasks.append(Gdown(url, os.path.join(dir, *out)))
 
-    G_drive = {os.path.join(dir, k): google_drive(v) for k, v in G_drive.items()}
-    Log.debug(G_drive)
-    tasks = [aria(url=url, out=out) for out, url in G_drive.items()]
-    tasks = [aio.create_task(t) for t in tasks]
-    tasks = aio.gather(*tasks)  # TODO
+    for t in tasks:
+        t.ret
+
     Log.info("✔ Download GVHMR pretrained models")
-    return tasks
 
 
-def i_gvhmr(dir='~', env=ENV, **kwargs):
+@async_worker
+async def i_gvhmr(dir='~', env=ENV, **kwargs):
     Log.info("📦 Install GVHMR")
     dir = path_expand(dir)
     d = ExistsPathList(chdir=dir)
@@ -390,8 +393,8 @@ def i_gvhmr(dir='~', env=ENV, **kwargs):
     os.makedirs('inputs/checkpoints', exist_ok=True)
     dir_checkpoints = os.path.join(dir, 'inputs/checkpoints')
 
-    def i_gvhmr_post():
-        p = Popen('git submodule update --init --recursive', **kwargs)
+    async def i_gvhmr_post():
+        p = await Popen('git submodule update --init --recursive', **kwargs)
         p = mamba(env=env, python='3.10', txt=txt_from_self('gvhmr.txt'), **kwargs)
         p = mamba(f'pip install -e {os.getcwd()}', env=env, **kwargs)
         return p
@@ -403,7 +406,7 @@ def i_gvhmr(dir='~', env=ENV, **kwargs):
         i_gvhmr_models(dir=dir_checkpoints, **kwargs)
     ]
     tasks = [aio.create_task(t) for t in tasks]
-    tasks = aio.gather(*tasks)  # TODO
+    tasks = await aio.gather(*tasks)
 
     Log.info("✔ Installed GVHMR")
 
@@ -418,7 +421,7 @@ def i_wilor_mini(env=ENV, **kwargs):
     return p
 
 
-def install(mods, **kwargs):
+async def install(mods, **kwargs):
     global Aria
     tasks = []
 
@@ -445,7 +448,7 @@ def install(mods, **kwargs):
         tasks.append(aio.create_task(i_wilor_mini(**kwargs)))
 
     Log.debug(f"task={tasks}")
-    tasks = aio.gather(*tasks)  # TODO
+    tasks = await aio.gather(*tasks)
     return tasks
 
 
@@ -458,10 +461,12 @@ SHELL = get_shell()
 PKG_MGR = get_pkg_mgr()
 PY_MGR = get_py_mgr()
 try:
+    import gdown
     from regex import sub, MULTILINE
     from netscape_cookies import save_cookies_to_file
     if __name__ == '__main__':
         with Progress(*Progress.get_default_columns(), SpeedColumn('')) as P:
-            run(install(mods=['gvhmr', ]))
-except ImportError as e:
-    Log.error(f"⚠️ detect missing packages, please check your current conda environment. {e}")
+            aio.run(install(mods=['gvhmr', ]))
+except ImportError:
+    Log.error(f"⚠️ detect missing packages, please check your current conda environment.")
+    raise

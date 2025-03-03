@@ -1,4 +1,5 @@
 rich
+gdown
 aria2p  # mamba failed:
 python-worker
 regex

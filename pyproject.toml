@@ -33,6 +33,7 @@ dependencies = [
   "aria2p",
   "regex",
   "rich",
+  "gdown",
   "python-worker",
   "netscape-cookies",
 ]
