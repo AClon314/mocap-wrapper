@@ -5,7 +5,7 @@ CWD = getcwd()
 PATH.append(CWD)
 from mocap_wrapper.install import *
 from mocap_wrapper.Gdown import google_drive
-DRY_RUN = True
+DRY_RUN = False
 ENV = 'test'
 
 
@@ -33,6 +33,7 @@ def test_mamba(pkgs, env, cmd):
 
 URLS = [
     'https://dldir1.qq.com/qqfile/qq/PCQQ9.7.17/QQ9.7.17.29225.exe',  # CN: 200MB
+    'http://speedtest.zju.edu.cn/100M',
     'https://speed.cloudflare.com/__down?during=download&bytes=104857600',   # GLOBAL: 100MB
 ]
 
@@ -43,12 +44,11 @@ URLS = [
     [(URLS, {'dir': os.path.join(CWD, 'output')})]
 )
 async def test_download(urls, kwargs):
-    with Progress(*Progress.get_default_columns(), SpeedColumn('')) as PG:
-        tasks = [aria(url, dry_run=DRY_RUN, P=PG, **kwargs) for url in urls]
-        dls = await aio.gather(*tasks)
-        for d in dls:
-            assert d.completed_length > 1, d
-            os.remove(d.path)
+    tasks = [download(url, dry_run=DRY_RUN, **kwargs) for url in urls]
+    dls = await aio.gather(*tasks)
+    for d in dls:
+        assert d.completed_length > 1, d
+        os.remove(d.path)
 
 
 @pytest.mark.skip(reason="403 Forbidden")

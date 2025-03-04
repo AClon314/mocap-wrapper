@@ -4,22 +4,24 @@ import asyncio as aio
 from sys import platform
 from datetime import timedelta
 from mocap_wrapper.logger import getLog
-from typing import Callable, Coroutine, List, Literal, Union, overload
+from typing import Any, Callable, Coroutine, List, Literal, Union, overload
 Log = getLog(__name__)
 TIMEOUT = timedelta(minutes=15).seconds
+RELAX = 15.0    # seconds for next http request, to prevent being 403 blocked
 CHECK_KWARGS = True
 ARIA_PORTS = [6800, 16800]
 OPT = {
     'dir': '.',
     # 'out': 'filename',
-    'continue': True,
+    'continue': 'true',
     'split': 5,
-    'max_connection_per_server': 5,
+    'max-connection-per-server': 5,
     'max-concurrent-downloads': 2,
-    'min_split_size': 20,  # don't split if file size < 40M
+    'min-split-size': '20M',  # don't split if file size < 40M
     'retry-wait': 5,
-    'max-tries': 5,
+    'max-tries': 3,
 }
+OPT = {k: str(v) for k, v in OPT.items()}
 is_linux = platform == 'linux'
 is_win = platform == 'win32'
 is_mac = platform == 'darwin'
@@ -34,8 +36,40 @@ def run_async(func: Coroutine, timeout=TIMEOUT, loop=aio.get_event_loop()):
 
 
 def rich_finish(task: int):
-    PG.update(task, completed=100)
-    PG.start_task(task)
+    P = PROGRESS.get()
+    P.update(task, completed=100)
+    P.start_task(task)
+
+
+async def run_1by1(
+    coros: List[Coroutine],
+    callback: Callable[[aio.Task], object] = None,
+    duration=RELAX
+):
+    """
+    Run tasks one by one with a duration of `duration` seconds
+
+    - callback: accept `Task` object as argument only
+    ```python
+    def callback(task: asyncio.Task[TYPE_OF_RETURN]):
+        if task.cancelled():
+            msg = "Download cancelled"
+            raise Exception(msg)
+        t = task.result()
+        return t
+    ```
+    """
+    tasks = []
+    for i in range(len(coros)):
+        c = coros[i]
+        t = aio.create_task(c)
+        if callback and callable(callback):
+            t.add_done_callback(callback)
+        tasks.append(t)
+        if i < len(coros) - 1:
+            await aio.sleep(duration)
+    results = await aio.gather(*tasks)
+    return results
 
 
 def Kwargs(funcs: List[Union[Callable, object]], kwargs, check=CHECK_KWARGS):
@@ -173,10 +207,56 @@ def try_aria_port():
             return None
 
 
-async def aria(url: Union[str, Callable], duration=0.5, dry_run=False, P: 'Progress' = None, **kwargs: 'aria2p.Options'):
+async def aria(url: str, duration=0.5, dry_run=False, options: 'aria2p.Options' = {**OPT}):
+    """used to be wrapped in `download`, no retry logic"""
+    P = PROGRESS.get()
+    url = url() if callable(url) else url
+    dl = Aria.add_uris([url], options=options)
+    task = P.add_task(f"⬇️ Download {url}", start=False) if P else None
+    def Url(): return dl.files[0].uris[0]['uri']     # get redirected url
+    def Path(): return dl.files[0].path
+    def Filename(): return os.path.basename(Path())
+    if dl.is_complete:
+        Log.info(f"{Path()} already downloaded")
+        return dl
+    Log.debug(f"options after: {dl.options.get_struct()}")
+    # max_speed = avg_speed = 0
+
+    while not dl.is_complete:
+        Log.debug(f"current: {dl.__dict__}")
+        if dry_run and dl.completed_length > 1024 ** 2 * 5:  # 5MB
+            break
+
+        await aio.sleep(duration)
+        dl = Aria.get_download(dl.gid)
+        # TODO: break when download speed is limited deliberately
+        # now_speed = dl.download_speed
+        # avg_speed = (now_speed + avg_speed) // 2    # B/s
+        # if now_speed > max_speed:
+        #     max_speed = (now_speed + max_speed) // 2    # B/s
+
+        status = f'{dl.completed_length_string()}/{dl.total_length_string()} @ {dl.download_speed_string()}'
+        if P:
+            if dl.total_length > 0:
+                P.start_task(task)
+            P.update(task, description=f"⬇️ {Filename()}",
+                     total=dl.total_length,
+                     completed=dl.completed_length,
+                     status=status)
+        else:
+            Log.info(status)
+
+    P.remove_task(task) if P else None
+    Aria.remove([dl])
+    dl.path = os.path.abspath(Path())   # TODO: check if path is correct
+    dl.url = Url()
+    return dl
+
+
+async def download(url: Union[str, Callable], duration=0.5, dry_run=False, **kwargs: 'aria2p.Options'):
     """check if download is complete every `duration` seconds
 
-    `**kwargs` for `aria2p.API.add_uris(...)`:
+    `**kwargs` for `aria2p.API.add_uris(...)`, key/value **use str, not int**:
     - `dir`: download directory
     - `out`: output filename
     - `max-connection-per-server`: `-x`
@@ -188,59 +268,18 @@ async def aria(url: Union[str, Callable], duration=0.5, dry_run=False, P: 'Progr
 
     [⚙️for more options](https://aria2.github.io/manual/en/html/aria2c.html#input-file)
     """
-    if not P:
-        P = PG
     options = {**OPT, **kwargs}
     Log.debug(f"options before: {options}")
     # if options.get('out'):
     #     options['dir'] = ''
 
-    async def add_download():
-        nonlocal url
-        url = url() if callable(url) else url
-        dl = Aria.add_uris([url], options=options)
-        dl = Aria.get_download(dl.gid)
-        def Url(): return dl.files[0].uris[0]['uri']     # get redirected url
-        def Path(): return dl.files[0].path
-        def Filename(): return os.path.basename(Path())
-        if dl.is_complete:
-            Log.info(f"{Path()} already downloaded")
-            return dl
-        Log.debug(f"options after: {dl.options.get_struct()}")
-
-        task = P.add_task(f"⬇️ Download {Filename()}", start=False) if P else None
-        while not dl.is_complete:
-            Log.debug(f"current: {dl.__dict__}")
-            if dry_run and dl.completed_length > 1024 ** 2 * 5:
-                break
-
-            await aio.sleep(duration)
-            dl = Aria.get_download(dl.gid)
-
-            status = f'{dl.completed_length_string()}/{dl.total_length_string()} @ {dl.download_speed_string()}'
-            if P:
-                if dl.total_length > 0:
-                    P.start_task(task)
-                P.update(task, description=f"⬇️ {Filename()}",
-                         total=dl.total_length,
-                         completed=dl.completed_length,
-                         status=status)
-            else:
-                Log.info(status)
-
-        P.remove_task(task) if P else None
-        Aria.remove([dl])
-        dl.path = Path()
-        dl.url = Url()
-        return dl
-
-    Try = options['max-tries']
-    dl = await add_download()
+    Try = int(options.get('max-tries', 3))
+    dl = await aria(url, duration, dry_run, options)
     while dl.status == 'error' and Try > 0:
         Try -= 1
         Log.error(f"{Try} retry {dl.path} after {options['retry-wait']} sec, ❌ {dl.error_message} from '{dl.url}'")
         await aio.sleep(int(options['retry-wait']))
-        dl = await add_download()
+        dl = await aria()
 
     if dl.completed_length < 1:
         Log.warning(f"Download failed: {url}")
@@ -283,6 +322,19 @@ class ExistsPathList(list):
         return p
 
 
+class Single():
+    instance = None
+
+    @classmethod
+    def get(cls, value: Union[Callable, Any] = None):
+        if Single.instance is None:
+            if callable(value):
+                Single.instance = value()
+            else:
+                Single.instance = value
+        return Single.instance
+
+
 Aria = None
 try:
     import aria2p
@@ -299,9 +351,19 @@ try:
                 return Text(f"{task.speed:.3f} steps/s")
             else:
                 return Text("")
-    Aria: 'aria2p.API' = try_aria_port()
-    PG = Progress(*Progress.get_default_columns(), SpeedColumn(''))
-    PG.start()
+
+    def rich_init():
+        pg = Progress(*Progress.get_default_columns(), SpeedColumn(''))
+        pg.start()
+        return pg
+
+    class PROGRESS(Single):
+        @classmethod
+        def get(cls, value=rich_init) -> Progress:
+            return super().get(value)
+
+    Aria: aria2p.API = try_aria_port()
+
     if __name__ == '__main__':
         ...
         # aio.run()

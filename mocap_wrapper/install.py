@@ -105,7 +105,7 @@ def i_mamba(require_restart=True, **kwargs):
         raise Exception("Unsupported platform")
     url += setup
     if Aria:
-        d = run_async(aria(url, **kwargs))
+        d = run_async(download(url, **kwargs))
     else:
         raise Exception("Aria2c not found")
 
@@ -247,26 +247,28 @@ def smpl_task(dir='.',
     """
     dir = path_expand(dir)
 
-    cookie = os.path.join(dir, 'cookies.txt')
+    path = os.path.join(dir, 'cookies.txt')
+    path = os.path.abspath(path)
     cookies = [{
         'domain': '.' + referer.split('/')[2],  # MAYBE BUGGY
         'name': 'PHPSESSID',
         'value': PHPSESSID,
     }]
-    save_cookies_to_file(cookies, cookie)
+    save_cookies_to_file(cookies, path)
     options = {
-        'load-cookies': cookie,
+        'load-cookies': path,
         'user-agent': user_agent,
         'referer': referer,
     }
     options = {**options, **kwargs}
-    return aria(download, **options)
+    return download(download, **options)
 
 
 @async_worker
 async def i_smpl(dir='.',
                  PHPSESSIDs: dict = {'smpl': '', 'smplx': ''},
                  user_agent='Transmission/2.77',
+                 duration=RELAX,
                  **kwargs) -> List['aria2p.Download']:
     """
     - PHPSESSIDs: {'smpl': '26-digits_123456789_123456', 'smplx': '26-digits_123456789_123456'}
@@ -277,30 +279,35 @@ async def i_smpl(dir='.',
         if not (v and isinstance(v, str)):
             Log.warning(f"🍪 cookies: PHPSESSID for {k}={v} could cause download failure")
 
-    tasks = [
+    dls = [
         smpl_task(dir=dir, PHPSESSID=PHPSESSIDs['smpl'], user_agent=user_agent, **kwargs),
         smpl_task(download='https://download.is.tue.mpg.de/download.php?domain=smplx&sfile=models_smplx_v1_1.zip',
                   referer='https://smpl-x.is.tue.mpg.de/',
                   dir=dir, PHPSESSID=PHPSESSIDs['smplx'], user_agent=user_agent, **kwargs)
     ]
-    tasks = await aio.gather(*tasks)  # TODO: test @worker
 
-    for t in tasks:
+    def unzip_after_dl(task: aio.Task[aria2p.Download]):
+        if task.cancelled():
+            msg = "Download cancelled"
+            raise Exception(msg)
+        t = task.result()
         if t.is_complete:
             unzip(t.path, to=dir, **kwargs)
 
-    if any([not t.is_complete for t in tasks]):
+    dls = await run_1by1(dls, unzip_after_dl)
+
+    if any([not dl.is_complete for dl in dls]):
         Log.error("❌ please check your cookies:PHPSESSID if it's expired, or change your IP address by VPN")
     else:
         Log.info("✔ Downloaded SMPL && SMPLX")
-    return tasks
+    return dls
 
 
 @async_worker
 async def i_dpvo(dir='.', env=ENV, **kwargs):
     Log.info("📦 Install DPVO")
     dir = path_expand(dir)
-    f = await aria('https://gitlab.com/libeigen/eigen/-/archive/3.4.0/eigen-3.4.0.zip')
+    f = await download('https://gitlab.com/libeigen/eigen/-/archive/3.4.0/eigen-3.4.0.zip')
     p = unzip(f.path, to=dir, **kwargs)
     remove_if_p(f.path, p)
 
@@ -321,13 +328,7 @@ async def i_dpvo(dir='.', env=ENV, **kwargs):
 
 
 @async_worker
-async def Gdown(ID, out):
-    f = await aria(google_drive(id=ID), out=out)
-    return f
-
-
-@async_worker
-async def i_gvhmr_models(dir='.'):
+async def i_gvhmr_models(dir='.', duration=RELAX):
     Log.info("📦 Download GVHMR pretrained models (📝 By downloading, you agree to the GVHMR's corresponding licences)")
     dir = path_expand(dir)
     G_drive = {
@@ -337,11 +338,13 @@ async def i_gvhmr_models(dir='.'):
         ('vitpose', 'vitpose-h-multi-coco.pth'): '1sR8xZD9wrZczdDVo6zKscNLwvarIRhP5',
         ('yolo', 'yolov8x.pt'): '1_HGm-lqIH83-M1ML4bAXaqhm_eT2FKo5',
     }
-    tasks = []
-    for out, url in G_drive.items():
-        tasks.append(Gdown(url, os.path.join(dir, *out)))
-    tasks = [await t for t in tasks]
-    ThreadWorkerManager.await_workers(*tasks)
+    coros = []
+    for out, ID in G_drive.items():
+        url = google_drive(id=ID)
+        t = download(url, out=os.path.join(dir, *out))
+        coros.append(t)
+
+    results = await run_1by1(coros)
 
     Log.info("✔ Download GVHMR pretrained models")
 
@@ -355,19 +358,23 @@ async def i_gvhmr(dir='.', env=ENV, **kwargs):
     if not os.path.exists(dir):
         p = Popen('git clone https://github.com/zju3dv/GVHMR', Raise=False, **kwargs)
     d.chdir('GVHMR')
-    os.makedirs('inputs/checkpoints', exist_ok=True)
-    dir_checkpoints = os.path.join(dir, 'inputs/checkpoints')
+    dir_checkpoints = os.path.join('inputs', 'checkpoints')
+    dir_checkpoints = os.path.abspath(dir_checkpoints)  # TODO: clean abspath, no relative path
+    os.makedirs(dir_checkpoints, exist_ok=True)
 
+    @async_worker
     async def i_gvhmr_post():
-        p = Popen('git submodule update --init --recursive', **kwargs)
+        p = Popen('git fetch --all', Raise=False, **kwargs)
+        p = Popen('git pull', Raise=False, **kwargs)
+        p = Popen('git submodule update --init --recursive', Raise=False, **kwargs)
         p = mamba(env=env, python='3.10', txt=txt_from_self('gvhmr.txt'), **kwargs)
         p = mamba(f'pip install -e {os.getcwd()}', env=env, **kwargs)
         return p
 
     tasks = [
-        # i_gvhmr_post(),
-        # i_dpvo(dir=os.path.join(dir, 'third-party/DPVO'), env=env, **kwargs),
-        # i_smpl(dir=dir_checkpoints, **kwargs),
+        i_gvhmr_post(),
+        i_dpvo(dir=os.path.join(dir, 'third-party/DPVO'), env=env, **kwargs),
+        i_smpl(dir=dir_checkpoints, **kwargs),
         i_gvhmr_models(dir=dir_checkpoints, **kwargs)
     ]
     tasks = [await t for t in tasks]
@@ -407,9 +414,9 @@ async def install(mods, **kwargs):
         run_async(i_mamba())
 
     if 'gvhmr' in mods:
-        tasks.append(i_gvhmr(**kwargs))
+        tasks.append(i_gvhmr(dir='..', **kwargs))
     if 'wilor' in mods:
-        tasks.append(i_wilor_mini(**kwargs))
+        tasks.append(i_wilor_mini(dir='..', **kwargs))
 
     Log.debug(f"task={tasks}")
     tasks = [await t for t in tasks]
