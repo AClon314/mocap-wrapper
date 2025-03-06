@@ -1,18 +1,21 @@
 """shared functions here"""
 import os
+import hashlib
 import subprocess as sp
 import asyncio as aio
 from sys import platform
 from datetime import timedelta
+from types import SimpleNamespace
 from mocap_wrapper.logger import getLogger, PG_DL
-from typing import Any, Callable, Coroutine, List, Literal, Union, overload
+from typing import Any, Callable, Coroutine, List, Literal, Tuple, Union, overload
 Log = getLogger(__name__)
 TIMEOUT = timedelta(minutes=15).seconds
-RELAX = 15    # seconds for next http request, to prevent being 403 blocked
+RELAX = 15      # seconds for next http request, to prevent being 403 blocked
+DIR = '.'       # fallback directory, don't edit
 CHECK_KWARGS = True
 ARIA_PORTS = [6800, 16800]
 OPT = {
-    'dir': '.',
+    'dir': '.',  # you can edit dir here
     # 'out': 'filename',
     'continue': 'true',
     'split': 5,
@@ -28,12 +31,20 @@ is_win = platform == 'win32'
 is_mac = platform == 'darwin'
 
 
-def path_expand(path: str):
-    return os.path.expandvars(os.path.expanduser(path))
+def path_expand(path: str, absolute=True):
+    path = os.path.expandvars(os.path.expanduser(path))
+    if absolute:
+        path = os.path.abspath(path)
+    return path
 
 
 def run_async(func: Coroutine, timeout=TIMEOUT, loop=aio.get_event_loop()):
     return aio.run_coroutine_threadsafe(func, loop).result(timeout)
+
+
+def is_main_thread():
+    import threading
+    return threading.current_thread() == threading.main_thread()
 
 
 def rich_finish(task: int):
@@ -43,7 +54,7 @@ def rich_finish(task: int):
 
 
 async def run_1by1(
-    coros: List[Coroutine],
+    coros: List[Union[Coroutine, aio.Task]],
     callback: Callable[[aio.Task], object] = None,
     duration=RELAX
 ):
@@ -52,11 +63,11 @@ async def run_1by1(
 
     ```python
     # urgent way
-    for result in aio.as_completed(run_1by1([coro1, coro2, coro3], callback)):
+    for result in aio.as_completed(await run_1by1([coro1, coro2], callback)):
         print(result)
 
     # wait until all complted
-    results = await aio.gather(run_1by1([coro1, coro2, coro3], callback))
+    results = await aio.gather(*await run_1by1([coro1, coro2], callback))
     ```
 
     - callback: accept `Task` object as argument only
@@ -71,10 +82,11 @@ async def run_1by1(
     """
     tasks: List[aio.Task] = []
     for i in range(len(coros)):
-        c = coros[i]
-        t = aio.create_task(c)
-        if callback and callable(callback):
-            t.add_done_callback(callback)
+        c = t = coros[i]
+        if not isinstance(c, aio.Task):
+            t = aio.create_task(c)
+            if callback and callable(callback):
+                t.add_done_callback(callback)
         tasks.append(t)
         if i < len(coros) - 1:
             await aio.sleep(duration)
@@ -120,10 +132,22 @@ def Kwargs(funcs: List[Union[Callable, object]], kwargs, check=CHECK_KWARGS):
     return d
 
 
-def unzip(zip_path: str, to: str, pwd='',
-          overwrite_policy: Literal['always', 'skip', 'rename_new', 'rename_old'] = 'skip',
-          **kwargs):
-    """use 7z to unzip files"""
+def unzip(
+    zip_path: str, From=None, to=DIR, pwd='',
+    overwrite_policy: Literal['always', 'skip', 'rename_new', 'rename_old'] = 'skip',
+    **kwargs
+):
+    """
+    use 7z to unzip files
+
+    - From: eg: `subdir/*`
+    - pwd: password
+    """
+    mode = 'x'
+    if From:
+        mode = 'e'
+    if to:
+        to = '-o' + to
     if pwd:
         pwd = f'-p{pwd}'
 
@@ -138,14 +162,16 @@ def unzip(zip_path: str, to: str, pwd='',
         conflict = '-aot'
     else:
         Log.warning(f"Unknown replace_if_existing: {overwrite_policy}")
-
-    cmd = f'7z x {conflict} {pwd} "{zip_path}" -o"{to}"'    # default: -mmt=on
+    cmd = ('7z', mode, conflict, pwd, f'"{zip_path}"', From, to)
+    cmd = ' '.join(filter(None, cmd))
     p = Popen(cmd, **Kwargs([sp.Popen, Popen], kwargs))
     return p
 
 
-async def Popen_(cmd='aria2c --enable-rpc --rpc-listen-port=6800',
-                 timeout=TIMEOUT, Raise=True, dry_run=False, **kwargs):
+async def Popen_(
+    cmd='aria2c --enable-rpc --rpc-listen-port=6800',
+    timeout=TIMEOUT, Raise=True, dry_run=False, **kwargs
+):
     """Used on long running commands
     set `timeout` to -1 to run in background (non-blocking)
     """
@@ -165,8 +191,10 @@ async def Popen_(cmd='aria2c --enable-rpc --rpc-listen-port=6800',
     return p
 
 
-def Popen(cmd='aria2c --enable-rpc --rpc-listen-port=6800',
-          timeout: Union[float, None] = None, Raise=True, dry_run=False, **kwargs):
+def Popen(
+    cmd='aria2c --enable-rpc --rpc-listen-port=6800',
+    timeout: Union[float, None] = None, Raise=True, dry_run=False, **kwargs
+):
     """Used on long running commands
     set `timeout` to -1 to run in background (non-blocking)
     """
@@ -200,6 +228,11 @@ def version(cmd: str):
     return p.returncode == 0
 
 
+def calc_md5(file_path: str):
+    with open(file_path, 'rb') as f:
+        return hashlib.md5(f.read()).hexdigest()
+
+
 def try_aria_port():
     for port in ARIA_PORTS:
         try:
@@ -227,13 +260,9 @@ async def aria(url: str, duration=0.5, resumable=False, dry_run=False, options: 
     dl = Aria.add_uris([url], options=options)
     task = P.add_task(f"⬇️ Download {url}", start=False) if P else None
     def Url(): return dl.files[0].uris[0]['uri']     # get redirected url
-    def Path(): return dl.files[0].path
-    def Filename(): return os.path.basename(Path())
-    if dl.is_complete:
-        Log.info(f"{Path()} already downloaded")
-        return dl
+    def Filename(): return os.path.basename(dl.files[0].path)
     Log.debug(f"options after: {dl.options.get_struct()}")
-    max_speed = 2
+    max_speed = 10
     count = 0   # to calc time lapse
 
     def keep_loop():
@@ -244,15 +273,15 @@ async def aria(url: str, duration=0.5, resumable=False, dry_run=False, options: 
         1. speed too slow→False"""
         if dl.is_complete or dl.status == 'error':
             return False
-        complted = dl.completed_length
-        if dry_run and complted > 1024 ** 2 * 5:  # 5MB
+        completed = dl.completed_length
+        if dry_run and completed > 1024 ** 2 * 5:  # 5MB
             return False
         if not resumable:
             return True
 
         # if now_speed is lower than 1/4 of max, and last to long, cancel
-        debt = complted - (max_speed // 4) * count * duration
-        Log.debug(f'debt={debt}\t{complted} {max_speed} {count} {duration}\t{Url()}')
+        debt = completed - (max_speed // 4) * count * duration
+        Log.debug(f'debt={debt}\t{completed} max={max_speed} {count}x{duration}\t{Url()}')
         debt = debt < -int(options.get('retry-wait', RELAX))
         if debt:
             return False
@@ -281,7 +310,7 @@ async def aria(url: str, duration=0.5, resumable=False, dry_run=False, options: 
         else:
             Log.info(status)
 
-    dl.path = os.path.abspath(Path())
+    dl.path = path_expand(dl.files[0].path)
     dl.url = Url()
     if dl.is_complete:
         Log.info(f"✅ {dl.path} from '{dl.url}'")
@@ -291,7 +320,13 @@ async def aria(url: str, duration=0.5, resumable=False, dry_run=False, options: 
     return dl
 
 
-async def download(url: Union[str, Callable], duration=0.5, dry_run=False, **kwargs: 'aria2p.Options'):
+async def download(
+    url: Union[str, Callable],
+    md5: str = None,
+    duration=0.5,
+    dry_run=False,
+    **kwargs: 'aria2p.Options'
+):
     """check if download is complete every `duration` seconds
 
     `**kwargs` for `aria2p.API.add_uris(...)`, key/value **use str, not int**:
@@ -308,15 +343,31 @@ async def download(url: Union[str, Callable], duration=0.5, dry_run=False, **kwa
     """
     options = {**OPT, **kwargs}
     Log.debug(f"options before: {options}")
-    # if options.get('out'):
-    #     options['dir'] = ''
 
-    resumable = await is_resumable(url)
+    resumable, filename = await is_resumable_file(url)
+    Path = os.path.join(options['dir'], filename)   # if out is just filenmae
+    out = options.get('out')
+    if out:
+        out = path_expand(out)
+        if os.path.exists(out):  # if out is path/filename
+            Path = out
+    Path = path_expand(Path)
+
+    if md5 and os.path.exists(Path):
+        _md5 = calc_md5(filename)
+        if _md5 == md5:
+            Log.info(f"✅ {filename} already exists (MD5={md5})")
+            dl = SimpleNamespace(path=Path, url=url, completed=True)
+            return dl
+
     Try = Try_init = int(options.get('max-tries', 5))  # default 5
     Wait = int(options.get('retry-wait', RELAX))
     def Task(): return aria(url, duration, resumable, dry_run, options)
+
+    # TODO 重试人为移除造成的异常 aria2p.client.ClientException: GID a000f9abff9597e7 is not found
     dl = await Task()
     Complted = dl.completed_length
+    Log.debug(f'resume={resumable}\twait={Wait} from {url}')
     while not dl.is_complete and Try > 0:
         # if succeeded in downloading 1KB, reset Try
         if dl.completed_length - Complted > 1024:
@@ -334,8 +385,12 @@ async def download(url: Union[str, Callable], duration=0.5, dry_run=False, **kwa
 
         dl = await Task()
 
-    if dl.completed_length < 1:
-        Log.error(f"Download failed: {url}")
+    if not dl.is_complete:
+        Log.error(f"😭 Download failed: {url}")
+    elif md5:
+        _md5 = calc_md5(dl.path)
+        if _md5 != md5:
+            Log.warning(f"MD5 checksum: yours {_md5} != {md5} expected")
 
     return dl
 
@@ -403,18 +458,26 @@ try:
     from worker import worker, async_worker, ThreadWorkerManager
     Aria: aria2p.API = try_aria_port()
 
-    async def is_resumable(url: str, timeout=TIMEOUT):
+    async def is_resumable_file(url: str, timeout=TIMEOUT) -> Tuple[bool, str | None]:
+        """```python
+        return resumable(True/False), filename(str/None)
+        ```"""
+        filename = os.path.basename(url)
         Timeout = aiohttp.ClientTimeout(total=timeout)
         async with aiohttp.ClientSession(timeout=Timeout) as session:
             try:
-                async with session.head(url, headers={'Range': 'bytes=0-0'}) as resp:
-                    status = resp.status == 206
-                    # header = resp.headers.get('Accept-Ranges') == 'bytes'
-                    Log.debug(f"Resumable: {status}:\t{url}\t{resp.status}\t{resp.headers}")
-                    return status
-            except Exception:
-                Log.error(f"Failed to connect to {url}")
-                return False
+                # async with session.head(url, headers={'Range': 'bytes=0-0'}) as resp:
+                #     status = resp.status == 206
+                async with session.head(url) as resp:
+                    header = resp.headers.get('Accept-Ranges') == 'bytes'
+                    content_disposition = resp.headers.get('Content-Disposition')
+                    if content_disposition:
+                        filename = content_disposition.split('filename=')[-1].strip('"')
+                    Log.debug(f"Resumable: {filename} {header}:\t{url}\t{resp.status}\t{resp.headers}")
+                    return header, filename
+            except Exception as e:
+                Log.error(f"{url}: {e}")
+                return False, filename
 
     if __name__ == '__main__':
         Log.debug('⛄')

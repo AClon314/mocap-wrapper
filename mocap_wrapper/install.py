@@ -60,6 +60,7 @@ PKG_MGRS['yum'] = PKG_MGRS['dnf']   # rhel
 
 
 def remove_if_p(path: str, progress: sp.Popen):
+    """remove file if progress is successful"""
     os.remove(path) if progress.returncode == 0 and os.path.exists(path) else None
 
 
@@ -168,7 +169,7 @@ async def mamba(
             p = Popen(f"{py_mgr} create -y -n {env} {python}", **kwargs)
 
     if txt:
-        if os.path.exists(os.path.abspath(txt)):
+        if os.path.exists(path_expand(txt)):
             if py_mgr == 'pip':
                 txt = '-r ' + txt
             else:
@@ -210,7 +211,7 @@ def txt_from_self(filename='requirements.txt'):
     return path
 
 
-def txt_pip_retry(txt: str, tmp_dir='.', env=ENV):
+def txt_pip_retry(txt: str, tmp_dir=DIR, env=ENV):
     """
     1. remove installed lines
     2. install package that start with `# ` (not like `##...`or`# #...`)
@@ -232,25 +233,23 @@ def txt_pip_retry(txt: str, tmp_dir='.', env=ENV):
     return p
 
 
-def smpl_task(dir='.',
-              download='https://download.is.tue.mpg.de/download.php?domain=smpl&sfile=SMPL_python_v.1.1.0.zip',
-              referer='https://smpl.is.tue.mpg.de/',
-              PHPSESSID='26-digits_123456789_123456',
-              user_agent='Transmission/2.77',
-              **kwargs):
+def tmd_coro(Dir=DIR,
+             url='https://download.is.tue.mpg.de/download.php?domain=smpl&sfile=SMPL_python_v.1.1.0.zip',
+             referer='https://smpl.is.tue.mpg.de/',
+             PHPSESSID='26-digits_123456789_123456',
+             user_agent='Transmission/2.77',
+             **kwargs):
     """
-    - dir: download to which temp dir
-    - download: file url
+    - Dir: download to which temp dir
+    - url: file url
     - referer: main domain
     - PHPSESSID: from your logged-in cookie🍪, **expires after next login**
     - user_agent: from your browser🌐
     """
-    dir = path_expand(dir)
-
-    path = os.path.join(dir, 'cookies.txt')
-    path = os.path.abspath(path)
+    Dir = path_expand(Dir)
+    path = path_expand(os.path.join(Dir, 'cookies.txt'))
     cookies = [{
-        'domain': '.' + referer.split('/')[2],  # MAYBE BUGGY
+        'domain': DIR + referer.split('/')[2],  # MAYBE BUGGY
         'name': 'PHPSESSID',
         'value': PHPSESSID,
     }]
@@ -261,15 +260,17 @@ def smpl_task(dir='.',
         'referer': referer,
     }
     options = {**options, **kwargs}
-    return download(download, **options)
+    return download(url, dir=Dir, **options)
 
 
 @async_worker
-async def i_smpl(dir='.',
-                 PHPSESSIDs: dict = {'smpl': '', 'smplx': ''},
-                 user_agent='Transmission/2.77',
-                 duration=RELAX,
-                 **kwargs) -> List['aria2p.Download']:
+async def i_smpl(
+    Dir=DIR,
+    PHPSESSIDs: dict = {'smpl': '', 'smplx': ''},
+    user_agent='Transmission/2.77',
+    duration=RELAX,
+    **kwargs
+) -> List['aria2p.Download']:
     """
     - PHPSESSIDs: {'smpl': '26-digits_123456789_123456', 'smplx': '26-digits_123456789_123456'}
     """
@@ -279,22 +280,43 @@ async def i_smpl(dir='.',
         if not (v and isinstance(v, str)):
             Log.warning(f"🍪 cookies: PHPSESSID for {k}={v} could cause download failure")
 
-    dls = [
-        smpl_task(dir=dir, PHPSESSID=PHPSESSIDs['smpl'], user_agent=user_agent, **kwargs),
-        smpl_task(download='https://download.is.tue.mpg.de/download.php?domain=smplx&sfile=models_smplx_v1_1.zip',
-                  referer='https://smpl-x.is.tue.mpg.de/',
-                  dir=dir, PHPSESSID=PHPSESSIDs['smplx'], user_agent=user_agent, **kwargs)
-    ]
+    Dir = path_expand(Dir)
+    zips = {
+        'SMPL_python_v.1.1.0.zip': {
+            'from': 'SMPL_python_v.1.1.0/smpl/models/*',
+            'to': 'smpl',
+            'coro': tmd_coro(Dir=Dir, PHPSESSID=PHPSESSIDs['smpl'], user_agent=user_agent, **kwargs),
+        },
+        'models_smplx_v1_1.zip': {
+            'from': 'models/smplx/*',
+            'to': 'smplx',
+            'coro': tmd_coro(
+                url='https://download.is.tue.mpg.de/download.php?domain=smplx&sfile=models_smplx_v1_1.zip',
+                referer='https://smpl-x.is.tue.mpg.de/',
+                Dir=Dir, PHPSESSID=PHPSESSIDs['smplx'], user_agent=user_agent, **kwargs
+            ),
+        }
+    }
+
+    dls = []
+    for zip, d in zips.items():
+        zip_file = os.path.join(Dir, zip)
+        zips[zip]['to'] = os.path.join(Dir, d['to'])
+        if os.path.exists(zip_file):
+            unzip(zip_file, From=d['from'], to=d['to'], **kwargs)
+        else:
+            dls.append(d['coro'])
 
     def unzip_after_dl(task: aio.Task[aria2p.Download]):
         if task.cancelled():
             msg = "Download cancelled"
-            raise Exception(msg)
+            Log.error(msg)
         t = task.result()
         if t.is_complete:
-            unzip(t.path, to=dir, **kwargs)
+            d = zips[os.path.basename(t.path)]  # TODO: check if t.path is correct
+            unzip(t.path, From=d['from'], to=d['to'], **kwargs)
 
-    dls = await run_1by1(dls, unzip_after_dl)
+    dls = await aio.gather(*await run_1by1(dls, unzip_after_dl))
 
     if any([not dl.is_complete for dl in dls]):
         Log.error("❌ please check your cookies:PHPSESSID if it's expired, or change your IP address by VPN")
@@ -304,12 +326,19 @@ async def i_smpl(dir='.',
 
 
 @async_worker
-async def i_dpvo(dir='.', env=ENV, **kwargs):
+async def i_dpvo(Dir=DIR, env=ENV, **kwargs):
     Log.info("📦 Install DPVO")
-    dir = path_expand(dir)
-    f = await download('https://gitlab.com/libeigen/eigen/-/archive/3.4.0/eigen-3.4.0.zip')
-    p = unzip(f.path, to=dir, **kwargs)
-    remove_if_p(f.path, p)
+    Dir = path_expand(Dir)
+    f = await download(
+        'https://gitlab.com/libeigen/eigen/-/archive/3.4.0/eigen-3.4.0.zip',
+        md5='994092410ba29875184f7725e0371596',
+        dir=Dir
+    )
+    if f.is_complete and os.path.exists(f.path):
+        p = unzip(f.path, to=os.path.join(Dir, 'thirdparty'), **kwargs)
+        # remove_if_p(f.path, p)
+    else:
+        Log.error("❌ Can't unzip Eigen to third-party/DPVO/thirdparty")
 
     if is_win:
         Log.warning("`export` not supported windows yet")
@@ -321,16 +350,16 @@ async def i_dpvo(dir='.', env=ENV, **kwargs):
             os.environ['CUDA_HOME'] = CUDA
         else:
             Log.warning(f"❌ CUDA not found in {CUDA}")
-    p = mamba(f'pip install -e {dir}', env=env, **kwargs)
+    p = mamba(f'pip install -e {Dir}', env=env, **kwargs)
 
     Log.info("✔ Installed DPVO")
     return p
 
 
 @async_worker
-async def i_gvhmr_models(dir='.', duration=RELAX):
+async def i_gvhmr_models(Dir=DIR, duration=RELAX):
     Log.info("📦 Download GVHMR pretrained models (📝 By downloading, you agree to the GVHMR's corresponding licences)")
-    dir = path_expand(dir)
+    Dir = path_expand(Dir)
     G_drive = {
         ('dpvo', 'dpvo.pth'): '1DE5GVftRCfZOTMp8YWF0xkGudDxK0nr0',
         ('gvhmr', 'gvhmr_siga24_release.ckpt'): '1c9iCeKFN4Kr6cMPJ9Ss6Jdc3SZFnO5NP',
@@ -341,7 +370,7 @@ async def i_gvhmr_models(dir='.', duration=RELAX):
     coros = []
     for out, ID in G_drive.items():
         url = google_drive(id=ID)
-        t = download(url, out=os.path.join(dir, *out))
+        t = download(url, out=os.path.join(Dir, *out))
         coros.append(t)
 
     results = await run_1by1(coros)
@@ -350,35 +379,35 @@ async def i_gvhmr_models(dir='.', duration=RELAX):
 
 
 @async_worker
-async def i_gvhmr(dir='.', env=ENV, **kwargs):
+async def i_gvhmr(Dir=DIR, env=ENV, **kwargs):
     Log.info("📦 Install GVHMR")
-    dir = path_expand(dir)
-    d = ExistsPathList(chdir=dir)
-    dir = os.path.join(dir, 'GVHMR')
-    if not os.path.exists(dir):
+    Dir = path_expand(Dir)
+    d = ExistsPathList(chdir=Dir)
+    Dir = os.path.join(Dir, 'GVHMR')
+    if not os.path.exists(Dir):
         p = Popen('git clone https://github.com/zju3dv/GVHMR', Raise=False, **kwargs)
     d.chdir('GVHMR')
-    dir_checkpoints = os.path.join('inputs', 'checkpoints')
-    dir_checkpoints = os.path.abspath(dir_checkpoints)  # TODO: clean abspath, no relative path
-    os.makedirs(dir_checkpoints, exist_ok=True)
+    dir_checkpoints = path_expand(os.path.join('inputs', 'checkpoints'))
+    dir_smpl = os.path.join(dir_checkpoints, 'body_models')
+    os.makedirs(dir_smpl, exist_ok=True)
 
-    @async_worker
-    async def i_gvhmr_post():
+    @worker
+    def i_gvhmr_post():
         p = Popen('git fetch --all', Raise=False, **kwargs)
         p = Popen('git pull', Raise=False, **kwargs)
         p = Popen('git submodule update --init --recursive', Raise=False, **kwargs)
         p = mamba(env=env, python='3.10', txt=txt_from_self('gvhmr.txt'), **kwargs)
         p = mamba(f'pip install -e {os.getcwd()}', env=env, **kwargs)
         return p
+    i_gvhmr_post()  # should non blocking in new thread
 
     tasks = [
-        i_gvhmr_post(),
-        i_dpvo(dir=os.path.join(dir, 'third-party/DPVO'), env=env, **kwargs),
-        i_smpl(dir=dir_checkpoints, **kwargs),
-        i_gvhmr_models(dir=dir_checkpoints, **kwargs)
+        i_dpvo(Dir=os.path.join(Dir, 'third-party/DPVO'), env=env, **kwargs),
+        i_smpl(Dir=dir_smpl, **kwargs),
+        i_gvhmr_models(Dir=dir_checkpoints, **kwargs)
     ]
-    tasks = [await t for t in tasks]
-    ThreadWorkerManager.await_workers(*tasks)
+    tasks = [await t for t in tasks]    # should non bloking in new threads
+    ThreadWorkerManager.await_workers(*tasks)   # should block
     Log.info("✔ Installed GVHMR")
 
 
@@ -414,9 +443,9 @@ async def install(mods, **kwargs):
         run_async(i_mamba())
 
     if 'gvhmr' in mods:
-        tasks.append(i_gvhmr(dir='..', **kwargs))
+        tasks.append(i_gvhmr(Dir='..', **kwargs))
     if 'wilor' in mods:
-        tasks.append(i_wilor_mini(dir='..', **kwargs))
+        tasks.append(i_wilor_mini(**kwargs))
 
     Log.debug(f"task={tasks}")
     tasks = [await t for t in tasks]

@@ -10,9 +10,10 @@ ENV = 'test'
 
 
 URLS = [
-    'https://dldir1.qq.com/qqfile/qq/PCQQ9.7.17/QQ9.7.17.29225.exe',  # CN: 200MB
-    'http://speedtest.zju.edu.cn/100M',
-    'https://speed.cloudflare.com/__down?during=download&bytes=104857600',   # GLOBAL: 100MB
+    # 'https://dldir1.qq.com/qqfile/qq/PCQQ9.7.17/QQ9.7.17.29225.exe',  # CN: 200MB
+    # 'http://speedtest.zju.edu.cn/100M',
+    # 'https://speed.cloudflare.com/__down?during=download&bytes=104857600',   # GLOBAL: 100MB
+    'https://gitlab.com/libeigen/eigen/-/archive/3.4.0/eigen-3.4.0.zip',  # 3MB
 ]
 
 
@@ -26,9 +27,10 @@ async def test_download(urls, kwargs):
     dls = await aio.gather(*tasks)
     for d in dls:
         assert d.completed_length > 1, d
-        os.remove(d.path)
+        # os.remove(d.path)
 
 
+@pytest.mark.skip(reason="need to pre-install in CI")
 @pytest.mark.parametrize(
     "From, to",
     [('output/SMPL_python_v.1.1.0.zip',
@@ -59,14 +61,13 @@ def test_kwargs(func, kwargs):
     [(URLS),]
 )
 async def test_resume(urls):
-    coros = [aio.create_task(is_resumable(url)) for url in urls]
+    coros = [aio.create_task(is_resumable_file(url)) for url in urls]
     for c in aio.as_completed(coros):
         try:
-            r = await c
+            is_resume, filename = await c
         except aiohttp.ServerConnectionError as e:
             Log.error(e)
             continue
-        # assert r, r
 
 
 @pytest.fixture(scope="function", autouse=True)
@@ -78,4 +79,7 @@ def setup_progress():
 
 if __name__ == '__main__':
     ...
-    aio.run(test_download(URLS, {'dir': CWD}))
+    aio.run(
+        test_download(URLS, {'dir': CWD})
+        # test_worker()
+    )

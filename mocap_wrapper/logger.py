@@ -6,14 +6,11 @@ import logging
 from logging import getLogger
 from os import environ, path
 LOGLEVEL = environ.get('LOGLVL', 'INFO').upper()
-LOGFILE = environ.get('LOG')
 fmt = ''
 config = {
     'level': LOGLEVEL,
     'datefmt': '%H:%M:%S',
 }
-if LOGFILE:
-    config['filename'] = LOGFILE
 
 # ignore urllib3.connectionpool
 connectionpool_logger = getLogger("urllib3.connectionpool")
