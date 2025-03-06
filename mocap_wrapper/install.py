@@ -141,7 +141,7 @@ def get_shell() -> Union[TYPE_SHELLS, None]:
             return s
 
 
-async def mamba(
+def mamba(
     cmd: str = None,
     py_mgr: TYPE_PY_MGRS = None,
     env=ENV,
@@ -200,7 +200,8 @@ async def mamba(
                 if word in cmd:
                     Log.warning(f"Detected suspicious untranslated executable: {word}. If you encounter errors, you may want to modify the source code :)")
         else:
-            cmd = f"{py_mgr} run -n {env} {SHELL} {_c} '{cmd}'"
+            cmd = (py_mgr, 'run -n', env, SHELL, _c, f"'{cmd}'")
+            cmd = ' '.join(filter(None, cmd))
         p = Popen(cmd, **kwargs)
 
     return p
@@ -229,16 +230,18 @@ def txt_pip_retry(txt: str, tmp_dir=DIR, env=ENV):
     with open(tmp, 'w', encoding='UTF-8') as f:
         f.write(raw)
     p = mamba(py_mgr='pip', txt=tmp, env=env)
-    remove_if_p(tmp, p)
+    # remove_if_p(tmp, p)
     return p
 
 
-def tmd_coro(Dir=DIR,
-             url='https://download.is.tue.mpg.de/download.php?domain=smpl&sfile=SMPL_python_v.1.1.0.zip',
-             referer='https://smpl.is.tue.mpg.de/',
-             PHPSESSID='26-digits_123456789_123456',
-             user_agent='Transmission/2.77',
-             **kwargs):
+def tmd_coro(
+    Dir=DIR,
+    url='https://download.is.tue.mpg.de/download.php?domain=smpl&sfile=SMPL_python_v.1.1.0.zip',
+    referer='https://smpl.is.tue.mpg.de/',
+    PHPSESSID='26-digits_123456789_123456',
+    user_agent='Transmission/2.77',
+    **kwargs
+):
     """
     - Dir: download to which temp dir
     - url: file url
@@ -321,7 +324,7 @@ async def i_smpl(
     if any([not dl.is_complete for dl in dls]):
         Log.error("❌ please check your cookies:PHPSESSID if it's expired, or change your IP address by VPN")
     else:
-        Log.info("✔ Downloaded SMPL && SMPLX")
+        Log.info("✔ Installed SMPL && SMPLX")
     return dls
 
 
@@ -339,6 +342,10 @@ async def i_dpvo(Dir=DIR, env=ENV, **kwargs):
         # remove_if_p(f.path, p)
     else:
         Log.error("❌ Can't unzip Eigen to third-party/DPVO/thirdparty")
+
+    txt = txt_from_self('dpvo.txt')
+    p = mamba(env=env, txt=txt, **kwargs)
+    p = txt_pip_retry(txt, env=env)
 
     if is_win:
         Log.warning("`export` not supported windows yet")
@@ -372,8 +379,7 @@ async def i_gvhmr_models(Dir=DIR, duration=RELAX):
         url = google_drive(id=ID)
         t = download(url, out=os.path.join(Dir, *out))
         coros.append(t)
-
-    results = await run_1by1(coros)
+    results = await aio.gather(*await run_1by1(coros))
 
     Log.info("✔ Download GVHMR pretrained models")
 
@@ -381,6 +387,7 @@ async def i_gvhmr_models(Dir=DIR, duration=RELAX):
 @async_worker
 async def i_gvhmr(Dir=DIR, env=ENV, **kwargs):
     Log.info("📦 Install GVHMR")
+    p = mamba(env=env, python='3.10', **kwargs)
     Dir = path_expand(Dir)
     d = ExistsPathList(chdir=Dir)
     Dir = os.path.join(Dir, 'GVHMR')
@@ -396,8 +403,10 @@ async def i_gvhmr(Dir=DIR, env=ENV, **kwargs):
         p = Popen('git fetch --all', Raise=False, **kwargs)
         p = Popen('git pull', Raise=False, **kwargs)
         p = Popen('git submodule update --init --recursive', Raise=False, **kwargs)
-        p = mamba(env=env, python='3.10', txt=txt_from_self('gvhmr.txt'), **kwargs)
+        txt = txt_from_self('gvhmr.txt')
+        p = mamba(env=env, txt=txt, **kwargs)
         p = mamba(f'pip install -e {os.getcwd()}', env=env, **kwargs)
+        p = txt_pip_retry(txt, env=env)
         return p
     i_gvhmr_post()  # should non blocking in new thread
 
@@ -426,7 +435,7 @@ async def install(mods, **kwargs):
     tasks = []
 
     pkgs = {p: which(p) for p in BINS}
-    Log.debug(pkgs)
+    Log.debug(f'installed: {pkgs}')
     pkgs = [p for p, v in pkgs.items() if not v]
     if any(pkgs):
         i_pkgs()
@@ -447,7 +456,6 @@ async def install(mods, **kwargs):
     if 'wilor' in mods:
         tasks.append(i_wilor_mini(**kwargs))
 
-    Log.debug(f"task={tasks}")
     tasks = [await t for t in tasks]
     ThreadWorkerManager.await_workers(*tasks)
     return tasks
