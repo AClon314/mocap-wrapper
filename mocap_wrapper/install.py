@@ -1,10 +1,10 @@
 import os
 from sys import path as PATH
 from shutil import which, copy as cp
-from mocap_wrapper.logger import getLog
+from mocap_wrapper.logger import getLogger
 from mocap_wrapper.lib import *
 from typing import Dict, List, Literal, Union, get_args
-Log = getLog(__name__)
+Log = getLogger(__name__)
 
 MODS = ['wilor', 'gvhmr']
 ENV = 'mocap'

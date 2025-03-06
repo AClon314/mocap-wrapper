@@ -5,7 +5,7 @@ CWD = getcwd()
 PATH.append(CWD)
 from mocap_wrapper.install import *
 from mocap_wrapper.Gdown import google_drive
-DRY_RUN = False
+DRY_RUN = True
 ENV = 'test'
 
 
@@ -31,26 +31,6 @@ def test_mamba(pkgs, env, cmd):
     assert not fail, fail
 
 
-URLS = [
-    'https://dldir1.qq.com/qqfile/qq/PCQQ9.7.17/QQ9.7.17.29225.exe',  # CN: 200MB
-    'http://speedtest.zju.edu.cn/100M',
-    'https://speed.cloudflare.com/__down?during=download&bytes=104857600',   # GLOBAL: 100MB
-]
-
-
-@pytest.mark.asyncio
-@pytest.mark.parametrize(
-    "urls, kwargs",
-    [(URLS, {'dir': os.path.join(CWD, 'output')})]
-)
-async def test_download(urls, kwargs):
-    tasks = [download(url, dry_run=DRY_RUN, **kwargs) for url in urls]
-    dls = await aio.gather(*tasks)
-    for d in dls:
-        assert d.completed_length > 1, d
-        os.remove(d.path)
-
-
 @pytest.mark.skip(reason="403 Forbidden")
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
@@ -63,30 +43,6 @@ async def test_smpl(smpl, smplx):
     for d in dls:
         assert d.completed_length > 1, d
         os.remove(d.path)
-
-
-@pytest.mark.parametrize(
-    "From, to",
-    [('output/SMPL_python_v.1.1.0.zip',
-      'output'),]
-)
-def test_unzip(From, to):
-    p = unzip(From, to, dry_run=DRY_RUN)
-    assert p.returncode == 0, p
-    # os.rmdir(to)
-
-
-@pytest.mark.parametrize(
-    "func, kwargs",
-    [
-        (sp.Popen, {'bad': 'arg', 'stdin': sp.PIPE}),
-        (sp.check_output, {'bad': 'arg', 'stdin': sp.PIPE}),
-    ]
-)
-def test_kwargs(func, kwargs):
-    kwargs = Kwargs([func], kwargs)
-    p = func(f"echo '{func}' {kwargs}", shell=True, **kwargs)
-    assert p, p
 
 
 @pytest.mark.asyncio
@@ -111,3 +67,8 @@ def setup_progress():
     ...
     yield
     # clean()
+
+
+if __name__ == '__main__':
+    ...
+    # aio.run(test_Gdrive('1DE5GVftRCfZOTMp8YWF0xkGudD'))

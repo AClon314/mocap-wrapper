@@ -4,4 +4,6 @@
 **/venv/
 **/.env
 
+*.log
 output/
+GVHMR/
