@@ -4,14 +4,14 @@ import torch
 import pytorch_lightning as pl
 import numpy as np
 import argparse
-from hmr4d.utils.pylogger import Log
+from hmr4d.utils.pylogger import Log  # type: ignore
 import hydra
 from hydra import initialize_config_module, compose
 from pathlib import Path
 from pytorch3d.transforms import quaternion_to_matrix
 
-from hmr4d.configs import register_store_gvhmr
-from hmr4d.utils.video_io_utils import (
+from hmr4d.configs import register_store_gvhmr  # type: ignore
+from hmr4d.utils.video_io_utils import (  # type: ignore
     get_video_lwh,
     read_video_np,
     save_video,
@@ -19,18 +19,22 @@ from hmr4d.utils.video_io_utils import (
     get_writer,
     get_video_reader,
 )
-from hmr4d.utils.vis.cv2_utils import draw_bbx_xyxy_on_image_batch, draw_coco17_skeleton_batch
+from hmr4d.utils.vis.cv2_utils import draw_bbx_xyxy_on_image_batch, draw_coco17_skeleton_batch  # type: ignore
 
-from hmr4d.utils.preproc import Tracker, Extractor, VitPoseExtractor, SLAMModel
+# from hmr4d.utils.preproc import Tracker, Extractor, VitPoseExtractor, SLAMModel
+from hmr4d.utils.preproc.tracker import Tracker  # type: ignore
+from hmr4d.utils.preproc.vitfeat_extractor import Extractor  # type: ignore
+from hmr4d.utils.preproc.vitpose import VitPoseExtractor  # type: ignore
+from hmr4d.utils.preproc.slam import SLAMModel  # type: ignore
 
-from hmr4d.utils.geo.hmr_cam import get_bbx_xys_from_xyxy, estimate_K, convert_K_to_K4, create_camera_sensor
-from hmr4d.utils.geo_transform import compute_cam_angvel
-from hmr4d.model.gvhmr.gvhmr_pl_demo import DemoPL
-from hmr4d.utils.net_utils import detach_to_cpu, to_cuda
-from hmr4d.utils.smplx_utils import make_smplx
-from hmr4d.utils.vis.renderer import Renderer, get_global_cameras_static, get_ground_params_from_points
+from hmr4d.utils.geo.hmr_cam import get_bbx_xys_from_xyxy, estimate_K, convert_K_to_K4, create_camera_sensor  # type: ignore
+from hmr4d.utils.geo_transform import compute_cam_angvel  # type: ignore
+from hmr4d.model.gvhmr.gvhmr_pl_demo import DemoPL  # type: ignore
+from hmr4d.utils.net_utils import detach_to_cpu, to_cuda  # type: ignore
+from hmr4d.utils.smplx_utils import make_smplx  # type: ignore
+from hmr4d.utils.vis.renderer import Renderer, get_global_cameras_static, get_ground_params_from_points  # type: ignore
 from tqdm import tqdm
-from hmr4d.utils.geo_transform import apply_T_on_points, compute_T_ayfz2ay
+from hmr4d.utils.geo_transform import apply_T_on_points, compute_T_ayfz2ay  # type: ignore
 from einops import einsum, rearrange
 
 
@@ -41,7 +45,7 @@ def parse_args_to_cfg():
     # Put all args to cfg
     parser = argparse.ArgumentParser()
     parser.add_argument("--video", type=str, default="inputs/demo/dance_3.mp4")
-    parser.add_argument("--output_root", type=str, default=None, help="by default to outputs/demo")
+    parser.add_argument("--output_root", type=str, default='output/demo', help="by default to outputs/demo")
     parser.add_argument("-s", "--static_cam", action="store_true", help="If true, skip DPVO")
     parser.add_argument("--verbose", action="store_true", help="If true, draw intermediate results")
     args = parser.parse_args()

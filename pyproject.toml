@@ -49,5 +49,5 @@ tests = [
   "pytest",
 ]
 
-[scripts]
-mocap = "mocap_wrapper:main:main"
+[project.scripts]
+mocap = "mocap_wrapper:app.main"

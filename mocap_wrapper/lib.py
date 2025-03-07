@@ -230,6 +230,7 @@ def version(cmd: str):
 
 def calc_md5(file_path: str):
     with open(file_path, 'rb') as f:
+        Log.info(f"Calculating MD5 for {file_path}")
         return hashlib.md5(f.read()).hexdigest()
 
 
@@ -258,7 +259,7 @@ async def aria(url: str, duration=0.5, resumable=False, dry_run=False, options: 
     P = PG_DL
     url = url() if callable(url) else url
     dl = Aria.add_uris([url], options=options)
-    task = P.add_task(f"⬇️ Download {url}", start=False) if P else None
+    task = P.add_task(f"⬇️ {url}", start=False) if P else None
     def Url(): return dl.files[0].uris[0]['uri']     # get redirected url
     def Filename(): return os.path.basename(dl.files[0].path)
     Log.debug(f"options after: {dl.options.get_struct()}")
@@ -341,6 +342,7 @@ async def download(
 
     [⚙️for more options](https://aria2.github.io/manual/en/html/aria2c.html#input-file)
     """
+    # TODO: queue design for run_1by1
     options = {**OPT, **kwargs}
     Log.debug(f"options before: {options}")
 
@@ -354,10 +356,10 @@ async def download(
     Path = path_expand(Path)
 
     if md5 and os.path.exists(Path):
-        _md5 = calc_md5(filename)
+        _md5 = calc_md5(Path)
         if _md5 == md5:
             Log.info(f"✅ {filename} already exists (MD5={md5})")
-            dl = SimpleNamespace(path=Path, url=url, completed=True)
+            dl = SimpleNamespace(path=Path, url=url, is_completed=True)
             return dl
 
     Try = Try_init = int(options.get('max-tries', 5))  # default 5

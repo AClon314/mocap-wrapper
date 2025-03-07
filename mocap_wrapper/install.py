@@ -203,8 +203,7 @@ def mamba(
             cmd = (py_mgr, 'run -n', env, SHELL, _c, f"'{cmd}'")
             cmd = ' '.join(filter(None, cmd))
         p = Popen(cmd, **kwargs)
-
-    return p
+    return True  # TODO: return failed list
 
 
 def txt_from_self(filename='requirements.txt'):
@@ -288,6 +287,7 @@ async def i_smpl(
         'SMPL_python_v.1.1.0.zip': {
             'from': 'SMPL_python_v.1.1.0/smpl/models/*',
             'to': 'smpl',
+            # TODO: rename
             'coro': tmd_coro(Dir=Dir, PHPSESSID=PHPSESSIDs['smpl'], user_agent=user_agent, **kwargs),
         },
         'models_smplx_v1_1.zip': {
@@ -368,20 +368,37 @@ async def i_gvhmr_models(Dir=DIR, duration=RELAX):
     Log.info("📦 Download GVHMR pretrained models (📝 By downloading, you agree to the GVHMR's corresponding licences)")
     Dir = path_expand(Dir)
     G_drive = {
-        ('dpvo', 'dpvo.pth'): '1DE5GVftRCfZOTMp8YWF0xkGudDxK0nr0',
-        ('gvhmr', 'gvhmr_siga24_release.ckpt'): '1c9iCeKFN4Kr6cMPJ9Ss6Jdc3SZFnO5NP',
-        ('hmr2', 'epoch=10-step=25000.ckpt'): '1X5hvVqvqI9tvjUCb2oAlZxtgIKD9kvsc',
-        ('vitpose', 'vitpose-h-multi-coco.pth'): '1sR8xZD9wrZczdDVo6zKscNLwvarIRhP5',
-        ('yolo', 'yolov8x.pt'): '1_HGm-lqIH83-M1ML4bAXaqhm_eT2FKo5',
+        ('dpvo', 'dpvo.pth'): {
+            'ID': '1DE5GVftRCfZOTMp8YWF0xkGudDxK0nr0',
+            'md5': 'a0f9fe5b98171bd4e63bba2d98077642',
+        },
+        ('gvhmr', 'gvhmr_siga24_release.ckpt'): {
+            'ID': '1c9iCeKFN4Kr6cMPJ9Ss6Jdc3SZFnO5NP',
+            'md5': '5203aeed445c5270eea9daa042887422',
+        },
+        ('hmr2', 'epoch=10-step=25000.ckpt'): {
+            'ID': '1X5hvVqvqI9tvjUCb2oAlZxtgIKD9kvsc',
+            'md5': '83fe68195d3e75c42d9acc143dfe4f32',
+        },
+        ('vitpose', 'vitpose-h-multi-coco.pth'): {
+            'ID': '1sR8xZD9wrZczdDVo6zKscNLwvarIRhP5',
+            'md5': 'f4f688596b67696967c700b497a44804',
+        },
+        ('yolo', 'yolov8x.pt'): {
+            'ID': '1_HGm-lqIH83-M1ML4bAXaqhm_eT2FKo5',
+            'md5': '1b82eaab0786b77a43e2394856604f08',
+        },
     }
     coros = []
-    for out, ID in G_drive.items():
-        url = google_drive(id=ID)
-        t = download(url, out=os.path.join(Dir, *out))
-        coros.append(t)
-    results = await aio.gather(*await run_1by1(coros))
-
-    Log.info("✔ Download GVHMR pretrained models")
+    try:
+        for out, dic in G_drive.items():
+            url = google_drive(id=dic['ID'])
+            t = download(url, md5=dic['md5'], out=os.path.join(Dir, *out))
+            coros.append(t)
+        results = await aio.gather(*await run_1by1(coros))
+        Log.info("✔ Download GVHMR pretrained models")
+    except Exception as e:
+        Log.error(f"❌ please download GVHMR pretrained models manually from: 'https://drive.google.com/drive/folders/1eebJ13FUEXrKBawHpJroW0sNSxLjh9xD?usp=drive_link', error: {e}")
 
 
 @async_worker

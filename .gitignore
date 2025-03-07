@@ -4,6 +4,6 @@
 **/venv/
 **/.env
 
+*.egg-info/
 *.log
 output/
-GVHMR/
