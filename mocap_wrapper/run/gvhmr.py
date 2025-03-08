@@ -155,7 +155,7 @@ def run_preprocess(cfg):
         else:
             Log.info(f"[Preprocess] slam results from {paths.slam}")
 
-    Log.info(f"[Preprocess] End. Time elapsed: {Log.time()-tic:.2f}s")
+    Log.info(f"[Preprocess] End. Time elapsed: {Log.time() - tic:.2f}s")
 
 
 def load_data_dict(cfg):

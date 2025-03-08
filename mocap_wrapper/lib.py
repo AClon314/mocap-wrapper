@@ -1,4 +1,5 @@
 """shared functions here"""
+import functools
 import os
 import hashlib
 import subprocess as sp
@@ -7,8 +8,10 @@ from sys import platform
 from datetime import timedelta
 from types import SimpleNamespace
 from mocap_wrapper.logger import getLogger, PG_DL
-from typing import Any, Callable, Coroutine, List, Literal, Tuple, Union, overload
+from typing import Any, Callable, Concatenate, Coroutine, List, Literal, ParamSpec, Tuple, TypeVar, Union, overload
+from typing_extensions import deprecated
 Log = getLogger(__name__)
+MODS = ['wilor', 'gvhmr']
 TIMEOUT = timedelta(minutes=15).seconds
 RELAX = 15      # seconds for next http request, to prevent being 403 blocked
 DIR = '.'       # fallback directory, don't edit
@@ -51,6 +54,16 @@ def rich_finish(task: int):
     P = PG_DL
     P.update(task, completed=100)
     P.start_task(task)
+
+
+def then(coro: Coroutine, *serials_1by1: Tuple[Callable], parallel_1toN: List[Callable] = []):
+    """run callbacks after coro"""
+    async def _then():
+        result = await coro
+        for func in parallel_1toN:
+            func(result)
+        return result
+    return _then()
 
 
 async def run_1by1(
@@ -96,7 +109,53 @@ async def run_1by1(
     # results = await aio.gather(*tasks)
     # return results
 
+PS = ParamSpec("PS")
+TV = TypeVar("TV")
 
+
+def copy_callable_signature(
+    source: Callable[PS, TV]
+) -> Callable[[Callable[..., TV]], Callable[PS, TV]]:
+    """```python
+    def f(x: bool, *extra: int) -> str:
+        return str(...)
+
+    # copied signature:
+    @copy_callable_signature(f)
+    def test(*args, **kwargs):  # type: ignore[no-untyped-def]
+        return f(*args, **kwargs)
+    ```"""
+    def wrapper(target: Callable[..., TV]) -> Callable[PS, TV]:
+        @functools.wraps(source)
+        def wrapped(*args: PS.args, **kwargs: PS.kwargs) -> TV:
+            return target(*args, **kwargs)
+        return wrapped
+    return wrapper
+
+
+def copy_method_signature(
+    source: Callable[Concatenate[Any, PS], TV]
+) -> Callable[[Callable[..., TV]], Callable[Concatenate[Any, PS], TV]]:
+    """```python
+    class A:
+        def foo(self, x: int, y: int, z: int) -> float:
+            return float()
+
+    class B:
+        # copied signature:
+        @copy_method_signature(A.foo)
+        def bar(self, *args, **kwargs):  # type: ignore[no-untyped-def]
+            print(*args)
+    ```"""
+    def wrapper(target: Callable[..., TV]) -> Callable[Concatenate[Any, PS], TV]:
+        @functools.wraps(source)
+        def wrapped(self: Any, /, *args: PS.args, **kwargs: PS.kwargs) -> TV:
+            return target(self, *args, **kwargs)
+        return wrapped
+    return wrapper
+
+
+@deprecated(message="Use `copy_callable_signature` instead")
 def Kwargs(funcs: List[Union[Callable, object]], kwargs, check=CHECK_KWARGS):
     """Filter out invalid kwargs to prevent Exception
 
@@ -168,6 +227,7 @@ def unzip(
     return p
 
 
+@deprecated(message="Use `Popen` instead")
 async def Popen_(
     cmd='aria2c --enable-rpc --rpc-listen-port=6800',
     timeout=TIMEOUT, Raise=True, dry_run=False, **kwargs
@@ -208,7 +268,7 @@ def Popen(
             if Raise:
                 raise Exception(f"{cmd}")
             else:
-                Log.error(f"{cmd}")
+                Log.warning(f"{cmd}")
     return p
 
 

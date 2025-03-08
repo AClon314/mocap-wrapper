@@ -9,9 +9,6 @@
 ## diffusers[torch]>=0.19.3  # Diffusion
 ## transformers>=4.31.0
 
-## pytorch==2.3.0  # conda-forge only offer with cuda120
-## cuda-version==12.1  # mamba install cuda-toolkit -c nvidia/label/cuda-12.1
-
 # --extra-index-url https://download.pytorch.org/whl/cu121
 # torch==2.3.0+cu121
 # torchvision==0.18.0+cu121

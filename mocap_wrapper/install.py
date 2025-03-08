@@ -6,7 +6,6 @@ from mocap_wrapper.lib import *
 from typing import Dict, List, Literal, Union, get_args
 Log = getLogger(__name__)
 
-MODS = ['wilor', 'gvhmr']
 ENV = 'mocap'
 PACKAGES = [('aria2', 'aria2c'), 'git', '7z']
 BINS = [p[1] if isinstance(p, tuple) else p for p in PACKAGES]
@@ -233,7 +232,7 @@ def txt_pip_retry(txt: str, tmp_dir=DIR, env=ENV):
     return p
 
 
-def tmd_coro(
+def itmd_coro(
     Dir=DIR,
     url='https://download.is.tue.mpg.de/download.php?domain=smpl&sfile=SMPL_python_v.1.1.0.zip',
     referer='https://smpl.is.tue.mpg.de/',
@@ -265,6 +264,20 @@ def tmd_coro(
     return download(url, dir=Dir, **options)
 
 
+async def itmd_full(
+    Dir=DIR,
+    url='https://download.is.tue.mpg.de/download.php?domain=smpl&sfile=SMPL_python_v.1.1.0.zip',
+    referer='https://smpl.is.tue.mpg.de/',
+    PHPSESSID='26-digits_123456789_123456',
+    user_agent='Transmission/2.77',
+    **kwargs
+):
+    f = await itmd_coro(Dir=Dir, url=url, referer=referer, PHPSESSID=PHPSESSID, user_agent=user_agent, **kwargs)
+    p = unzip(f.path, to=Dir, **kwargs)
+    os.symlink('basicmodel_neutral_lbs_10_207_0_v1.1.0.pkl', 'SMPL_NEUTRAL.pkl')
+    return f
+
+
 @async_worker
 async def i_smpl(
     Dir=DIR,
@@ -278,9 +291,9 @@ async def i_smpl(
     """
     Log.info("⬇️ Download SMPL && SMPLX (📝 By downloading, you agree to SMPL/SMPL-X corresponding licences)")
 
-    for k, v in PHPSESSIDs.items():
-        if not (v and isinstance(v, str)):
-            Log.warning(f"🍪 cookies: PHPSESSID for {k}={v} could cause download failure")
+    # for k, v in PHPSESSIDs.items():
+    #     if not (v and isinstance(v, str)):
+    #         Log.warning(f"🍪 cookies: PHPSESSID for {k}={v} could cause download failure")
 
     Dir = path_expand(Dir)
     zips = {
@@ -288,16 +301,23 @@ async def i_smpl(
             'from': 'SMPL_python_v.1.1.0/smpl/models/*',
             'to': 'smpl',
             # TODO: rename
-            'coro': tmd_coro(Dir=Dir, PHPSESSID=PHPSESSIDs['smpl'], user_agent=user_agent, **kwargs),
+            'serial': [
+                itmd_coro(Dir=Dir, PHPSESSID=PHPSESSIDs['smpl'], user_agent=user_agent, **kwargs),
+                unzip_after_dl,
+                os.symlink
+            ],
         },
         'models_smplx_v1_1.zip': {
             'from': 'models/smplx/*',
             'to': 'smplx',
-            'coro': tmd_coro(
-                url='https://download.is.tue.mpg.de/download.php?domain=smplx&sfile=models_smplx_v1_1.zip',
-                referer='https://smpl-x.is.tue.mpg.de/',
-                Dir=Dir, PHPSESSID=PHPSESSIDs['smplx'], user_agent=user_agent, **kwargs
-            ),
+            'serial': [
+                itmd_coro(
+                    url='https://download.is.tue.mpg.de/download.php?domain=smplx&sfile=models_smplx_v1_1.zip',
+                    referer='https://smpl-x.is.tue.mpg.de/',
+                    Dir=Dir, PHPSESSID=PHPSESSIDs['smplx'], user_agent=user_agent, **kwargs
+                ),
+                unzip_after_dl,
+            ],
         }
     }
 
@@ -308,7 +328,7 @@ async def i_smpl(
         if os.path.exists(zip_file):
             unzip(zip_file, From=d['from'], to=d['to'], **kwargs)
         else:
-            dls.append(d['coro'])
+            dls.append(d['serial'])
 
     def unzip_after_dl(task: aio.Task[aria2p.Download]):
         if task.cancelled():
@@ -350,6 +370,7 @@ async def i_dpvo(Dir=DIR, env=ENV, **kwargs):
     if is_win:
         Log.warning("`export` not supported windows yet")
     else:
+        # TODO these seems unnecessary
         CUDA = '/usr/local/cuda-12.1/'.split('/')
         CUDA = os.path.join(*CUDA)
         if os.path.exists(CUDA):
@@ -437,8 +458,10 @@ async def i_gvhmr(Dir=DIR, env=ENV, **kwargs):
     Log.info("✔ Installed GVHMR")
 
 
+@worker
 def i_wilor_mini(env=ENV, **kwargs):
     Log.info("📦 Install WiLoR-mini")
+    kwargs.pop('Dir', None)
     txt = txt_from_self('wilor-mini.txt')
     p = mamba(txt=txt, env=env, python='3.10', **kwargs)
     p = txt_pip_retry(txt, env=env)
@@ -469,11 +492,10 @@ async def install(mods, **kwargs):
         run_async(i_mamba())
 
     if 'gvhmr' in mods:
-        tasks.append(i_gvhmr(Dir='..', **kwargs))
+        tasks.append(await i_gvhmr(**kwargs))
     if 'wilor' in mods:
         tasks.append(i_wilor_mini(**kwargs))
 
-    tasks = [await t for t in tasks]
     ThreadWorkerManager.await_workers(*tasks)
     return tasks
 

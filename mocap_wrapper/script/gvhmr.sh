@@ -24,6 +24,12 @@ gvhmr() {
     popd
 
     # SMPL SMPLX
+    # inputs/checkpoints/
+    # ├── body_models/smplx/
+    # │   └── SMPLX_{GENDER}.npz # SMPLX (We predict SMPLX params + evaluation)
+    # └── body_models/smpl/
+    #     └── SMPL_{GENDER}.pkl  # SMPL (rendering and evaluation)
+
 
     # https://drive.google.com/drive/folders/1eebJ13FUEXrKBawHpJroW0sNSxLjh9xD?usp=drive_link
 

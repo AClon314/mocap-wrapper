@@ -426,4 +426,4 @@ def test_wilor_video_pipeline(video_path='assets/video.mp4'):
 
 if __name__ == '__main__':
     # test_wilor_image_pipeline("/home/n/photo/主从多核.jpg")
-    test_wilor_video_pipeline("/home/n/GVHMR/docs/example_video/tennis.mp4")
+    test_wilor_video_pipeline("/home/n/document/code/GVHMR/docs/example_video/tennis.mp4")
