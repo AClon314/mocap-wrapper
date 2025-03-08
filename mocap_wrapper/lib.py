@@ -1,14 +1,14 @@
 """shared functions here"""
-import functools
 import os
 import hashlib
 import subprocess as sp
 import asyncio as aio
 from sys import platform
 from datetime import timedelta
+from functools import wraps
 from types import SimpleNamespace
 from mocap_wrapper.logger import getLogger, PG_DL
-from typing import Any, Callable, Concatenate, Coroutine, List, Literal, ParamSpec, Tuple, TypeVar, Union, overload
+from typing import Any, Callable, Concatenate, Coroutine, List, Literal, NewType, ParamSpec, Tuple, TypeVar, Union, cast, overload
 from typing_extensions import deprecated
 Log = getLogger(__name__)
 MODS = ['wilor', 'gvhmr']
@@ -50,7 +50,7 @@ def is_main_thread():
     return threading.current_thread() == threading.main_thread()
 
 
-def rich_finish(task: int):
+def rich_finish(task: rich.progress.TaskID):
     P = PG_DL
     P.update(task, completed=100)
     P.start_task(task)
@@ -113,50 +113,16 @@ PS = ParamSpec("PS")
 TV = TypeVar("TV")
 
 
-def copy_callable_signature(
-    source: Callable[PS, TV]
+def copy_kwargs(
+    kwargs_call: Callable[PS, Any]
 ) -> Callable[[Callable[..., TV]], Callable[PS, TV]]:
-    """```python
-    def f(x: bool, *extra: int) -> str:
-        return str(...)
-
-    # copied signature:
-    @copy_callable_signature(f)
-    def test(*args, **kwargs):  # type: ignore[no-untyped-def]
-        return f(*args, **kwargs)
-    ```"""
-    def wrapper(target: Callable[..., TV]) -> Callable[PS, TV]:
-        @functools.wraps(source)
-        def wrapped(*args: PS.args, **kwargs: PS.kwargs) -> TV:
-            return target(*args, **kwargs)
-        return wrapped
-    return wrapper
+    """Decorator does nothing but returning the casted original function"""
+    def return_func(func: Callable[..., TV]) -> Callable[PS, TV]:
+        return cast(Callable[PS, TV], func)
+    return return_func
 
 
-def copy_method_signature(
-    source: Callable[Concatenate[Any, PS], TV]
-) -> Callable[[Callable[..., TV]], Callable[Concatenate[Any, PS], TV]]:
-    """```python
-    class A:
-        def foo(self, x: int, y: int, z: int) -> float:
-            return float()
-
-    class B:
-        # copied signature:
-        @copy_method_signature(A.foo)
-        def bar(self, *args, **kwargs):  # type: ignore[no-untyped-def]
-            print(*args)
-    ```"""
-    def wrapper(target: Callable[..., TV]) -> Callable[Concatenate[Any, PS], TV]:
-        @functools.wraps(source)
-        def wrapped(self: Any, /, *args: PS.args, **kwargs: PS.kwargs) -> TV:
-            return target(self, *args, **kwargs)
-        return wrapped
-    return wrapper
-
-
-@deprecated(message="Use `copy_callable_signature` instead")
-def Kwargs(funcs: List[Union[Callable, object]], kwargs, check=CHECK_KWARGS):
+def filter_kwargs(funcs: List[Union[Callable, object]], kwargs, check=CHECK_KWARGS):
     """Filter out invalid kwargs to prevent Exception
 
     Don't use this if the funcs 
@@ -192,7 +158,7 @@ def Kwargs(funcs: List[Union[Callable, object]], kwargs, check=CHECK_KWARGS):
 
 
 def unzip(
-    zip_path: str, From=None, to=DIR, pwd='',
+    zip_path: str, From='', to=DIR, pwd='',
     overwrite_policy: Literal['always', 'skip', 'rename_new', 'rename_old'] = 'skip',
     **kwargs
 ):
@@ -221,13 +187,12 @@ def unzip(
         conflict = '-aot'
     else:
         Log.warning(f"Unknown replace_if_existing: {overwrite_policy}")
-    cmd = ('7z', mode, conflict, pwd, f'"{zip_path}"', From, to)
-    cmd = ' '.join(filter(None, cmd))
-    p = Popen(cmd, **Kwargs([sp.Popen, Popen], kwargs))
+    cmd = ' '.join(filter(None, ('7z', mode, conflict, pwd, f'"{zip_path}"', From, to)))
+    p = Popen(cmd, **kwargs)
     return p
 
 
-@deprecated(message="Use `Popen` instead")
+@deprecated("Use `Popen` instead")
 async def Popen_(
     cmd='aria2c --enable-rpc --rpc-listen-port=6800',
     timeout=TIMEOUT, Raise=True, dry_run=False, **kwargs
@@ -239,7 +204,7 @@ async def Popen_(
     if dry_run:
         return
     p = await aio.create_subprocess_shell(
-        cmd, **Kwargs([aio.create_subprocess_shell, Popen], kwargs)
+        cmd, **filter_kwargs([aio.create_subprocess_shell, Popen], kwargs)
     )
     if timeout is None or timeout >= 0:
         await p.wait()
@@ -251,31 +216,45 @@ async def Popen_(
     return p
 
 
+@copy_kwargs(sp.Popen)
 def Popen(
-    cmd='aria2c --enable-rpc --rpc-listen-port=6800',
-    timeout: Union[float, None] = None, Raise=True, dry_run=False, **kwargs
+    args, Raise=True, dry_run=False, **kwargs
 ):
-    """Used on long running commands
+    """Used on long running commands  
     set `timeout` to -1 to run in background (non-blocking)
+
+    - Raise: if False, log warning instead of raising Exception
+    - dry_run: if True, only print the command without executing
     """
-    Log.info(cmd)
+    Log.info(args)
     if dry_run:
         return
-    p = sp.Popen(cmd, shell=True, env=os.environ, **Kwargs([sp.Popen], kwargs))
-    if timeout is None or timeout >= 0:
-        p.wait(timeout=timeout)
+    kwargs.setdefault('args', 'aria2c --enable-rpc --rpc-listen-port=6800')
+    kwargs.setdefault('shell', True)
+    kwargs.setdefault('env', os.environ)
+    kwargs.setdefault('encoding', 'utf-8')
+    p = sp.Popen(args, **filter_kwargs([sp.Popen], kwargs))
+    if kwargs.timeout is None or kwargs.timeout >= 0:
+        p.wait(timeout=kwargs.timeout)
         if p.returncode != 0:
             if Raise:
-                raise Exception(f"{cmd}")
+                raise Exception(f"{args}")
             else:
-                Log.warning(f"{cmd}")
+                Log.warning(f"{args}")
     return p
 
 
-def Exec(cmd, timeout=TIMEOUT, Print=True, **kwargs) -> Union[str, bytes, None]:
-    """Only used on instantly returning commands"""
-    Log.info(cmd)
-    s = sp.check_output(cmd, shell=True, timeout=timeout, **Kwargs([Exec], kwargs)).decode().strip()
+@copy_kwargs(sp.check_output)
+def Exec(args, Print=True, **kwargs) -> Union[str, bytes, None]:
+    """Only used on instantly returning commands
+
+    - Print: print the output
+    - kwargs: default `shell=True`, `timeout=TIMEOUT`
+    """
+    Log.info(args)
+    kwargs.setdefault('shell', True)
+    kwargs.setdefault('timeout', TIMEOUT)
+    s = sp.check_output(args, **kwargs).decode().strip()
     if Print:
         print(s)
     return s
@@ -284,7 +263,7 @@ def Exec(cmd, timeout=TIMEOUT, Print=True, **kwargs) -> Union[str, bytes, None]:
 def version(cmd: str):
     """use `cmd --version` to check if a program is installed"""
     cmd += ' --version'
-    p = Popen(cmd)
+    p = Popen(cmd)  # type: ignore
     return p.returncode == 0
 
 
@@ -314,12 +293,18 @@ def try_aria_port():
             return None
 
 
-async def aria(url: str, duration=0.5, resumable=False, dry_run=False, options: 'aria2p.Options' = {**OPT}):
+async def aria(
+    url: str,
+    duration=0.5,
+    resumable=False,
+    dry_run=False,
+    options: 'aria2p.Options' = {**OPT},  # type: ignore
+):
     """used to be wrapped in `download`, no retry logic"""
     P = PG_DL
     url = url() if callable(url) else url
-    dl = Aria.add_uris([url], options=options)
-    task = P.add_task(f"⬇️ {url}", start=False) if P else None
+    dl = Aria.add_uris([url], options=options)  # type: ignore
+    task = P.add_task(f"⬇️ {url}", start=False)
     def Url(): return dl.files[0].uris[0]['uri']     # get redirected url
     def Filename(): return os.path.basename(dl.files[0].path)
     Log.debug(f"options after: {dl.options.get_struct()}")
@@ -351,7 +336,7 @@ async def aria(url: str, duration=0.5, resumable=False, dry_run=False, options: 
 
     while keep_loop():
         await aio.sleep(duration)
-        dl = Aria.get_download(dl.gid)
+        dl = Aria.get_download(dl.gid)  # type: ignore
         count += 1
         # Log.debug(f"current: {dl.__dict__}")
         # Log.debug(f"♻️ is_loop: {keep_loop()}\t{Url()}")
@@ -375,15 +360,15 @@ async def aria(url: str, duration=0.5, resumable=False, dry_run=False, options: 
     dl.url = Url()
     if dl.is_complete:
         Log.info(f"✅ {dl.path} from '{dl.url}'")
-    else:
+    elif Aria:
         Aria.remove([dl])   # warning: can't get_download(dl.gid) after dl.gid removed
     P.remove_task(task)
     return dl
 
 
 async def download(
-    url: Union[str, Callable],
-    md5: str = None,
+    url: str,
+    md5: str = '',
     duration=0.5,
     dry_run=False,
     **kwargs: 'aria2p.Options'
@@ -407,8 +392,8 @@ async def download(
     Log.debug(f"options before: {options}")
 
     resumable, filename = await is_resumable_file(url)
-    Path = os.path.join(options['dir'], filename)   # if out is just filenmae
-    out = options.get('out')
+    Path = os.path.join(str(options['dir']), filename)   # if out is just filenmae
+    out = str(options.get('out'))
     if out:
         out = path_expand(out)
         if os.path.exists(out):  # if out is path/filename
@@ -422,8 +407,8 @@ async def download(
             dl = SimpleNamespace(path=Path, url=url, is_completed=True)
             return dl
 
-    Try = Try_init = int(options.get('max-tries', 5))  # default 5
-    Wait = int(options.get('retry-wait', RELAX))
+    Try = Try_init = int(options.get('max-tries', 5))  # type: ignore
+    Wait = int(options.get('retry-wait', RELAX))    # type: ignore
     def Task(): return aria(url, duration, resumable, dry_run, options)
 
     # TODO 重试人为移除造成的异常 aria2p.client.ClientException: GID a000f9abff9597e7 is not found
@@ -458,7 +443,7 @@ async def download(
 
 
 class ExistsPathList(list):
-    def __init__(self, chdir: str = None, *args, **kwargs):
+    def __init__(self, chdir: str = '', *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.append(os.getcwd())
         if chdir:
@@ -517,10 +502,11 @@ Aria = None
 try:
     import aria2p
     import aiohttp
-    from worker import worker, async_worker, ThreadWorkerManager
-    Aria: aria2p.API = try_aria_port()
+    import rich.progress
+    from worker import worker, async_worker, ThreadWorkerManager    # type: ignore
+    Aria = try_aria_port()
 
-    async def is_resumable_file(url: str, timeout=TIMEOUT) -> Tuple[bool, str | None]:
+    async def is_resumable_file(url: str, timeout=TIMEOUT):
         """```python
         return resumable(True/False), filename(str/None)
         ```"""

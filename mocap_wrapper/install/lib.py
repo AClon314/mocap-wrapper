@@ -1,3 +1,4 @@
+"""shared install logic"""
 import os
 from sys import path as PATH
 from shutil import which, copy as cp
@@ -11,9 +12,9 @@ PACKAGES = [('aria2', 'aria2c'), 'git', '7z']
 BINS = [p[1] if isinstance(p, tuple) else p for p in PACKAGES]
 PACKAGES = [p[0] if isinstance(p, tuple) else p for p in PACKAGES]
 TYPE_SHELLS = Literal['zsh', 'bash', 'ps']
-SHELLS: TYPE_SHELLS = get_args(TYPE_SHELLS)
+SHELLS: Tuple[TYPE_SHELLS] = get_args(TYPE_SHELLS)
 TYPE_PY_MGRS = Literal['mamba', 'conda', 'pip']
-PY_MGRS: TYPE_PY_MGRS = get_args(TYPE_PY_MGRS)
+PY_MGRS: Tuple[TYPE_PY_MGRS] = get_args(TYPE_PY_MGRS)
 SU = '' if is_win or os.geteuid() == 0 else 'sudo '
 TYPE_PKG_ACT = Union[None, Literal['install', 'remove', 'update']]
 PKG_MGRS: Dict[str, Dict[TYPE_PKG_ACT, str]] = {
@@ -72,7 +73,13 @@ def get_py_mgr() -> Union[TYPE_PY_MGRS, None]:
     raise Exception(f"Not found any of {PY_MGRS}")
 
 
-def get_pkg_mgr() -> Union[str, None]:
+def get_shell():
+    for s in SHELLS:
+        if which(s):
+            return s
+
+
+def get_pkg_mgr():
     for mgr in PKG_MGRS.keys():
         if which(mgr):
             return mgr
@@ -98,7 +105,7 @@ def i_mamba(require_restart=True, **kwargs):
     setup = ''
     if is_linux or is_mac:
         setup = "echo Miniforge3-$(uname)-$(uname -m).sh"
-        setup = Exec(setup, **kwargs)
+        setup = str(Exec(setup, **kwargs))
     elif is_win:
         setup = "Miniforge3-Windows-x86_64.exe"
     else:
@@ -134,18 +141,12 @@ def get_envs(manager='mamba', **kwargs):
     return env, now
 
 
-def get_shell() -> Union[TYPE_SHELLS, None]:
-    for s in SHELLS:
-        if which(s):
-            return s
-
-
 def mamba(
-    cmd: str = None,
-    py_mgr: TYPE_PY_MGRS = None,
+    cmd: str = '',
+    py_mgr: TYPE_PY_MGRS = 'mamba',
     env=ENV,
-    python: str = None,
-    txt: Literal['requirements.txt'] = None,
+    python: str = '',
+    txt: Union[Literal['requirements.txt'], str] = '',
     pkgs=[], **kwargs
 ):
     """By default do 2 things:
@@ -199,8 +200,7 @@ def mamba(
                 if word in cmd:
                     Log.warning(f"Detected suspicious untranslated executable: {word}. If you encounter errors, you may want to modify the source code :)")
         else:
-            cmd = (py_mgr, 'run -n', env, SHELL, _c, f"'{cmd}'")
-            cmd = ' '.join(filter(None, cmd))
+            cmd = ' '.join(filter(None, (py_mgr, 'run -n', env, SHELL, _c, f"'{cmd}'")))
         p = Popen(cmd, **kwargs)
     return True  # TODO: return failed list
 
@@ -265,15 +265,16 @@ def itmd_coro(
 
 
 async def itmd_full(
-    Dir=DIR,
-    url='https://download.is.tue.mpg.de/download.php?domain=smpl&sfile=SMPL_python_v.1.1.0.zip',
-    referer='https://smpl.is.tue.mpg.de/',
-    PHPSESSID='26-digits_123456789_123456',
-    user_agent='Transmission/2.77',
+    From='SMPL_python_v.1.1.0/smpl/models/*',
+    to='smpl',
     **kwargs
 ):
-    f = await itmd_coro(Dir=Dir, url=url, referer=referer, PHPSESSID=PHPSESSID, user_agent=user_agent, **kwargs)
-    p = unzip(f.path, to=Dir, **kwargs)
+    """
+    - From: which files to unzip
+    - to: where to unzip
+    """
+    f = await itmd_coro(**kwargs)
+    p = unzip(f.path, to=kwargs.setdefault('Dir', DIR), **kwargs)
     os.symlink('basicmodel_neutral_lbs_10_207_0_v1.1.0.pkl', 'SMPL_NEUTRAL.pkl')
     return f
 
@@ -384,92 +385,6 @@ async def i_dpvo(Dir=DIR, env=ENV, **kwargs):
     return p
 
 
-@async_worker
-async def i_gvhmr_models(Dir=DIR, duration=RELAX):
-    Log.info("📦 Download GVHMR pretrained models (📝 By downloading, you agree to the GVHMR's corresponding licences)")
-    Dir = path_expand(Dir)
-    G_drive = {
-        ('dpvo', 'dpvo.pth'): {
-            'ID': '1DE5GVftRCfZOTMp8YWF0xkGudDxK0nr0',
-            'md5': 'a0f9fe5b98171bd4e63bba2d98077642',
-        },
-        ('gvhmr', 'gvhmr_siga24_release.ckpt'): {
-            'ID': '1c9iCeKFN4Kr6cMPJ9Ss6Jdc3SZFnO5NP',
-            'md5': '5203aeed445c5270eea9daa042887422',
-        },
-        ('hmr2', 'epoch=10-step=25000.ckpt'): {
-            'ID': '1X5hvVqvqI9tvjUCb2oAlZxtgIKD9kvsc',
-            'md5': '83fe68195d3e75c42d9acc143dfe4f32',
-        },
-        ('vitpose', 'vitpose-h-multi-coco.pth'): {
-            'ID': '1sR8xZD9wrZczdDVo6zKscNLwvarIRhP5',
-            'md5': 'f4f688596b67696967c700b497a44804',
-        },
-        ('yolo', 'yolov8x.pt'): {
-            'ID': '1_HGm-lqIH83-M1ML4bAXaqhm_eT2FKo5',
-            'md5': '1b82eaab0786b77a43e2394856604f08',
-        },
-    }
-    coros = []
-    try:
-        for out, dic in G_drive.items():
-            url = google_drive(id=dic['ID'])
-            t = download(url, md5=dic['md5'], out=os.path.join(Dir, *out))
-            coros.append(t)
-        results = await aio.gather(*await run_1by1(coros))
-        Log.info("✔ Download GVHMR pretrained models")
-    except Exception as e:
-        Log.error(f"❌ please download GVHMR pretrained models manually from: 'https://drive.google.com/drive/folders/1eebJ13FUEXrKBawHpJroW0sNSxLjh9xD?usp=drive_link', error: {e}")
-
-
-@async_worker
-async def i_gvhmr(Dir=DIR, env=ENV, **kwargs):
-    Log.info("📦 Install GVHMR")
-    p = mamba(env=env, python='3.10', **kwargs)
-    Dir = path_expand(Dir)
-    d = ExistsPathList(chdir=Dir)
-    Dir = os.path.join(Dir, 'GVHMR')
-    if not os.path.exists(Dir):
-        p = Popen('git clone https://github.com/zju3dv/GVHMR', Raise=False, **kwargs)
-    d.chdir('GVHMR')
-    dir_checkpoints = path_expand(os.path.join('inputs', 'checkpoints'))
-    dir_smpl = os.path.join(dir_checkpoints, 'body_models')
-    os.makedirs(dir_smpl, exist_ok=True)
-
-    @worker
-    def i_gvhmr_post():
-        p = Popen('git fetch --all', Raise=False, **kwargs)
-        p = Popen('git pull', Raise=False, **kwargs)
-        p = Popen('git submodule update --init --recursive', Raise=False, **kwargs)
-        txt = txt_from_self('gvhmr.txt')
-        p = mamba(env=env, txt=txt, **kwargs)
-        p = mamba(f'pip install -e {os.getcwd()}', env=env, **kwargs)
-        p = txt_pip_retry(txt, env=env)
-        return p
-    i_gvhmr_post()  # should non blocking in new thread
-
-    tasks = [
-        i_dpvo(Dir=os.path.join(Dir, 'third-party/DPVO'), env=env, **kwargs),
-        i_smpl(Dir=dir_smpl, **kwargs),
-        i_gvhmr_models(Dir=dir_checkpoints, **kwargs)
-    ]
-    tasks = [await t for t in tasks]    # should non bloking in new threads
-    ThreadWorkerManager.await_workers(*tasks)   # should block
-    Log.info("✔ Installed GVHMR")
-
-
-@worker
-def i_wilor_mini(env=ENV, **kwargs):
-    Log.info("📦 Install WiLoR-mini")
-    kwargs.pop('Dir', None)
-    txt = txt_from_self('wilor-mini.txt')
-    p = mamba(txt=txt, env=env, python='3.10', **kwargs)
-    p = txt_pip_retry(txt, env=env)
-    p = mamba(py_mgr='pip', pkgs=['git+https://github.com/warmshao/WiLoR-mini'], env=env, **kwargs)
-    Log.info("✔ Installed WiLoR-mini")
-    return p
-
-
 async def install(mods, **kwargs):
     global Aria
     tasks = []
@@ -511,7 +426,7 @@ PY_MGR = get_py_mgr()
 try:
     from mocap_wrapper.Gdown import google_drive
     from regex import sub, MULTILINE
-    from netscape_cookies import save_cookies_to_file
+    from netscape_cookies import save_cookies_to_file   # type: ignore
     if __name__ == '__main__':
         aio.run(install(mods=['gvhmr', ]))
 except ImportError:

@@ -3,7 +3,7 @@ from os import getcwd
 from sys import path as PATH
 CWD = getcwd()
 PATH.append(CWD)
-from mocap_wrapper.install import *
+from mocap_wrapper.install.lib import *
 from mocap_wrapper.Gdown import google_drive
 DRY_RUN = True
 ENV = 'test'

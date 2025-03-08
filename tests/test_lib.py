@@ -3,7 +3,7 @@ from os import getcwd
 from sys import path as PATH
 CWD = getcwd()
 PATH.append(CWD)
-from mocap_wrapper.install import *
+from mocap_wrapper.install.lib import *
 from mocap_wrapper.Gdown import google_drive
 DRY_RUN = False
 ENV = 'test'
@@ -50,7 +50,7 @@ def test_unzip(From, to):
     ]
 )
 def test_kwargs(func, kwargs):
-    kwargs = Kwargs([func], kwargs)
+    kwargs = filter_kwargs([func], kwargs)
     p = func(f"echo '{func}' {kwargs}", shell=True, **kwargs)
     assert p, p
 

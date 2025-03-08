@@ -26,7 +26,7 @@ def main():
                 mods += m.split(',')
         else:
             mods = DEFAULT
-        from mocap_wrapper.install import install
+        from mocap_wrapper.install.lib import install
         tasks = aio.run(install(mods=mods, Dir=arg.install_at))
     if arg.input:
         print(f'Input file: {arg.input}')
