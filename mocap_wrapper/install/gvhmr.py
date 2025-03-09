@@ -6,7 +6,7 @@ from mocap_wrapper.install.lib import *
 Log = getLogger(__name__)
 
 
-@async_worker
+@async_worker  # type: ignore
 async def i_gvhmr_models(Dir=DIR, duration=RELAX):
     Log.info("📦 Download GVHMR pretrained models (📝 By downloading, you agree to the GVHMR's corresponding licences)")
     Dir = path_expand(Dir)
@@ -44,7 +44,7 @@ async def i_gvhmr_models(Dir=DIR, duration=RELAX):
         Log.error(f"❌ please download GVHMR pretrained models manually from: 'https://drive.google.com/drive/folders/1eebJ13FUEXrKBawHpJroW0sNSxLjh9xD?usp=drive_link', error: {e}")
 
 
-@async_worker
+@async_worker  # type: ignore
 async def i_gvhmr(Dir=DIR, env=ENV, **kwargs):
     Log.info("📦 Install GVHMR")
     p = mamba(env=env, python='3.10', **kwargs)
@@ -52,23 +52,23 @@ async def i_gvhmr(Dir=DIR, env=ENV, **kwargs):
     d = ExistsPathList(chdir=Dir)
     Dir = os.path.join(Dir, 'GVHMR')
     if not os.path.exists(Dir):
-        p = Popen('git clone https://github.com/zju3dv/GVHMR', Raise=False, **kwargs)
+        p = await Popen('git clone https://github.com/zju3dv/GVHMR', Raise=False, **kwargs)
     d.chdir('GVHMR')
     dir_checkpoints = path_expand(os.path.join('inputs', 'checkpoints'))
     dir_smpl = os.path.join(dir_checkpoints, 'body_models')
     os.makedirs(dir_smpl, exist_ok=True)
 
-    @worker
-    def i_gvhmr_post():
-        p = Popen('git fetch --all', Raise=False, **kwargs)
-        p = Popen('git pull', Raise=False, **kwargs)
-        p = Popen('git submodule update --init --recursive', Raise=False, **kwargs)
+    @async_worker  # type: ignore
+    async def i_gvhmr_post():
+        p = await Popen('git fetch --all', Raise=False, **kwargs)
+        p = await Popen('git pull', Raise=False, **kwargs)
+        p = await Popen('git submodule update --init --recursive', Raise=False, **kwargs)
         txt = txt_from_self('gvhmr.txt')
         p = mamba(env=env, txt=txt, **kwargs)
         p = mamba(f'pip install -e {os.getcwd()}', env=env, **kwargs)
         p = txt_pip_retry(txt, env=env)
         return p
-    i_gvhmr_post()  # should non blocking in new thread
+    await i_gvhmr_post()  # should non blocking in new thread
 
     tasks = [
         i_dpvo(Dir=os.path.join(Dir, 'third-party/DPVO'), env=env, **kwargs),

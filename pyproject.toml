@@ -51,3 +51,7 @@ tests = [
 
 [project.scripts]
 mocap = "mocap_wrapper:app.main"
+
+[tool.setuptools.packages.find]
+include = ["mocap_wrapper.*"]
+where = ["mocap_wrapper"]

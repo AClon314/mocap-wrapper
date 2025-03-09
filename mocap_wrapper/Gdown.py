@@ -72,7 +72,7 @@ def google_drive(
 
     url_origin = url
 
-    sess, cookies_file = _get_session(
+    sess, cookies_file = _get_session(  # type: ignore
         proxy=proxy,
         use_cookies=use_cookies,
         user_agent=user_agent,
@@ -88,7 +88,7 @@ def google_drive(
         is_gdrive_download_link = True
 
     while True:
-        res = sess.get(url, stream=True, verify=verify)
+        res = sess.get(url, stream=True, verify=verify)  # type: ignore
 
         if not (gdrive_file_id and is_gdrive_download_link):
             break

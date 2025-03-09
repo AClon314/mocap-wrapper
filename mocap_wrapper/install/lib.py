@@ -1,10 +1,12 @@
-"""shared install logic"""
+"""shared install logic."""
+from hashlib import md5
 import os
 from sys import path as PATH
 from shutil import which, copy as cp
-from mocap_wrapper.logger import getLogger
 from mocap_wrapper.lib import *
-from typing import Dict, List, Literal, Union, get_args
+from typing import Dict, List, Literal, TypedDict, Union, Unpack, get_args
+from mocap_wrapper.logger import getLogger
+
 Log = getLogger(__name__)
 
 ENV = 'mocap'
@@ -64,7 +66,7 @@ def remove_if_p(path: str, progress: sp.Popen):
     os.remove(path) if progress.returncode == 0 and os.path.exists(path) else None
 
 
-def get_py_mgr() -> Union[TYPE_PY_MGRS, None]:
+def get_py_mgr() -> TYPE_PY_MGRS:
     for mgr in PY_MGRS:
         if which(mgr):
             if mgr == 'conda':
@@ -85,9 +87,9 @@ def get_pkg_mgr():
             return mgr
 
 
-def pkg(action: TYPE_PKG_ACT, package: list[str] = [], **kwargs):
+async def pkg(action: TYPE_PKG_ACT, package: list[str] = [], **kwargs):
     p = f"{SU}{PKG_MGR} {PKG_MGRS[PKG_MGR][action]} {' '.join(package)}"
-    p = Popen(p, **kwargs)
+    p = await Popen(p, **kwargs)
     return p
 
 
@@ -99,7 +101,7 @@ def i_pkgs(**kwargs):
     return True
 
 
-def i_mamba(require_restart=True, **kwargs):
+async def i_mamba(require_restart=True, **kwargs):
     Log.info("📦 Install Mamba")
     url = "https://github.com/conda-forge/miniforge/releases/latest/download/"
     setup = ''
@@ -119,42 +121,55 @@ def i_mamba(require_restart=True, **kwargs):
     setup = d.dir + '/' + setup
     p = None
     if is_win:
-        p = Popen(f'start /wait "" {setup} /InstallationType=JustMe /RegisterPython=0 /S /D=%UserProfile%\\Miniforge3', **kwargs)
+        p = await Popen(f'start /wait "" {setup} /InstallationType=JustMe /RegisterPython=0 /S /D=%UserProfile%\\Miniforge3', **kwargs)
     else:
-        p = Popen(f'bash "{setup}" -b', **kwargs)
+        p = await Popen(f'bash "{setup}" -b', **kwargs)
     remove_if_p(setup, p)
 
     p = mamba(env='nogil', txt=txt_from_self(), pkgs=['python-freethreading'], **kwargs)
-    p = Popen("conda config --set env_prompt '({default_env})'", **kwargs)  # TODO: need test
+    p = await Popen("conda config --set env_prompt '({default_env})'", **kwargs)  # TODO: need test
 
     if require_restart:
         Log.info(f"✔ re-open new terminal and run me again to refresh shell env!")
         exit(0)  # TODO: find a way not to exit
 
 
-def get_envs(manager='mamba', **kwargs):
-    """return {'base': '~/miniforge3'}"""
+def get_envs(manager: TYPE_PY_MGRS = 'mamba', **kwargs):
+    """
+    Args:
+        manager (str): 'mamba', 'conda', 'pip'
+        kwargs (dict): `subprocess.Popen()` args
+
+    Returns: 
+        env (dict): eg: {'base': '~/miniforge3'}
+        now (str): currently env name like 'base'
+    """
     env = Exec(f'{manager} env list', **kwargs)
     env = [l.split() for l in env.split('\n') if l and not l.startswith('#')]
     env = {l[0]: l[1 if len(l) == 2 else 2] for l in env}
-    now = os.getenv('CONDA_DEFAULT_ENV')
+    now = str(os.getenv('CONDA_DEFAULT_ENV'))
     return env, now
 
 
-def mamba(
+async def mamba(
     cmd: str = '',
     py_mgr: TYPE_PY_MGRS = 'mamba',
     env=ENV,
     python: str = '',
     txt: Union[Literal['requirements.txt'], str] = '',
-    pkgs=[], **kwargs
+    pkgs=[],
+    **kwargs
 ):
     """By default do 2 things:
     1. create env if no exist
-    2. install from `pkgs`
-    - if `cmd` then, run `cmd` in the env
+    2. install from `pkgs` and `txt`
+    3. if `cmd` then, run `cmd` in the env
 
-    `**kwargs` for `subprocess.Popen(...)`
+    Args:
+        kwargs (dict): `subprocess.Popen` args
+
+    Returns:
+        TODO: return failed list
     """
     envs = {}
     python = f'python={python}' if python else ''
@@ -166,7 +181,7 @@ def mamba(
     else:
         envs, _ = get_envs(py_mgr)
         if env and env not in envs:
-            p = Popen(f"{py_mgr} create -y -n {env} {python}", **kwargs)
+            p = await Popen(f"{py_mgr} create -y -n {env} {python}", **kwargs)
 
     if txt:
         if os.path.exists(path_expand(txt)):
@@ -183,9 +198,9 @@ def mamba(
             py_bin = os.path.join(envs[env], 'bin')
             pip = os.path.join(py_bin, 'pip')
             python = os.path.join(py_bin, 'python')
-            p = Popen(f"{pip} install {txt} {' '.join(pkgs)}", **kwargs)
+            p = await Popen(f"{pip} install {txt} {' '.join(pkgs)}", **kwargs)
         else:
-            p = Popen(f"{py_mgr} install -y -n {env} {txt} {' '.join(pkgs)}", **kwargs)
+            p = await Popen(f"{py_mgr} install -y -n {env} {txt} {' '.join(pkgs)}", **kwargs)
 
     if cmd:
         cmd = sub(r"'(['])", r"\\\1", cmd)
@@ -201,7 +216,7 @@ def mamba(
                     Log.warning(f"Detected suspicious untranslated executable: {word}. If you encounter errors, you may want to modify the source code :)")
         else:
             cmd = ' '.join(filter(None, (py_mgr, 'run -n', env, SHELL, _c, f"'{cmd}'")))
-        p = Popen(cmd, **kwargs)
+        p = await Popen(cmd, **kwargs)
     return True  # TODO: return failed list
 
 
@@ -232,20 +247,44 @@ def txt_pip_retry(txt: str, tmp_dir=DIR, env=ENV):
     return p
 
 
-def itmd_coro(
+class Kw_itmd_coro(TypedDict):
+    md5: str
+    duration: float
+    dry_run: bool
+
+
+class Kw_itmd(Kw_itmd_coro):
+    Dir: str
+    url: str
+    referer: str
+    PHPSESSID: str
+    user_agent: str
+
+
+class Kw_i_smpl(Kw_itmd):
+    From: str
+    to: str
+
+
+def tue_mpg_download(
     Dir=DIR,
     url='https://download.is.tue.mpg.de/download.php?domain=smpl&sfile=SMPL_python_v.1.1.0.zip',
     referer='https://smpl.is.tue.mpg.de/',
     PHPSESSID='26-digits_123456789_123456',
     user_agent='Transmission/2.77',
-    **kwargs
+    **kwargs: Unpack[Kw_itmd_coro]
 ):
     """
-    - Dir: download to which temp dir
-    - url: file url
-    - referer: main domain
-    - PHPSESSID: from your logged-in cookie🍪, **expires after next login**
-    - user_agent: from your browser🌐
+    Returns:
+        Coroutine: async download()
+
+    Args:
+        Dir (str): downlaod directory
+        url (str): download file url
+        referer (str): prevent error 403
+        PHPSESSID (str, optional): not necessary. PHPSESSID retrieved from logged in cookie, **expires after next login**  
+                        从已登录的 cookie 中获取的 PHPSESSID，**在下次登录后过期**
+        user_agent (str, optional): not necessary. User-Agent to prevent error 403
     """
     Dir = path_expand(Dir)
     path = path_expand(os.path.join(Dir, 'cookies.txt'))
@@ -264,31 +303,40 @@ def itmd_coro(
     return download(url, dir=Dir, **options)
 
 
-async def itmd_full(
+async def tue_mpg(
     From='SMPL_python_v.1.1.0/smpl/models/*',
     to='smpl',
-    **kwargs
+    map: Dict[str, str] = {},
+    **kwargs: Unpack[Kw_itmd]
 ):
     """
-    - From: which files to unzip
-    - to: where to unzip
+    1.Download 2.unzip 3.synlink files
+
+    Args:
+        Dir (str): work directory
+        url (str): download file url
+        referer (str): prevent error 403
+
+        From (str): which files to unzip
+        to (str): where to unzip
+        map (dict): symlink after unzip  
+            eg: {'basicmodel_neutral_lbs_10_207_0_v1.1.0.pkl': 'SMPL_NEUTRAL.pkl'}
     """
-    f = await itmd_coro(**kwargs)
-    p = unzip(f.path, to=kwargs.setdefault('Dir', DIR), **kwargs)
-    os.symlink('basicmodel_neutral_lbs_10_207_0_v1.1.0.pkl', 'SMPL_NEUTRAL.pkl')
+    f = await tue_mpg_download(**kwargs)
+    p = await unzip(f.path, From=From, to=to, **kwargs)
+    for From, to in map.items():
+        os.symlink(From, to)
     return f
 
 
-@async_worker
+@async_worker  # type: ignore
 async def i_smpl(
-    Dir=DIR,
     PHPSESSIDs: dict = {'smpl': '', 'smplx': ''},
-    user_agent='Transmission/2.77',
-    duration=RELAX,
-    **kwargs
+    **kwargs: Unpack[Kw_i_smpl]
 ) -> List['aria2p.Download']:
     """
-    - PHPSESSIDs: {'smpl': '26-digits_123456789_123456', 'smplx': '26-digits_123456789_123456'}
+    Args:
+        PHPSESSIDs (dict): {'smpl': '26-digits_123456789_123456', 'smplx': '26-digits_123456789_123456'}
     """
     Log.info("⬇️ Download SMPL && SMPLX (📝 By downloading, you agree to SMPL/SMPL-X corresponding licences)")
 
@@ -296,14 +344,14 @@ async def i_smpl(
     #     if not (v and isinstance(v, str)):
     #         Log.warning(f"🍪 cookies: PHPSESSID for {k}={v} could cause download failure")
 
-    Dir = path_expand(Dir)
+    Dir = path_expand(kwargs.setdefault('Dir', DIR))
     zips = {
         'SMPL_python_v.1.1.0.zip': {
             'from': 'SMPL_python_v.1.1.0/smpl/models/*',
             'to': 'smpl',
             # TODO: rename
             'serial': [
-                itmd_coro(Dir=Dir, PHPSESSID=PHPSESSIDs['smpl'], user_agent=user_agent, **kwargs),
+                tue_mpg_download(PHPSESSID=PHPSESSIDs['smpl'], user_agent=user_agent, **kwargs),
                 unzip_after_dl,
                 os.symlink
             ],
@@ -312,10 +360,10 @@ async def i_smpl(
             'from': 'models/smplx/*',
             'to': 'smplx',
             'serial': [
-                itmd_coro(
+                tue_mpg_download(
                     url='https://download.is.tue.mpg.de/download.php?domain=smplx&sfile=models_smplx_v1_1.zip',
                     referer='https://smpl-x.is.tue.mpg.de/',
-                    Dir=Dir, PHPSESSID=PHPSESSIDs['smplx'], user_agent=user_agent, **kwargs
+                    PHPSESSID=PHPSESSIDs['smplx'], user_agent=user_agent, **kwargs
                 ),
                 unzip_after_dl,
             ],
@@ -349,7 +397,7 @@ async def i_smpl(
     return dls
 
 
-@async_worker
+@async_worker  # type: ignore
 async def i_dpvo(Dir=DIR, env=ENV, **kwargs):
     Log.info("📦 Install DPVO")
     Dir = path_expand(Dir)
@@ -358,7 +406,7 @@ async def i_dpvo(Dir=DIR, env=ENV, **kwargs):
         md5='994092410ba29875184f7725e0371596',
         dir=Dir
     )
-    if f.is_complete and os.path.exists(f.path):
+    if f.is_completed and os.path.exists(f.path):
         p = unzip(f.path, to=os.path.join(Dir, 'thirdparty'), **kwargs)
         # remove_if_p(f.path, p)
     else:
@@ -397,7 +445,7 @@ async def install(mods, **kwargs):
 
     if Aria is None:
         # try to start aria2c
-        Popen(timeout=False, **kwargs)
+        p = await Popen('aria2c --enable-rpc --rpc-listen-port=6800', timeout=False, **kwargs)
         Aria = try_aria_port()
         if Aria is None:
             raise Exception("Failed to connect rpc to aria2, is aria2c/Motrix running?")
@@ -407,17 +455,19 @@ async def install(mods, **kwargs):
         run_async(i_mamba())
 
     if 'gvhmr' in mods:
+        from mocap_wrapper.install.gvhmr import i_gvhmr
         tasks.append(await i_gvhmr(**kwargs))
     if 'wilor' in mods:
+        from mocap_wrapper.install.wilor_mini import i_wilor_mini
         tasks.append(i_wilor_mini(**kwargs))
 
     ThreadWorkerManager.await_workers(*tasks)
     return tasks
 
 
-def clean():
-    p = Popen('pip cache purge')
-    p = Popen('conda clean --all')
+async def clean():
+    p = await Popen('pip cache purge')
+    p = await Popen('conda clean --all')
 
 
 SHELL = get_shell()

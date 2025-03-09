@@ -17,7 +17,6 @@ URLS = [
 ]
 
 
-@pytest.mark.asyncio
 @pytest.mark.parametrize(
     "urls, kwargs",
     [(URLS, {'dir': os.path.join(CWD, 'output')}),]
@@ -55,7 +54,6 @@ def test_kwargs(func, kwargs):
     assert p, p
 
 
-@pytest.mark.asyncio
 @pytest.mark.parametrize(
     "urls",
     [(URLS),]

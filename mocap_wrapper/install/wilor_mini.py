@@ -4,7 +4,7 @@ from mocap_wrapper.logger import getLogger
 Log = getLogger(__name__)
 
 
-@worker
+@worker  # type: ignore
 def i_wilor_mini(env=ENV, **kwargs):
     Log.info("📦 Install WiLoR-mini")
     kwargs.pop('Dir', None)

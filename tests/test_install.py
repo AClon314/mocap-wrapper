@@ -25,14 +25,13 @@ def test_env_list(mgr: str):
     "pkgs, env, cmd",
     [(('numpy', 'pandas'), ENV, "echo $CONDA_DEFAULT_ENV"),]
 )
-def test_mamba(pkgs, env, cmd):
-    fail = mamba(*pkgs, env=env, txt=None, cmd=cmd, dry_run=DRY_RUN)
-    cleanup = Popen(f"{PY_MGR} env remove -y -n {ENV}")
+async def test_mamba(pkgs, env, cmd):
+    fail = await mamba(*pkgs, env=env, txt=None, cmd=cmd, dry_run=DRY_RUN)
+    cleanup = await Popen(f"{PY_MGR} env remove -y -n {ENV}")
     assert not fail, fail
 
 
 @pytest.mark.skip(reason="403 Forbidden")
-@pytest.mark.asyncio
 @pytest.mark.parametrize(
     "smpl, smplx",
     [('smpl=18j30naqt388odc21r4kkmvpa0',
@@ -45,7 +44,6 @@ async def test_smpl(smpl, smplx):
         os.remove(d.path)
 
 
-@pytest.mark.asyncio
 @pytest.mark.parametrize(
     "ID",
     [

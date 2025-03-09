@@ -8,7 +8,7 @@ from datetime import timedelta
 from functools import wraps
 from types import SimpleNamespace
 from mocap_wrapper.logger import getLogger, PG_DL
-from typing import Any, Callable, Concatenate, Coroutine, List, Literal, NewType, ParamSpec, Tuple, TypeVar, Union, cast, overload
+from typing import Any, Callable, Coroutine, List, Literal, ParamSpec, Tuple, TypeVar, TypedDict, Union, Unpack, cast, overload
 from typing_extensions import deprecated
 Log = getLogger(__name__)
 MODS = ['wilor', 'gvhmr']
@@ -50,7 +50,7 @@ def is_main_thread():
     return threading.current_thread() == threading.main_thread()
 
 
-def rich_finish(task: rich.progress.TaskID):
+def rich_finish(task: 'rich.progress.TaskID'):
     P = PG_DL
     P.update(task, completed=100)
     P.start_task(task)
@@ -68,7 +68,7 @@ def then(coro: Coroutine, *serials_1by1: Tuple[Callable], parallel_1toN: List[Ca
 
 async def run_1by1(
     coros: List[Union[Coroutine, aio.Task]],
-    callback: Callable[[aio.Task], object] = None,
+    callback: Union[Callable, aio.Task, None] = None,
     duration=RELAX
 ):
     """
@@ -95,19 +95,19 @@ async def run_1by1(
     """
     tasks: List[aio.Task] = []
     for i in range(len(coros)):
-        c = t = coros[i]
-        if not isinstance(c, aio.Task):
+        c = coros[i]
+        if isinstance(c, Coroutine):
             t = aio.create_task(c)
             if callback and callable(callback):
                 t.add_done_callback(callback)
-        tasks.append(t)
+            tasks.append(t)
+        elif isinstance(c, aio.Task):
+            tasks.append(c)
+        else:
+            raise TypeError(f"Invalid type: {type(c)}")
         if i < len(coros) - 1:
             await aio.sleep(duration)
     return tasks
-    # result = await t
-    # yield result
-    # results = await aio.gather(*tasks)
-    # return results
 
 PS = ParamSpec("PS")
 TV = TypeVar("TV")
@@ -157,16 +157,17 @@ def filter_kwargs(funcs: List[Union[Callable, object]], kwargs, check=CHECK_KWAR
     return d
 
 
-def unzip(
+async def unzip(
     zip_path: str, From='', to=DIR, pwd='',
-    overwrite_policy: Literal['always', 'skip', 'rename_new', 'rename_old'] = 'skip',
+    overwrite_rule: Literal['always', 'skip', 'rename_new', 'rename_old'] = 'skip',
     **kwargs
 ):
     """
     use 7z to unzip files
 
-    - From: eg: `subdir/*`
-    - pwd: password
+    Args:
+        From (str): eg: `subdir/*`
+        pwd (str): password
     """
     mode = 'x'
     if From:
@@ -177,48 +178,61 @@ def unzip(
         pwd = f'-p{pwd}'
 
     conflict = ''
-    if overwrite_policy == 'skip':
+    if overwrite_rule == 'skip':
         conflict = '-aos'
-    elif overwrite_policy == 'always':
+    elif overwrite_rule == 'always':
         conflict = '-aoa'
-    elif overwrite_policy == 'rename_new':
+    elif overwrite_rule == 'rename_new':
         conflict = '-aou'
-    elif overwrite_policy == 'rename_old':
+    elif overwrite_rule == 'rename_old':
         conflict = '-aot'
     else:
-        Log.warning(f"Unknown replace_if_existing: {overwrite_policy}")
+        Log.warning(f"Unknown replace_if_existing: {overwrite_rule}")
     cmd = ' '.join(filter(None, ('7z', mode, conflict, pwd, f'"{zip_path}"', From, to)))
-    p = Popen(cmd, **kwargs)
+    p = await Popen(cmd, **kwargs)
     return p
 
 
-@deprecated("Use `Popen` instead")
-async def Popen_(
-    cmd='aria2c --enable-rpc --rpc-listen-port=6800',
-    timeout=TIMEOUT, Raise=True, dry_run=False, **kwargs
+@overload
+async def Popen(cmd: str, timeout: Union[int, float] = TIMEOUT, Raise: bool = True, dry_run: Literal[False] = False, **kwargs) -> aio.subprocess.Process: ...
+
+
+@overload
+async def Popen(cmd: str, timeout: Union[int, float] = TIMEOUT, Raise: bool = True, dry_run: Literal[True] = True, **kwargs) -> None: ...
+
+
+async def Popen(
+    cmd: str,
+    timeout: Union[int, float] = TIMEOUT, Raise=True, dry_run=False, **kwargs
 ):
     """Used on long running commands
-    set `timeout` to -1 to run in background (non-blocking)
+
+    Args:
+        timeout (float): set to -1 to run in background (non-blocking)
+        Raise (bool): if False, log warning instead of raising Exception
+        dry_run (bool): if True, only print the command without executing
     """
     Log.info(cmd)
     if dry_run:
         return
     p = await aio.create_subprocess_shell(
-        cmd, **filter_kwargs([aio.create_subprocess_shell, Popen], kwargs)
+        cmd,
+        **filter_kwargs([aio.create_subprocess_shell, Popen], kwargs)
     )
     if timeout is None or timeout >= 0:
         await p.wait()
         if p.returncode != 0:
             if Raise:
-                raise Exception(f"{cmd}")
+                raise ChildProcessError(f"{cmd}")
             else:
-                Log.error(f"{cmd}")
+                Log.warning(f"{cmd}")
     return p
 
 
 @copy_kwargs(sp.Popen)
-def Popen(
-    args, Raise=True, dry_run=False, **kwargs
+def Popen_(
+    cmd: str,
+    timeout=TIMEOUT, Raise=True, dry_run=False, **kwargs
 ):
     """Used on long running commands  
     set `timeout` to -1 to run in background (non-blocking)
@@ -226,26 +240,26 @@ def Popen(
     - Raise: if False, log warning instead of raising Exception
     - dry_run: if True, only print the command without executing
     """
-    Log.info(args)
+    Log.info(cmd)
     if dry_run:
         return
-    kwargs.setdefault('args', 'aria2c --enable-rpc --rpc-listen-port=6800')
-    kwargs.setdefault('shell', True)
-    kwargs.setdefault('env', os.environ)
-    kwargs.setdefault('encoding', 'utf-8')
-    p = sp.Popen(args, **filter_kwargs([sp.Popen], kwargs))
-    if kwargs.timeout is None or kwargs.timeout >= 0:
-        p.wait(timeout=kwargs.timeout)
+    p = sp.Popen(
+        cmd,
+        shell=True, env=os.environ, encoding='utf-8',
+        **filter_kwargs([sp.Popen], kwargs)
+    )
+    if timeout is None or timeout >= 0:
+        p.wait(timeout=timeout)
         if p.returncode != 0:
             if Raise:
-                raise Exception(f"{args}")
+                raise ChildProcessError(f"{cmd}")
             else:
-                Log.warning(f"{args}")
+                Log.warning(f"{cmd}")
     return p
 
 
 @copy_kwargs(sp.check_output)
-def Exec(args, Print=True, **kwargs) -> Union[str, bytes, None]:
+def Exec(args, Print=True, **kwargs) -> Union[str, None]:
     """Only used on instantly returning commands
 
     - Print: print the output
@@ -260,10 +274,10 @@ def Exec(args, Print=True, **kwargs) -> Union[str, bytes, None]:
     return s
 
 
-def version(cmd: str):
+async def version(cmd: str):
     """use `cmd --version` to check if a program is installed"""
     cmd += ' --version'
-    p = Popen(cmd)  # type: ignore
+    p = await Popen(cmd)  # type: ignore
     return p.returncode == 0
 
 
@@ -366,12 +380,23 @@ async def aria(
     return dl
 
 
+class Kw_download(TypedDict, total=False):
+    dir: str
+    out: str
+    max_connection_per_server: str
+    split: str
+    user_agent: str
+    referer: str
+    max_tries: str
+    header: str
+
+
 async def download(
     url: str,
     md5: str = '',
     duration=0.5,
     dry_run=False,
-    **kwargs: 'aria2p.Options'
+    **kwargs: Unpack[Kw_download]
 ):
     """check if download is complete every `duration` seconds
 
