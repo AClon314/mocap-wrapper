@@ -23,7 +23,7 @@ connectionpool_logger.setLevel(logging.CRITICAL)
 try:
     from rich import print
     from rich.text import Text
-    from rich.console import Console
+    # from rich.console import Console
     from rich.logging import RichHandler
     from rich.progress import Progress, TextColumn
     config['handlers'] = [RichHandler(rich_tracebacks=True)]

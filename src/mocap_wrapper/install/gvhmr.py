@@ -43,19 +43,29 @@ async def i_gvhmr_models(Dir=DIR, **kwargs):
     coros = []
     try:
         for out, dic in LFS.items():
-            url = google_drive(id=dic['GD_ID'])
+            url = URL_HUGGINGFACE + '/'.join(out)
             t = download(url, md5=dic['md5'], out=os.path.join(Dir, *out))
             coros.append(t)
         for out, dic in LFS_SMPL.items():
             url = URL_HUGGINGFACE + out[-1]
             t = download(url, md5=dic['md5'], out=os.path.join(Dir, *out))
             coros.append(t)
-        results = await aio.gather(*await run_1by1(coros))
-        SMPL_PATH = [os.path.join(Dir, *out) for out in LFS_SMPL.keys()]
-        IS_SMPL = all([os.path.exists(p) for p in SMPL_PATH])
+        results = await aio.gather(*coros)
+
+        coros = []
+        PATH_MODEL = [os.path.join(Dir, *out) for out in LFS.keys()]
+        IS_MODEL = all([os.path.exists(p) for p in PATH_MODEL])
+        if not IS_MODEL:
+            for out, dic in LFS.items():
+                url = google_drive(id=dic['GD_ID'])
+                t = download(url, md5=dic['md5'], out=os.path.join(Dir, *out))
+                coros.append(t)
+        PATH_SMPL = [os.path.join(Dir, *out) for out in LFS_SMPL.keys()]
+        IS_SMPL = all([os.path.exists(p) for p in PATH_SMPL])
         if not IS_SMPL:
-            # fallback
-            result = await i_smpl(Dir=os.path.join(Dir, 'body_models'), **kwargs)
+            coros.append(i_smpl(Dir=os.path.join(Dir, 'body_models'), **kwargs))
+        results = await aio.gather(*coros)
+
         Log.info("✔ Download GVHMR pretrained models")
     except Exception as e:
         Log.error(f"❌ please download GVHMR pretrained models manually from: 'https://drive.google.com/drive/folders/1eebJ13FUEXrKBawHpJroW0sNSxLjh9xD?usp=drive_link', error: {e}")

@@ -79,12 +79,12 @@
 
 ## install
 ```
-
+mocap -I -I@ ..
 ```
 
 ## usage
 ```
-mocap -I -i input.mp4 output.mp4
+mocap -i input.mp4 output.mp4
 ```
 
 ## dev
