@@ -12,7 +12,7 @@ description = "GVHMR, TRAM, WiLoR...mocap install/run with blender/unreal in one
 keywords = ["mocap", "pose estimate", "blender", "unreal"]
 license = {file = "LICENSE"}
 name = "mocap-wrapper"
-readme = "A Python package"
+readme = "README.md"
 version = "0.1.0"
 
 classifiers = [
@@ -28,17 +28,11 @@ classifiers = [
   "Programming Language :: Python :: 3.11",
   "Programming Language :: Python :: 3.12",
 ]
-
-dependencies = [
-  "aria2p",
-  "regex",
-  "rich",
-  "gdown",
-  "python-worker",
-  "aiohttp",
-  "netscape-cookies",
-]
+dynamic = ["dependencies"]
 requires-python = ">=3.7"
+
+[tool.setuptools.dynamic]
+dependencies = {file = ["requirements.txt"]}
 
 [project.urls]
 Download = "http://github.com/AClon314/mocap-wrapper/releases"

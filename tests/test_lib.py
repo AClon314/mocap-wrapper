@@ -35,8 +35,8 @@ async def test_download(urls, kwargs):
     [('output/SMPL_python_v.1.1.0.zip',
       'output'),]
 )
-def test_unzip(From, to):
-    p = unzip(From, to, dry_run=DRY_RUN)
+async def test_unzip(From, to):
+    p = await unzip(From, to, dry_run=DRY_RUN)
     assert p.returncode == 0, p
     # os.rmdir(to)
 
@@ -66,6 +66,11 @@ async def test_resume(urls):
         except aiohttp.ServerConnectionError as e:
             Log.error(e)
             continue
+
+
+async def test_popen():
+    p, out, err = await Popen_wait('echo "Hello World!"')
+    assert p.returncode == 0, p
 
 
 @pytest.fixture(scope="function", autouse=True)

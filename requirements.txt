@@ -1,7 +1,9 @@
 rich
 gdown
 aiohttp
-aria2p  # mamba failed:
-python-worker
+pexpect
+## mamba failed:
 regex
+aria2p
+python-worker
 netscape-cookies

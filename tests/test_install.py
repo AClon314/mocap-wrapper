@@ -27,7 +27,7 @@ def test_env_list(mgr: str):
 )
 async def test_mamba(pkgs, env, cmd):
     fail = await mamba(*pkgs, env=env, txt=None, cmd=cmd, dry_run=DRY_RUN)
-    cleanup = await Popen(f"{PY_MGR} env remove -y -n {ENV}")
+    cleanup = await popen(f"{PY_MGR} env remove -y -n {ENV}")
     assert not fail, fail
 
 

@@ -1,11 +1,15 @@
 """```python
-from mocap_wrapper.logger import getLogger, dl_pg
+from mocap_wrapper.logger import getLogger, PG_DL, IS_DEBUG, LOGLEVEL
 ```"""
 import atexit
 import logging
 from logging import getLogger
 from os import environ, path
-LOGLEVEL = environ.get('LOGLVL', 'INFO').upper()
+IS_DEBUG = False
+LOGLEVEL = environ.get('LOGLVL')
+if LOGLEVEL:
+    IS_DEBUG = True
+LOGLEVEL = (LOGLEVEL or 'INFO').upper()
 fmt = ''
 config = {
     'level': LOGLEVEL,
@@ -19,6 +23,7 @@ connectionpool_logger.setLevel(logging.CRITICAL)
 try:
     from rich import print
     from rich.text import Text
+    from rich.console import Console
     from rich.logging import RichHandler
     from rich.progress import Progress, TextColumn
     config['handlers'] = [RichHandler(rich_tracebacks=True)]
@@ -32,8 +37,17 @@ try:
                 text = f"{task.speed:.3f} steps/s"
             return Text(text=text)
 
-    PG_DL = Progress(*Progress.get_default_columns(), SpeedColumn(''))
-    PG_DL.start()
+    def cleanup():
+        if 'PROGRESS_DL' in globals():
+            PROGRESS_DL.stop()
+        # if 'CONSOLE' in globals():
+        #     CONSOLE.end_capture()
+    atexit.register(cleanup)
+
+    PROGRESS_DL = Progress(*Progress.get_default_columns(), SpeedColumn(''))
+    PROGRESS_DL.start()
+
+    # CONSOLE = Console()
 except ImportError:
     print(f'{path.basename(__file__)}\t⚠️ rich not installed，fallback to logging.StreamHandler')
     from logging import StreamHandler
@@ -43,14 +57,6 @@ logging.basicConfig(
     **config,
     format=fmt + '%(funcName)s: %(message)s',
 )
-
-
-def cleanup():
-    if 'PG_DL' in globals():
-        PG_DL.stop()
-
-
-atexit.register(cleanup)
 
 if __name__ == '__main__':
     Log = getLogger(__name__)

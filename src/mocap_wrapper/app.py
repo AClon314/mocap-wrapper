@@ -3,7 +3,16 @@ import os
 import argparse
 import asyncio as aio
 from mocap_wrapper.lib import DIR, MODS
+from mocap_wrapper.logger import IS_DEBUG
+from mocap_wrapper.install.lib import install, async_queue
 DEFAULT = ['gvhmr', 'wilor']
+
+
+async def one_by_one(tasks):
+    ret = []
+    for t in tasks:
+        ret.append(await t)
+    return ret
 
 
 def main():
@@ -16,6 +25,7 @@ def main():
     # arg.add_argument('--smplx', help='cookies:PHPSESSID to download smplx files. eg: `--smplx=26-digits_123456789_123456`')
     # arg.add_argument('--user-agent', help='From your logged in browser. eg: `--user-agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.36 Edge/16.16299"`')
 
+    tasks = [async_queue()]  # type: list
     arg = arg.parse_args()
     if os.path.exists(arg.install_at) == False:
         os.makedirs(arg.install_at, exist_ok=True)
@@ -26,10 +36,10 @@ def main():
                 mods += m.split(',')
         else:
             mods = DEFAULT
-        from mocap_wrapper.install.lib import install
-        tasks = aio.run(install(mods=mods, Dir=arg.install_at))
+        tasks.append(install(mods=mods, Dir=arg.install_at))
     if arg.input:
         print(f'Input file: {arg.input}')
+    aio.run(one_by_one(tasks), debug=IS_DEBUG)
 
 
 if __name__ == "__main__":
