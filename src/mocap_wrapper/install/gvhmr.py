@@ -1,3 +1,4 @@
+from functools import partial
 import os
 from mocap_wrapper.Gdown import google_drive
 from mocap_wrapper.logger import getLogger
@@ -84,16 +85,18 @@ async def i_gvhmr(Dir=DIR, env=ENV, **kwargs):
     os.makedirs(os.path.join(dir_checkpoints, 'body_models'), exist_ok=True)
 
     async def i_gvhmr_post():
-        p = await popen('git fetch --all', Raise=False, **kwargs)
-        p = await popen('git pull', Raise=False, **kwargs)
-        p = await popen('git submodule update --init --recursive', Raise=False, **kwargs)
         txt = txt_from_self('gvhmr.txt')
-        p = mamba(env=env, txt=txt, **kwargs)
-        p = mamba(f'pip install -e {os.getcwd()}', env=env, **kwargs)
-        p = txt_pip_retry(txt, env=env)
+        p = await mamba(env=env, txt=txt, **kwargs)
+        p = await txt_pip_retry(txt, env=env)
+        return p
+
+    async def git_mamba():
+        p = await git_pull()
+        p = await mamba(f'pip install -e {os.getcwd()}', env=env, **kwargs)
         return p
 
     tasks = [
+        git_mamba(),
         i_gvhmr_post(),
         i_dpvo(Dir=os.path.join(Dir, 'third-party/DPVO'), env=env, **kwargs),
         i_gvhmr_models(Dir=dir_checkpoints, **kwargs)

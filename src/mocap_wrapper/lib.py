@@ -84,16 +84,6 @@ async def async_queue(duration=0.02):
 #     P.start_task(task)
 
 
-def then(coro: Coroutine, *serials_1by1: Tuple[Callable], parallel_1toN: List[Callable] = []):
-    """run callbacks after coro"""
-    async def _then():
-        result = await coro
-        for func in parallel_1toN:
-            func(result)
-        return result
-    return _then()
-
-
 async def run_1by1(
     coros: Sequence[Union[Coroutine, aio.Task]],
     callback: Union[Callable, aio.Task, None] = None,
@@ -104,11 +94,11 @@ async def run_1by1(
 
     ```python
     # urgent way
-    for result in aio.as_completed(await run_1by1([coro1, coro2], callback)):
+    for result in aio.as_completed(await run_1by1([coro1(), coro2()], sync_func)):
         print(result)
 
     # wait until all complted
-    results = await aio.gather(*await run_1by1([coro1, coro2], callback))
+    results = await aio.gather(*await run_1by1([coro1(), coro2()], async_func()))
     ```
 
     - callback: accept `Task` object as argument only
@@ -365,7 +355,7 @@ async def calc_md5(file_path):
     @worker  # type: ignore
     def wrap():
         with open(file_path, 'rb') as f:
-            Log.info(f"Calculating MD5 for {file_path}")
+            Log.info(f"🖩 Calc MD5 for {file_path}")
             return hashlib.md5(f.read()).hexdigest()
     task = wrap()
     return await worker_ret(task)

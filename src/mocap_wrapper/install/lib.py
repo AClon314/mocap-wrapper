@@ -4,7 +4,7 @@ import os
 from sys import path as PATH
 from shutil import which, copy as cp
 from mocap_wrapper.lib import *
-from typing import Dict, List, Literal, TypedDict, Union, Unpack, get_args
+from typing import Dict, List, Literal, TypedDict, Union, get_args
 from mocap_wrapper.logger import getLogger
 
 Log = getLogger(__name__)
@@ -248,6 +248,19 @@ def txt_pip_retry(txt: str, tmp_dir=DIR, env=ENV):
         f.write(raw)
     p = mamba(py_mgr='pip', txt=tmp, env=env)
     # remove_if_p(tmp, p)
+    return p
+
+
+async def git_pull(**kwargs):
+    """```sh
+    git fetch --all
+    git pull
+    git submodule update --init --recursive
+    ```"""
+    kwargs.setdefault('Raise', False)
+    p = await popen('git fetch --all', **kwargs)
+    p = await popen('git pull', **kwargs)
+    p = await popen('git submodule update --init --recursive', **kwargs)
     return p
 
 
