@@ -146,8 +146,8 @@ async def get_envs(manager: TYPE_PY_MGRS = 'mamba', **kwargs):
         env (dict): eg: {'base': '~/miniforge3'}
         now (str): currently env name like 'base'
     """
-    p = await popen(f'{manager} env list', **kwargs)
-    env = p.before.decode()  # type: ignore
+    p, env = await echo(f'{manager} env list', **kwargs)
+    env = env.strip()
     env = [l.split() for l in env.split('\n') if l and not l.startswith('#')]   # type: ignore
     env = {l[0]: l[1 if len(l) == 2 else 2] for l in env}
     now = str(os.getenv('CONDA_DEFAULT_ENV'))

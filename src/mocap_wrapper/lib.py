@@ -237,7 +237,7 @@ async def popen(
             - no-wait: **background**, immediately return, suitable for **forever-looping**, use:
             p = await popen('cmd', mode='bg')
             await p.expect(pexpect.EOF, async_=True)
-            print(p.before.decode())
+            print(p.before.decode().strip())
         kwargs: `pexpect.spawn()` args
 
     Returns:

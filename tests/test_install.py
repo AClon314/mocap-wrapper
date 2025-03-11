@@ -9,13 +9,13 @@ DRY_RUN = True
 ENV = 'test'
 
 
-@pytest.mark.skip(reason="need to pre-install in CI")
+# @pytest.mark.skip(reason="need to pre-install in CI")
 @pytest.mark.parametrize(
     "mgr",
     [('mamba'), ('conda'),]
 )
-def test_env_list(mgr: str):
-    envs, now = get_envs(mgr)
+async def test_env_list(mgr: str):
+    envs, now = await get_envs(mgr)
     Log.debug(f'{now}, {envs}')
     assert 'base' in envs.keys(), envs
 
