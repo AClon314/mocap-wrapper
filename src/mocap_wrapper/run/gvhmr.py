@@ -19,6 +19,12 @@ from hmr4d.utils.video_io_utils import (
     get_writer,
     get_video_reader,
 )
+from hmr4d.utils.seq_utils import (  # patched
+    get_frame_id_list_from_mask,
+    linear_interpolate_frame_ids,
+    frame_id_to_mask,
+    rearrange_by_mask,
+)
 from hmr4d.utils.vis.cv2_utils import draw_bbx_xyxy_on_image_batch, draw_coco17_skeleton_batch
 
 from hmr4d.utils.preproc import Tracker, Extractor, VitPoseExtractor, SimpleVO
@@ -26,7 +32,7 @@ from hmr4d.utils.preproc import Tracker, Extractor, VitPoseExtractor, SimpleVO
 from hmr4d.utils.geo.hmr_cam import get_bbx_xys_from_xyxy, estimate_K, convert_K_to_K4, create_camera_sensor
 from hmr4d.utils.geo_transform import compute_cam_angvel
 from hmr4d.model.gvhmr.gvhmr_pl_demo import DemoPL
-from hmr4d.utils.net_utils import detach_to_cpu, to_cuda
+from hmr4d.utils.net_utils import detach_to_cpu, to_cuda, moving_average_smooth  # patched
 from hmr4d.utils.smplx_utils import make_smplx
 from hmr4d.utils.vis.renderer import Renderer, get_global_cameras_static, get_ground_params_from_points
 from tqdm import tqdm
@@ -35,13 +41,42 @@ from einops import einsum, rearrange
 
 
 CRF = 23  # 17 is lossless, every +6 halves the mp4 size
+person = 0
+
+
+def get_one_track_patch(self, video_path, person):
+    # track
+    track_history = self.track(video_path)
+
+    # parse track_history & use top1 track
+    id_to_frame_ids, id_to_bbx_xyxys, id_sorted = self.sort_track_length(track_history, video_path)
+    print('How many people in the video?', len(id_sorted))
+    # track_id = id_sorted[0]
+    track_id = id_sorted[person]  # adicionei essa variavel para escolher que
+    frame_ids = torch.tensor(id_to_frame_ids[track_id])  # (N,)
+    bbx_xyxys = torch.tensor(id_to_bbx_xyxys[track_id])  # (N, 4)
+
+    # interpolate missing frames
+    mask = frame_id_to_mask(frame_ids, get_video_lwh(video_path)[0])
+    bbx_xyxy_one_track = rearrange_by_mask(bbx_xyxys, mask)  # (F, 4), missing filled with 0
+    missing_frame_id_list = get_frame_id_list_from_mask(~mask)  # list of list
+    bbx_xyxy_one_track = linear_interpolate_frame_ids(bbx_xyxy_one_track, missing_frame_id_list)
+    assert (bbx_xyxy_one_track.sum(1) != 0).all()
+
+    bbx_xyxy_one_track = moving_average_smooth(bbx_xyxy_one_track, window_size=5, dim=0)
+    bbx_xyxy_one_track = moving_average_smooth(bbx_xyxy_one_track, window_size=5, dim=0)
+
+    return bbx_xyxy_one_track
+
+
+Tracker.get_one_track = get_one_track_patch  # patched
 
 
 def parse_args_to_cfg():
     # Put all args to cfg
     parser = argparse.ArgumentParser()
     parser.add_argument("--video", type=str, default="inputs/demo/dance_3.mp4")
-    parser.add_argument("--output_root", type=str, default=None, help="by default to outputs/demo")
+    parser.add_argument("--output_root", type=str, default='output/demo', help="by default to output/demo")
     parser.add_argument("-s", "--static_cam", action="store_true", help="If true, skip DPVO")
     parser.add_argument("--use_dpvo", action="store_true", help="If true, use DPVO. By default not using DPVO.")
     parser.add_argument(
@@ -76,6 +111,8 @@ def parse_args_to_cfg():
             overrides.append(f"output_root={args.output_root}")
         register_store_gvhmr()
         cfg = compose(config_name="demo", overrides=overrides)
+    if cfg.f_mm == 'None':
+        cfg.f_mm = None
 
     # Output
     Log.info(f"[Output Dir]: {cfg.output_dir}")
@@ -107,7 +144,7 @@ def run_preprocess(cfg):
     # Get bbx tracking result
     if not Path(paths.bbx).exists():
         tracker = Tracker()
-        bbx_xyxy = tracker.get_one_track(video_path).float()  # (L, 4)
+        bbx_xyxy = tracker.get_one_track(video_path, person).float()  # (L, 4)
         bbx_xys = get_bbx_xys_from_xyxy(bbx_xyxy, base_enlarge=1.2).float()  # (L, 3) apply aspect ratio and enlarge
         torch.save({"bbx_xyxy": bbx_xyxy, "bbx_xys": bbx_xys}, paths.bbx)
         del tracker
@@ -201,7 +238,7 @@ def load_data_dict(cfg):
 
 
 def render_incam(cfg):
-    incam_video_path = Path(cfg.paths.incam_video)
+    incam_video_path = Path(f'{cfg.paths.incam_video}_{person}.mp4')
     if incam_video_path.exists():
         Log.info(f"[Render Incam] Video already exists at {incam_video_path}")
         return
@@ -303,7 +340,61 @@ def render_global(cfg):
     writer.close()
 
 
-if __name__ == "__main__":
+def torch_to_numpy(pred: dict, out_path='gvhmr.pkl'):
+    """
+    Convert `'pred'` torch tensors (.pt) to numpy (.pkl) and save to out_path.
+    """
+    import pickle
+    pred_np = {}
+    keyname = ['smpl_params_global', 'smpl_params_incam']
+    keyname_deep = ['body_pose', 'global_orient', 'transl', 'betas']
+
+    for K in keyname:
+        pred_np[K] = {k: pred[K][k].cpu().numpy() for k in keyname_deep}
+    with open(out_path, 'wb') as handle:
+        pickle.dump(pred_np, handle, protocol=pickle.HIGHEST_PROTOCOL)
+
+
+def find_camera_extrinsics(verts_world, verts_camera):
+    """
+    Find camera extrinsics (R, T) given vertices in world and camera coordinate systems.
+
+    Args:
+        verts_world: (N, 3) Vertices in world coordinates.
+        verts_camera: (N, 3) Vertices in camera coordinates.
+
+    Returns:
+        R: (3, 3) Rotation matrix.
+        T: (3,) Translation vector.
+    """
+    # Compute centroids
+    centroid_world = verts_world.mean(dim=0)
+    centroid_camera = verts_camera.mean(dim=0)
+
+    # Center the points
+    centered_verts_world = verts_world - centroid_world
+    centered_verts_camera = verts_camera - centroid_camera
+
+    # Compute the cross-covariance matrix
+    H = centered_verts_camera.T @ centered_verts_world
+
+    # Perform SVD
+    U, _, Vt = torch.linalg.svd(H)
+
+    # Compute rotation matrix
+    R = U @ Vt
+    # Ensure R is a proper rotation matrix
+    if torch.det(R) < 0:
+        U[:, -1] *= -1  # Adjust U if determinant is negative
+        R = U @ Vt
+
+    # Compute translation vector
+    T = centroid_camera - R @ centroid_world
+
+    return R, T
+
+
+def main():
     cfg = parse_args_to_cfg()
     paths = cfg.paths
     Log.info(f"[GPU]: {torch.cuda.get_device_name()}")
@@ -314,6 +405,7 @@ if __name__ == "__main__":
     data = load_data_dict(cfg)
 
     # ===== HMR4D ===== #
+    pred = {}
     if not Path(paths.hmr4d_results).exists():
         Log.info("[HMR4D] Predicting")
         model: DemoPL = hydra.utils.instantiate(cfg.model, _recursive_=False)
@@ -325,6 +417,17 @@ if __name__ == "__main__":
         data_time = data["length"] / 30
         Log.info(f"[HMR4D] Elapsed: {Log.sync_time() - tic:.2f}s for data-length={data_time:.1f}s")
         torch.save(pred, paths.hmr4d_results)
+    else:
+        pred = torch.load(paths.hmr4d_results)
+
+    # === pkl === #
+    out_path = f'{cfg.paths.hmr4d_results[:-3]}_{person}.pkl'
+    torch_to_numpy(pred, out_path)
+
+    # ===== Check camera extrinsics ===== #
+    # R, T = find_camera_extrinsics(verts_world, verts_camera)
+    # verts_camera_pred = (verts_world @ R.T) + T
+    # print(torch.allclose(verts_camera_pred, verts_camera, atol=1e-6))  # Should return True
 
     # ===== Render ===== #
     render_incam(cfg)
@@ -332,3 +435,7 @@ if __name__ == "__main__":
     if not Path(paths.incam_global_horiz_video).exists():
         Log.info("[Merge Videos]")
         merge_videos_horizontal([paths.incam_video, paths.global_video], paths.incam_global_horiz_video)
+
+
+if __name__ == "__main__":
+    main()
