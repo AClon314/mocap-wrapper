@@ -1,3 +1,6 @@
+"""
+https://github.com/carlosedubarreto/CEB_4d_Humans/blob/main/four_d_humans_blender.py
+"""
 import bpy
 import os
 # import sys

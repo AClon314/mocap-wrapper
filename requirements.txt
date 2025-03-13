@@ -1,4 +1,5 @@
 rich
+numpy
 gdown
 aiohttp
 pexpect
