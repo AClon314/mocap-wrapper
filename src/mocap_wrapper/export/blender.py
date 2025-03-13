@@ -8,7 +8,6 @@ from mathutils import Matrix, Vector, Quaternion, Euler
 import json
 import pickle
 
-
 # Change the variables here
 ###############################
 smpl_model = r"D:\AI_Stuff\GVHMR\basicModel_m_lbs_10_207_0_v1.0.2.fbx"

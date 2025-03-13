@@ -35,7 +35,7 @@ jobs:
 
       #  Install project dependencies with pytest and run tests
       - name: Install dependencies
-        run: pip install -r requirements-dev.txt pytest
+        run: pip install -e ".[dev]"
 
 
       #  `-rs` flag is used to debug for the test failure

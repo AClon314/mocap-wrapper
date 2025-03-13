@@ -13,7 +13,7 @@ keywords = ["mocap", "pose estimate", "blender", "unreal"]
 license = {file = "LICENSE"}
 name = "mocap-wrapper"
 readme = "README.md"
-version = "0.1.0"
+version = "0.2.0"
 
 classifiers = [
   "License :: OSI Approved :: MIT License",
@@ -27,21 +27,19 @@ classifiers = [
   "Programming Language :: Python :: 3.10",
   "Programming Language :: Python :: 3.11",
   "Programming Language :: Python :: 3.12",
-]
-dynamic = ["dependencies"]
-requires-python = ">=3.7"
+] 
+dynamic = ["dependencies"] 
+requires-python = ">=3.11" # 💡 you can remove the codes about `typing Unpack` to lower the python version
 
 [tool.setuptools.dynamic]
 dependencies = {file = ["requirements.txt"]}
 
+[project.optional-dependencies]
+dev = ["pytest", "pytest-asyncio", "fake-bpy-module-4.3"]
+
 [project.urls]
 Download = "http://github.com/AClon314/mocap-wrapper/releases"
 Homepage = "http://github.com/AClon314/mocap-wrapper"
-
-[project.optional-dependencies]
-tests = [
-  "pytest",
-]
 
 [project.scripts]
 mocap = "mocap_wrapper:app.main"
