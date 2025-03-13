@@ -84,7 +84,7 @@ async def tue_mpg(
     return f
 
 
-async def i_smpl_pk(
+async def i_smpl(
     PHPSESSIDs: dict = {'smpl': '', 'smplx': ''},
     **kwargs: Unpack[Kw_i_smpl]
 ) -> List['aria2p.Download']:
@@ -101,7 +101,7 @@ async def i_smpl_pk(
     Dir = path_expand(kwargs.setdefault('Dir', DIR))
     tasks = [
         tue_mpg(
-            **filter_kwargs([i_smpl_pk], kwargs),  # type: ignore
+            **filter_kwargs([i_smpl], kwargs),  # type: ignore
             url='https://download.is.tue.mpg.de/download.php?domain=smpl&sfile=SMPL_python_v.1.1.0.zip',
             referer='https://smpl.is.tue.mpg.de/',
             md5='21f382969eed3ee3f597b049f228f84d',
@@ -112,7 +112,7 @@ async def i_smpl_pk(
             PHPSESSID=PHPSESSIDs['smpl'],
         ),
         tue_mpg(
-            **filter_kwargs([i_smpl_pk], kwargs),  # type: ignore
+            **filter_kwargs([i_smpl], kwargs),  # type: ignore
             url='https://download.is.tue.mpg.de/download.php?domain=smplx&sfile=models_smplx_v1_1.zip',
             referer='https://smpl-x.is.tue.mpg.de/',
             md5='763a8d2d6525263ed09aeeac3e67b134',

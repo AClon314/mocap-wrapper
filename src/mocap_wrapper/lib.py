@@ -1,4 +1,10 @@
-"""shared functions here"""
+"""shared functions: 
+- download/aria, calc_md5, is_resumable_file, try_aria_port
+- popen/echo, unzip/version
+- run_1by1, async_queue
+- copy_kwargs, filter_kwargs, get_coro_sig, is_main_thread
+- path_expand, ExistsPathList, Single
+"""
 import os
 import sys
 import hashlib

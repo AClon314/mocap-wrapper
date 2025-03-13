@@ -1,9 +1,7 @@
-from functools import partial
-import os
 from mocap_wrapper.Gdown import google_drive
-from mocap_wrapper.logger import getLogger
-from mocap_wrapper.lib import *
 from mocap_wrapper.install.lib import *
+from mocap_wrapper.install.smpl import i_smpl
+from mocap_wrapper.install.dpvo import i_dpvo
 Log = getLogger(__name__)
 
 
