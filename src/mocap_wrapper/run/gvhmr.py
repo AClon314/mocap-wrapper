@@ -81,7 +81,7 @@ def parse_args_to_cfg():
     parser.add_argument("--use_dpvo", action="store_true", help="If true, use DPVO. By default not using DPVO.")
     parser.add_argument(
         "--f_mm",
-        type=float,
+        type=int,
         default=None,
         help="Focal length of fullframe camera in mm. Leave it as None to use default values."
         "For iPhone 15p, the [0.5x, 1x, 2x, 3x] lens have typical values [13, 24, 48, 77]."
@@ -103,16 +103,15 @@ def parse_args_to_cfg():
             f"static_cam={args.static_cam}",
             f"verbose={args.verbose}",
             f"use_dpvo={args.use_dpvo}",
-            f"f_mm={args.f_mm}",
         ]
+        if args.f_mm is not None:
+            overrides.append(f"f_mm={args.f_mm}")
 
         # Allow to change output root
         if args.output_root is not None:
             overrides.append(f"output_root={args.output_root}")
         register_store_gvhmr()
         cfg = compose(config_name="demo", overrides=overrides)
-    if cfg.f_mm == 'None':
-        cfg.f_mm = None
 
     # Output
     Log.info(f"[Output Dir]: {cfg.output_dir}")
@@ -206,7 +205,7 @@ def run_preprocess(cfg):
         else:
             Log.info(f"[Preprocess] slam results from {paths.slam}")
 
-    Log.info(f"[Preprocess] End. Time elapsed: {Log.time() - tic:.2f}s")
+    Log.info(f"[Preprocess] End. Time elapsed: {Log.time()-tic:.2f}s")
 
 
 def load_data_dict(cfg):
