@@ -1,4 +1,8 @@
 # https://github.com/zju3dv/GVHMR/blob/main/tools/demo/demo.py
+from typing import Sequence, Set, Union
+import gc
+import time
+import inspect
 import cv2
 import torch
 import pytorch_lightning as pl
@@ -41,18 +45,42 @@ from einops import einsum, rearrange
 
 
 CRF = 23  # 17 is lossless, every +6 halves the mp4 size
-person = 0
+person_count = 1
+PERSON_COUNT_MAX = 10
+
+
+def vram_gb(): return torch.cuda.memory_allocated() / 1024 ** 3
+
+
+def free_ram():
+    vram_before = vram_gb()
+
+    stack = inspect.stack()
+    caller = stack[1]
+    gc.collect()
+    torch.cuda.empty_cache()
+
+    vram_release = vram_gb() - vram_before
+    msg = f"[Free VRAM] {vram_release:.2f} GB at\t{caller.filename}:{caller.lineno}"
+    if vram_release < -0.01:
+        Log.info(msg)
+    elif vram_release > 0.01:
+        Log.warning(msg)
 
 
 def get_one_track_patch(self, video_path, person):
+    # TODO cache track_history
+    global person_count
+
     # track
     track_history = self.track(video_path)
 
     # parse track_history & use top1 track
     id_to_frame_ids, id_to_bbx_xyxys, id_sorted = self.sort_track_length(track_history, video_path)
-    print('How many people in the video?', len(id_sorted))
+    person_count = len(id_sorted)
+    Log.info(f'How many people in the video? {person_count}')
     # track_id = id_sorted[0]
-    track_id = id_sorted[person]  # adicionei essa variavel para escolher que
+    track_id = id_sorted[person]
     frame_ids = torch.tensor(id_to_frame_ids[track_id])  # (N,)
     bbx_xyxys = torch.tensor(id_to_bbx_xyxys[track_id])  # (N, 4)
 
@@ -87,6 +115,7 @@ def parse_args_to_cfg():
         "For iPhone 15p, the [0.5x, 1x, 2x, 3x] lens have typical values [13, 24, 48, 77]."
         "If the camera zoom in a lot, you can try 135, 200 or even larger values.",
     )
+    parser.add_argument("--render", action="store_true", help="render the incam/global result video")
     parser.add_argument("--verbose", action="store_true", help="If true, draw intermediate results")
     args = parser.parse_args()
 
@@ -99,10 +128,13 @@ def parse_args_to_cfg():
     # Cfg
     with initialize_config_module(version_base="1.3", config_module=f"hmr4d.configs"):
         overrides = [
-            f"video_name={video_path.stem}",
+            f"video_name='{video_path.stem}'",
             f"static_cam={args.static_cam}",
             f"verbose={args.verbose}",
             f"use_dpvo={args.use_dpvo}",
+            f"person_count={person_count}",   # TODO maybe buggy
+            f"person=0",
+            f"+is_render={args.render}",
         ]
         if args.f_mm is not None:
             overrides.append(f"f_mm={args.f_mm}")
@@ -143,7 +175,7 @@ def run_preprocess(cfg):
     # Get bbx tracking result
     if not Path(paths.bbx).exists():
         tracker = Tracker()
-        bbx_xyxy = tracker.get_one_track(video_path, person).float()  # (L, 4)
+        bbx_xyxy = tracker.get_one_track(video_path, cfg.person).float()  # (L, 4)
         bbx_xys = get_bbx_xys_from_xyxy(bbx_xyxy, base_enlarge=1.2).float()  # (L, 3) apply aspect ratio and enlarge
         torch.save({"bbx_xyxy": bbx_xyxy, "bbx_xys": bbx_xys}, paths.bbx)
         del tracker
@@ -155,6 +187,8 @@ def run_preprocess(cfg):
         bbx_xyxy = torch.load(paths.bbx)["bbx_xyxy"]
         video_overlay = draw_bbx_xyxy_on_image_batch(bbx_xyxy, video)
         save_video(video_overlay, cfg.paths.bbx_xyxy_video_overlay)
+
+    free_ram()
 
     # Get VitPose
     if not Path(paths.vitpose).exists():
@@ -170,6 +204,8 @@ def run_preprocess(cfg):
         video_overlay = draw_coco17_skeleton_batch(video, vitpose, 0.5)
         save_video(video_overlay, paths.vitpose_video_overlay)
 
+    free_ram()
+
     # Get vit features
     if not Path(paths.vit_features).exists():
         extractor = Extractor()
@@ -178,6 +214,8 @@ def run_preprocess(cfg):
         del extractor
     else:
         Log.info(f"[Preprocess] vit_features from {paths.vit_features}")
+
+    free_ram()
 
     # Get visual odometry results
     if not static_cam:  # use slam to get cam rotation
@@ -237,7 +275,7 @@ def load_data_dict(cfg):
 
 
 def render_incam(cfg):
-    incam_video_path = Path(f'{cfg.paths.incam_video}_{person}.mp4')
+    incam_video_path = Path(cfg.paths.incam_video)
     if incam_video_path.exists():
         Log.info(f"[Render Incam] Video already exists at {incam_video_path}")
         return
@@ -339,19 +377,28 @@ def render_global(cfg):
     writer.close()
 
 
-def torch_to_numpy(pred: dict, out_path='gvhmr.pkl'):
+def torch_to_numpy(pred: dict, out_path='gvhmr.npz'):
     """
-    Convert `'pred'` torch tensors (.pt) to numpy (.pkl) and save to out_path.
+    Convert `'pred'` torch tensors (.pt) to numpy (.npz) and save to out_path.
     """
-    import pickle
     pred_np = {}
-    keyname = ['smpl_params_global', 'smpl_params_incam']
-    keyname_deep = ['body_pose', 'global_orient', 'transl', 'betas']
+    keyname = {
+        'smpl_params_global': 'smplx;gvhmr;global;',
+        'smpl_params_incam': 'smplx;gvhmr;incam;',
+    }
+    keyname_deep = {
+        'body_pose': 'pose;',
+        'global_orient': 'rotate;',
+        'transl': 'trans;',
+        'betas': 'shape',
+    }
 
-    for K in keyname:
-        pred_np[K] = {k: pred[K][k].cpu().numpy() for k in keyname_deep}
-    with open(out_path, 'wb') as handle:
-        pickle.dump(pred_np, handle, protocol=pickle.HIGHEST_PROTOCOL)
+    for K, K_ in keyname.items():
+        for k, k_ in keyname_deep.items():
+            pred_np[K_ + k_] = pred[K][k].cpu().numpy()
+    np.savez(out_path, **pred_np)
+    # with open(out_path, 'wb') as handle:
+    #     pickle.dump(pred_np, handle, protocol=pickle.HIGHEST_PROTOCOL)
 
 
 def find_camera_extrinsics(verts_world, verts_camera):
@@ -393,19 +440,25 @@ def find_camera_extrinsics(verts_world, verts_camera):
     return R, T
 
 
-def main():
-    cfg = parse_args_to_cfg()
-    paths = cfg.paths
-    Log.info(f"[GPU]: {torch.cuda.get_device_name()}")
-    Log.info(f'[GPU]: {torch.cuda.get_device_properties("cuda")}')
+def per_person(cfg):
+    """
+    run and save `.pt` results to disk, for each person.
 
+    Returns:
+        pred: dict, torch.tensor
+    """
+    free_ram()
+    paths = cfg.paths
     # ===== Preprocess and save to disk ===== #
     run_preprocess(cfg)
     data = load_data_dict(cfg)
 
+    free_ram()
+
     # ===== HMR4D ===== #
     pred = {}
-    if not Path(paths.hmr4d_results).exists():
+    hmr4d_results = paths.hmr4d_results
+    if not Path(hmr4d_results).exists():
         Log.info("[HMR4D] Predicting")
         model: DemoPL = hydra.utils.instantiate(cfg.model, _recursive_=False)
         model.load_pretrained_model(cfg.ckpt_path)
@@ -415,13 +468,9 @@ def main():
         pred = detach_to_cpu(pred)
         data_time = data["length"] / 30
         Log.info(f"[HMR4D] Elapsed: {Log.sync_time() - tic:.2f}s for data-length={data_time:.1f}s")
-        torch.save(pred, paths.hmr4d_results)
+        torch.save(pred, hmr4d_results)
     else:
-        pred = torch.load(paths.hmr4d_results)
-
-    # === pkl === #
-    out_path = f'{cfg.paths.hmr4d_results[:-3]}_{person}.pkl'
-    torch_to_numpy(pred, out_path)
+        pred = torch.load(hmr4d_results)
 
     # ===== Check camera extrinsics ===== #
     # R, T = find_camera_extrinsics(verts_world, verts_camera)
@@ -429,11 +478,35 @@ def main():
     # print(torch.allclose(verts_camera_pred, verts_camera, atol=1e-6))  # Should return True
 
     # ===== Render ===== #
-    render_incam(cfg)
-    render_global(cfg)
-    if not Path(paths.incam_global_horiz_video).exists():
-        Log.info("[Merge Videos]")
-        merge_videos_horizontal([paths.incam_video, paths.global_video], paths.incam_global_horiz_video)
+    if cfg.is_render:
+        render_incam(cfg)
+        render_global(cfg)
+        if not Path(paths.incam_global_horiz_video).exists():
+            Log.info("[Merge Videos]")
+            merge_videos_horizontal([paths.incam_video, paths.global_video], paths.incam_global_horiz_video)
+    return pred
+
+
+def main(Persons: Union[Sequence[int], Set[int], None] = None):
+    cfg = parse_args_to_cfg()
+    Log.info(f"[GPU]: {torch.cuda.get_device_name()}")
+    Log.info(f'[GPU]: {torch.cuda.get_device_properties("cuda")}')
+
+    run_preprocess(cfg)
+    # TODO record Persons in yaml
+    if Persons == None:
+        Persons = range(0, min(person_count, PERSON_COUNT_MAX))
+    if not isinstance(Persons, list):
+        Persons = list(Persons)
+        Persons.pop(0)  # remove the first person
+    for p in Persons:
+        cfg.person = p
+        Log.info(f"[Person {p}] from {Persons}")
+        pred = per_person(cfg)
+
+    # === pkl === #
+    # out_path = f'{cfg.paths.hmr4d_results[:-3]}_{len(Persons)}.npz'
+    # torch_to_numpy(pred, out_path)
 
 
 if __name__ == "__main__":

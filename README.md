@@ -1,7 +1,7 @@
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.7.2/css/all.min.css" integrity="sha512-Evv84Mr4kqVGRNSgIGL/F/aIDqQb7xQ2vcrdIwxfjThSH8CSR7PBEakCr51Ck+w+/U6swU2Im1vVX0SVk9ABhg==" crossorigin="anonymous" referrerpolicy="no-referrer" />
 
 # mocap-wrapper
-
+Addon: [mocap_importer](https://github.com/AClon314/mocap_importer_blender)
 
 ## solutions
 ### software:OpenSource
@@ -13,19 +13,23 @@
     <th>comment</th>
   </tr>
   <tr>
-    <td rowspan="2"><a href="https://paperswithcode.com/task/3d-human-pose-estimation" title="3d-human-pose-estimation 3D人体姿态估计">body</a></td>
+    <td rowspan="3"><a href="https://paperswithcode.com/task/3d-human-pose-estimation" title="3d-human-pose-estimation 3D人体姿态估计">body</a></td>
     <td><a href="https://github.com/zju3dv/GVHMR" title="Implementing">🚧GVHMR</a></td>
-    <td></td>
+    <td>VRAM > 3GB </td>
   </tr>
   <tr>
     <td><a href="https://github.com/yufu-wang/tram" title="">TRAM</a></td>
-    <td>suit for fast-motion, but high VRAM usage</td>
+    <td>suit for fast-motion, but VRAM > 6GB</td>
+  </tr>
+  <tr>
+    <td><a href="https://physicalmotionrestoration.github.io/" title="">Plug-and-Play</a></td>
+    <td>waiting code release</td>
   </tr>
 
   <tr>
     <td rowspan="3"><a href="https://paperswithcode.com/task/3d-hand-pose-estimation" title="3d-hand-pose-estimation 3D手部姿态估计">hand</a></td>
     <td><a href="https://github.com/rolpotamias/WiLoR">WiLoR</a>(<a href="https://github.com/warmshao/WiLoR-mini">🚧mini</a>)</td>
-    <td>fast, low VRAM usage: 2.5GB</td>
+    <td>fast, VRAM > 2.5GB</td>
   </tr>
   <tr>
     <td><a href="https://github.com/amathislab/hoisdf">HOISDF</a></td>
@@ -79,6 +83,7 @@
 
 ## install
 ```
+pip install git+https://github.com/AClon314/mocap-wrapper
 mocap -I -I@ ..
 ```
 
@@ -92,3 +97,23 @@ mocap -i input.mp4 output.mp4
 # docker build -t mocap -f docker/Dockerfile .
 podman build -t mocap -f docker/Dockerfile . --security-opt label=disable
 ```
+
+### .npz struct
+key: `Armature`;`Algorithm`;`CustomKey`
+CustomKey: `personID`;`CoordinateSystem`;`MocapKey`
+
+example: 
+- smplx;gvhmr;p0;global;pose = array([...], dtype=...)
+- smplx;wilor;p1;incam;pose = ...
+- smplx;gvhmr;K = ...
+
+#### array
+atFrame;data(e.g.: 3d coord)
+- smplx;gvhmr;global;pose[2][33]: at the 3rd person, at frame 33
+
+#### MocapKey
+- pose: thetas, θ
+- shape: betas, β
+- expression: psi, ψ
+- trans(lation) 平移
+- rotate: globalOrient 旋转
