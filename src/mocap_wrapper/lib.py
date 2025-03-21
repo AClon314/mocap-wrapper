@@ -608,6 +608,25 @@ class Single():
         return Single.instance
 
 
+async def ffmpeg_split(
+    input: str,
+    output: str,
+    start: str = '00:00:00',
+    duration: str = '00:00:10',
+    encode: Literal['copy', 'h264'] = 'copy',
+    overwrite=True,
+    **kwargs
+):
+    if encode == 'copy':
+        _codec = '-c copy'
+    elif encode == 'h264':
+        _codec = '-c:v libx264'  # -c:a aac
+    _y = ''
+    if overwrite:
+        _y = '-y'
+    cmd = f'ffmpeg {_y} -i "{input}" -ss {start} -t {duration} {_codec} "{output}"'
+    return await popen(cmd, **kwargs)
+
 Aria = None
 try:
     import aria2p
