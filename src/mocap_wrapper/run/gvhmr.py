@@ -67,7 +67,8 @@ def free_ram():
     elif vram_release > 0.01:
         Log.warning(msg)
     else:
-        Log.error(f'(DEBUG: Need removed) {msg}')
+        ...
+        # Log.warning(f'(DEBUG: Need removed) {msg}')
 
 
 def load_yolo_track(cfg):
@@ -120,7 +121,7 @@ def parse_args_to_cfg():
     # Put all args to cfg
     parser = argparse.ArgumentParser()
     parser.add_argument("--video", type=str, default="inputs/demo/dance_3.mp4")
-    parser.add_argument("--output_root", type=str, default='output/demo', help="by default to output/demo")
+    parser.add_argument("--output_root", type=str, default='output', help="by default to output")
     parser.add_argument("-s", "--static_cam", action="store_true", help="If true, skip DPVO")
     parser.add_argument("--use_dpvo", action="store_true", help="If true, use DPVO. By default not using DPVO.")
     parser.add_argument(
@@ -161,7 +162,7 @@ def parse_args_to_cfg():
         if args.output_root is not None:
             overrides.append(f"output_root={args.output_root}")
         register_store_gvhmr()
-        cfg = compose(config_name="demo", overrides=overrides)
+        cfg = compose(config_name="gvhmr", overrides=overrides)
 
     # Output
     Log.info(f"[Output Dir]: {cfg.output_dir}")
@@ -406,20 +407,22 @@ def torch_to_numpy(
     Convert `'pred'` torch tensors (.pt) to numpy (.npz) and save to out_path.
     """
     pred_np = {}
+    tmp = ('smplx', 'gvhmr', f'person{person}')
     keyname = {
-        'smpl_params_global': f'smplx;gvhmr;{person};global;',
-        'smpl_params_incam': f'smplx;gvhmr;{person};incam;',
+        'smpl_params_global': (*tmp, 'global'),
+        'smpl_params_incam': (*tmp, 'incam'),
     }
     keyname_deep = {
-        'body_pose': 'pose;',
-        'global_orient': 'rotate;',
-        'transl': 'trans;',
+        'body_pose': 'pose',
+        'global_orient': 'rotate',
+        'transl': 'trans',
         'betas': 'shape',
     }
 
     for K, K_ in keyname.items():
         for k, k_ in keyname_deep.items():
-            pred_np[K_ + k_] = pred[K][k].cpu().numpy()
+            key = ';'.join([*K_[:2], k_, *K_[2:]])
+            pred_np[key] = pred[K][k].cpu().numpy()
 
     savez(file, pred_np)
     # with open(out_path, 'wb') as handle:
@@ -521,7 +524,6 @@ def main(Persons: Union[Sequence[int], Set[int], None] = None):
         Persons = set(cfg.persons)
         # if still None
         if not Persons:
-            Log.info(f"Persons = {Persons}")
             if person_count is None:
                 load_yolo_track(cfg)
             if person_count is not None:
@@ -533,8 +535,7 @@ def main(Persons: Union[Sequence[int], Set[int], None] = None):
         Log.info(f"[Person {p}] from {Persons}")
         pred = per_person(cfg)
         # === pkl === #
-        out_path = Path(cfg.output_dir).joinpath(f"mocap_gvhmr_{cfg.video_name}.npz")
-        torch_to_numpy(pred, out_path, person=p)
+        torch_to_numpy(pred, cfg.npz_path, person=p)
 
 
 if __name__ == "__main__":

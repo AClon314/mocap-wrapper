@@ -1,0 +1,49 @@
+defaults:
+  - _self_
+  - model: gvhmr/gvhmr_pl_demo
+  - network: gvhmr/relative_transformer
+  - endecoder: gvhmr/v1_amass_local_bedlam_cam
+
+pipeline:
+  _target_: hmr4d.model.gvhmr.pipeline.gvhmr_pipeline.Pipeline
+  args_denoiser3d: ${network}
+  args:
+    endecoder_opt: ${endecoder}
+    normalize_cam_angvel: True
+    weights: null
+    static_conf: null
+
+ckpt_path: inputs/checkpoints/gvhmr/gvhmr_siga24_release.ckpt
+
+# ================================ #
+#          global setting          #
+# ================================ #
+
+video_name: ???
+output_root: output/demo
+output_dir: "${output_root}/${video_name}"
+preprocess_dir: ${output_dir}/preprocess
+video_path: "${output_dir}/0_input_video.mp4"
+npz_path: "${output_dir}/mocap_${video_name}.npz"
+
+# Options
+static_cam: False
+verbose: False
+use_dpvo: False
+f_mm: null  # focal length of fullframe camera in mm
+person_count: 1
+persons: []
+person: 0
+
+paths:
+  yolo_track: ${preprocess_dir}/yolo_track
+  bbx: ${preprocess_dir}/bbx_${person}.pt
+  bbx_xyxy_video_overlay: ${preprocess_dir}/bbx_xyxy_video_overlay_${person}.mp4
+  vit_features: ${preprocess_dir}/vit_features_${person}.pt
+  vitpose: ${preprocess_dir}/vitpose_${person}.pt
+  vitpose_video_overlay: ${preprocess_dir}/vitpose_video_overlay_${person}.mp4
+  hmr4d_results: ${output_dir}/hmr4d_results_${person}.pt
+  incam_video: ${output_dir}/1_incam_${person}.mp4
+  global_video: ${output_dir}/2_global_${person}.mp4
+  incam_global_horiz_video: ${output_dir}/${video_name}_3_incam_global_horiz_${person}.mp4
+  slam: ${preprocess_dir}/slam_results.pt

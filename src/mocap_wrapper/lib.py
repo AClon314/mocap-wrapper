@@ -24,6 +24,7 @@ MODS = ['wilor', 'gvhmr']
 TIME_OUT = timedelta(minutes=10).seconds
 RELAX = 15      # seconds for next http request, to prevent being 403 blocked
 DIR = '.'       # fallback directory, don't edit
+DIR_SELF = os.path.dirname(os.path.abspath(__file__))
 CHECK_KWARGS = True
 ARIA_PORTS = [6800, 16800]
 OPT = {
@@ -48,6 +49,15 @@ def path_expand(path: Union[str, Path], absolute=True):
     if absolute:
         path = os.path.abspath(path)
     return path
+
+
+def res_path(pkg=__package__, module='requirements', file='requirements.txt'):
+    if __package__ is None:
+        return os.path.join(DIR_SELF, module, file)
+    else:
+        from importlib.resources import path
+        with path(f'{pkg}.{module}', file) as P:
+            return P.absolute()
 
 
 def run_async(func: Coroutine, timeout=TIME_OUT, loop=aio.get_event_loop()):

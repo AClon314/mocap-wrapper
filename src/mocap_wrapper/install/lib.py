@@ -9,7 +9,6 @@ from typing import Dict, Literal, Union, get_args
 from mocap_wrapper.logger import getLogger
 
 Log = getLogger(__name__)
-
 ENV = 'mocap'
 PACKAGES = [('aria2', 'aria2c'), 'git', '7z']
 BINS = [p[1] if isinstance(p, tuple) else p for p in PACKAGES]
@@ -129,7 +128,7 @@ async def i_mamba(require_restart=True, **kwargs):
         p = await popen(f'bash "{setup}" -b', **kwargs)
     remove_if_p(setup)
 
-    p = mamba(env='nogil', txt=txt_from_self(), pkgs=['python-freethreading'], **kwargs)
+    p = mamba(env='nogil', txt=res_path(), pkgs=['python-freethreading'], **kwargs)
     p = await popen("conda config --set env_prompt '({default_env})'", **kwargs)  # TODO: need test
 
     if require_restart:
@@ -160,7 +159,7 @@ async def mamba(
     py_mgr: TYPE_PY_MGRS = 'mamba',
     env=ENV,
     python: str = '',
-    txt: Union[Literal['requirements.txt'], str] = '',
+    txt: Union[Literal['requirements.txt'], Path, str] = '',
     pkgs=[],
     **kwargs
 ):
@@ -187,14 +186,15 @@ async def mamba(
         if env and env not in envs:
             p = await popen(f"{py_mgr} create -y -n {env} {python}", **kwargs)
 
+    _txt = ''
     if txt:
         if os.path.exists(path_expand(txt)):
             if py_mgr == 'pip':
-                txt = '-r ' + txt
+                _txt = '-r ' + str(txt)
             else:
-                txt = '--file ' + txt
+                _txt = '--file ' + str(txt)
         else:
-            Log.warning(f"{txt} not found as requirements.txt")
+            Log.warning(f"{_txt} not found as requirements.txt")
     else:
         txt = ''
     if pkgs or txt:
@@ -202,9 +202,9 @@ async def mamba(
             py_bin = os.path.join(envs[env], 'bin')
             pip = os.path.join(py_bin, 'pip')
             python = os.path.join(py_bin, 'python')
-            p = await popen(f"{pip} install {txt} {' '.join(pkgs)}", **kwargs)
+            p = await popen(f"{pip} install {_txt} {' '.join(pkgs)}", **kwargs)
         else:
-            p = await popen(f"{py_mgr} install -y -n {env} {txt} {' '.join(pkgs)}", **kwargs)
+            p = await popen(f"{py_mgr} install -y -n {env} {_txt} {' '.join(pkgs)}", **kwargs)
 
     if cmd:
         cmd = re_sub(r"'(['])", r"\\\1", cmd)
@@ -224,13 +224,7 @@ async def mamba(
     return True  # TODO: return failed list
 
 
-def txt_from_self(filename='requirements.txt'):
-    from importlib.resources import path as res_path
-    with res_path('mocap_wrapper.requirements', filename) as path:
-        return str(path.absolute())
-
-
-def txt_pip_retry(txt: str, tmp_dir=DIR, env=ENV):
+def txt_pip_retry(txt: Union[str, Path], tmp_dir=DIR, env=ENV):
     """
     1. remove installed lines
     2. install package that start with `# ` (not like `##...`or`# #...`)

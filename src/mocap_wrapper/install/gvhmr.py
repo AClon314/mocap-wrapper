@@ -5,6 +5,10 @@ from mocap_wrapper.install.dpvo import i_dpvo
 Log = getLogger(__name__)
 
 
+def i_gvhmr_config(Dir=DIR, file='gvhmr.yaml'):
+    os.symlink(res_path(module='install', file=file), os.path.join(Dir, 'hmr4d', 'configs', file))
+
+
 async def i_gvhmr_models(Dir=DIR, **kwargs):
     Log.info("📦 Download GVHMR pretrained models (📝 By downloading, you agree to the GVHMR's corresponding licences)")
     Dir = path_expand(Dir)
@@ -72,6 +76,7 @@ async def i_gvhmr_models(Dir=DIR, **kwargs):
 
 async def i_gvhmr(Dir=DIR, env=ENV, **kwargs):
     Log.info("📦 Install GVHMR")
+    i_gvhmr_config(Dir)
     p = mamba(env=env, python='3.10', **kwargs)
     Dir = path_expand(Dir)
     d = ExistsPathList(chdir=Dir)
@@ -83,7 +88,7 @@ async def i_gvhmr(Dir=DIR, env=ENV, **kwargs):
     os.makedirs(os.path.join(dir_checkpoints, 'body_models'), exist_ok=True)
 
     async def i_gvhmr_post():
-        txt = txt_from_self('gvhmr.txt')
+        txt = res_path(file='gvhmr.txt')
         p = await mamba(env=env, txt=txt, **kwargs)
         p = await txt_pip_retry(txt, env=env)
         return p
@@ -101,3 +106,7 @@ async def i_gvhmr(Dir=DIR, env=ENV, **kwargs):
     ]
     tasks = await aio.gather(*tasks)
     Log.info("✔ Installed GVHMR")
+
+if __name__ == '__main__':
+    i_gvhmr_config('../GVHMR')
+    # aio.run(i_gvhmr())

@@ -15,7 +15,7 @@ async def i_dpvo(Dir=DIR, env=ENV, **kwargs):
     else:
         Log.error("❌ Can't unzip Eigen to third-party/DPVO/thirdparty")
 
-    txt = txt_from_self('dpvo.txt')
+    txt = res_path(file='dpvo.txt')
     p = mamba(env=env, txt=txt, **kwargs)
     p = txt_pip_retry(txt, env=env)
 
