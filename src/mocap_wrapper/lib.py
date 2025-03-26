@@ -6,28 +6,28 @@
 - path_expand, ExistsPathList, Single
 """
 import os
+from re import search
 import sys
+import toml
 import hashlib
-from pathlib import Path
 import subprocess as sp
 import asyncio as aio
+from pathlib import Path
 from sys import platform
 from datetime import timedelta
-from types import SimpleNamespace
-
+from platformdirs import user_config_path
+from importlib.resources import path as _res_path
+from importlib.metadata import version as _version
 from worker import worker    # type: ignore
 from mocap_wrapper.logger import getLogger, PROGRESS_DL
-from typing import Any, Callable, Coroutine, List, Literal, ParamSpec, Sequence, Tuple, TypeVar, TypedDict, Union, Unpack, cast, overload
+from types import SimpleNamespace
+from typing import Any, Callable, Coroutine, Dict, List, Literal, ParamSpec, Self, Sequence, Tuple, TypeVar, TypedDict, Union, Unpack, cast, get_args, overload
 from typing_extensions import deprecated
-Log = getLogger(__name__)
-MODS = ['wilor', 'gvhmr']
-TIME_OUT = timedelta(minutes=10).seconds
-RELAX = 15      # seconds for next http request, to prevent being 403 blocked
-DIR = '.'       # fallback directory, don't edit
-DIR_SELF = os.path.dirname(os.path.abspath(__file__))
-CHECK_KWARGS = True
-ARIA_PORTS = [6800, 16800]
-OPT = {
+# config
+_TIME_OUT = timedelta(minutes=10).seconds
+_RELAX = 15      # seconds for next http request, to prevent being 403 blocked
+_ARIA_PORTS = [6800, 16800]
+_OPT = {
     'dir': '.',  # you can edit dir here
     # 'out': 'filename',
     'continue': 'true',
@@ -35,13 +35,39 @@ OPT = {
     'max-connection-per-server': 5,
     'max-concurrent-downloads': 2,
     'min-split-size': '20M',  # don't split if file size < 40M
-    'retry-wait': RELAX,
+    'retry-wait': _RELAX,
     'max-tries': 3,
 }
-OPT = {k: str(v) for k, v in OPT.items()}
+_OPT = {k: str(v) for k, v in _OPT.items()}
+_CHECK_KWARGS = True
+
+# export
+DIR = '.'       # fallback directory, don't edit
+TYPE_MODS = Literal['wilor', 'gvhmr']
+MODS = get_args(TYPE_MODS)
+DIR_SELF = os.path.dirname(os.path.abspath(__file__))
+PACKAGE = __package__ if __package__ else os.path.basename(DIR_SELF)
+__version__ = _version(PACKAGE)
+Log = getLogger(__name__)
 is_linux = platform == 'linux'
 is_win = platform == 'win32'
 is_mac = platform == 'darwin'
+QRCODE = """
+█▀▀▀▀▀█ ▄ █ ▀▀█▄ █▀▀▀ █▀▀▀▀▀█
+█ ███ █ ▄▄▄ █▄▀█▀▄  ▄ █ ███ █
+█ ▀▀▀ █ ▄█ ▄▄ █▄█▄ ▀█ █ ▀▀▀ █
+▀▀▀▀▀▀▀ ▀▄█▄▀ ▀▄▀ ▀ █ ▀▀▀▀▀▀▀
+▀█▀██ ▀▀█▀▄▀▄▀▄ ▄▀▄▄██▄▀▄█▄█▄
+ ██ █ ▀   ▀ ▄▀███  ▄█▄█▀▀▄▀▀▄
+▀ █   ▀▀▄█▀ ▀▀▄ ▄▀ █ ▄▄▄▄ ▀ ▄
+▄█▀▀▀█▀▀█▄ █▀▀▀▀█▀█ █▀▄▄▀▄▀ ▄
+▄▀▀█ ▄▀▄▄▀█▀█▀▄ ▀██▄▀▄▄▄▄ █ ▄
+█ ▀▄ ▀▀██▀ ▄   █ ▀    █▀▀█  ▄
+▀  ▀▀▀▀▀██▀▄▄▀▄ ██▄▀█▀▀▀█▄█ ▄
+█▀▀▀▀▀█ ▀▄  ▀▀███ ▀██ ▀ █▄ ▄▄
+█ ███ █ █▄ ▄▄█▄▀▄█▄▄█▀▀▀▀ █▄█
+█ ▀▀▀ █ █▄█▄  ▄█▄▀▄▀█▀█▀▀█ █ 
+▀▀▀▀▀▀▀ ▀▀▀  ▀ ▀ ▀      ▀ ▀  """[1:]
 
 
 def path_expand(path: Union[str, Path], absolute=True):
@@ -55,12 +81,47 @@ def res_path(pkg=__package__, module='requirements', file='requirements.txt'):
     if __package__ is None:
         return os.path.join(DIR_SELF, module, file)
     else:
-        from importlib.resources import path
-        with path(f'{pkg}.{module}', file) as P:
+        with _res_path(f'{pkg}.{module}', file) as P:
             return P.absolute()
 
 
-def run_async(func: Coroutine, timeout=TIME_OUT, loop=aio.get_event_loop()):
+class ConfigTD(TypedDict, total=False):
+    search_dir: str
+
+
+class Config(dict):
+    default: ConfigTD = {
+        'search_dir': '.',
+    }
+
+    def __init__(self, /, *args, toml: Union[Path, str] = "config.toml", **kwargs: Unpack[ConfigTD]) -> None:
+        super().__init__(*args, **kwargs)
+        self.path = user_config_path(appname=PACKAGE, ensure_exists=True).joinpath(toml)
+        if not os.path.exists(self.path):
+            self.dump()
+
+    def __setattr__(self, name: str, value: Any) -> None:
+        super().__setattr__(name, value)
+        self.dump()
+
+    def dump(self, file: Union[Path, str] = '') -> None:
+        """将self dict保存到TOML文件"""
+        if not file:
+            file = self.path
+        with open(file, "w") as f:
+            toml.dump(self, f)
+
+    # 支持Pylance静态类型推断
+    def __class_getitem__(cls, key: str) -> Any:
+        # 此方法仅用于类型提示
+        pass
+
+
+CONFIG = Config()
+print(CONFIG)
+
+
+def run_async(func: Coroutine, timeout=_TIME_OUT, loop=aio.get_event_loop()):
     return aio.run_coroutine_threadsafe(func, loop).result(timeout)
 
 
@@ -103,7 +164,7 @@ async def async_queue(duration=0.02):
 async def run_1by1(
     coros: Sequence[Union[Coroutine, aio.Task]],
     callback: Union[Callable, aio.Task, None] = None,
-    duration=RELAX
+    duration=_RELAX
 ):
     """
     Run tasks one by one with a duration of `duration` seconds
@@ -156,7 +217,7 @@ def copy_kwargs(
     return return_func
 
 
-def filter_kwargs(funcs: List[Union[Callable, object]], kwargs, check=CHECK_KWARGS):
+def filter_kwargs(funcs: List[Union[Callable, object]], kwargs, check=_CHECK_KWARGS):
     """Filter out invalid kwargs to prevent Exception
 
     Don't use this if the funcs 
@@ -231,7 +292,7 @@ async def popen(
     cmd: str,
     mode: Literal['realtime', 'wait', 'no-wait'] = 'realtime',
     Raise=True,
-    timeout=TIME_OUT,
+    timeout=_TIME_OUT,
     **kwargs
 ):
     """Used on long running commands
@@ -299,7 +360,7 @@ async def echo(*args, **kwargs):
 @deprecated('Use `popen` instead, this sync would block the main thread')
 def Popen_(
     cmd: str,
-    timeout=TIME_OUT, Raise=True, dry_run=False, **kwargs
+    timeout=_TIME_OUT, Raise=True, dry_run=False, **kwargs
 ):
     """Used on long running commands  
     set `timeout` to -1 to run in background (non-blocking)
@@ -335,7 +396,7 @@ def Exec_(args, Print=True, **kwargs) -> str:
     """
     Log.info(args)
     kwargs.setdefault('shell', True)
-    kwargs.setdefault('timeout', TIME_OUT)
+    kwargs.setdefault('timeout', _TIME_OUT)
     s: str = sp.check_output(args, **kwargs).decode().strip()
     if Print:
         print(s)
@@ -378,7 +439,7 @@ async def calc_md5(file_path):
 
 
 def try_aria_port() -> 'aria2p.API':
-    for port in ARIA_PORTS:
+    for port in _ARIA_PORTS:
         try:
             aria2 = aria2p.API(
                 aria2p.Client(
@@ -391,7 +452,7 @@ def try_aria_port() -> 'aria2p.API':
             return aria2
         except Exception:
             Log.warning(f"Failed to connect to aria2 on port {port}: {e}")
-    raise ConnectionError(f"Failed to connect to aria2 on ports {ARIA_PORTS}")
+    raise ConnectionError(f"Failed to connect to aria2 on ports {_ARIA_PORTS}")
 
 
 async def aria(
@@ -399,7 +460,7 @@ async def aria(
     duration=0.5,
     resumable=False,
     dry_run=False,
-    options: dict = {**OPT},  # type: ignore
+    options: dict = {**_OPT},  # type: ignore
 ):
     """
     used to be wrapped in `download`, this is without retry logic
@@ -438,7 +499,7 @@ async def aria(
         # if now_speed is lower than 1/4 of max, and last to long, cancel
         debt = completed - (max_speed // 4) * count * duration
         Log.debug(f'debt={debt}\t{completed} max={max_speed} {count}x{duration}\t{dl.url}')
-        debt = debt < -int(options.get('retry-wait', RELAX))
+        debt = debt < -int(options.get('retry-wait', _RELAX))
         if debt:
             return False
 
@@ -509,7 +570,7 @@ async def download(
     [⚙️for more options](https://aria2.github.io/manual/en/html/aria2c.html#input-file)
     """
     # TODO: queue design for run_1by1
-    options = {**OPT, **kwargs}
+    options = {**_OPT, **kwargs}
     Log.debug(f"options before: {options}")
 
     resumable, filename = await is_resumable_file(url)
@@ -529,7 +590,7 @@ async def download(
             return dl
 
     Try = Try_init = int(options.get('max-tries', 5))  # type: ignore
-    Wait = int(options.get('retry-wait', RELAX))    # type: ignore
+    Wait = int(options.get('retry-wait', _RELAX))    # type: ignore
     def Task(): return aria(url, duration, resumable, dry_run, options)
 
     # TODO 重试人为移除造成的异常 aria2p.client.ClientException: GID a000f9abff9597e7 is not found
@@ -646,7 +707,7 @@ try:
 
     Aria = try_aria_port()
 
-    async def is_resumable_file(url: str, timeout=TIME_OUT):
+    async def is_resumable_file(url: str, timeout=_TIME_OUT):
         """```python
         return resumable(True/False), filename(str/None)
         ```"""
