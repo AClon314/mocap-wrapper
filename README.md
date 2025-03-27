@@ -3,6 +3,9 @@
 # mocap-wrapper
 Addon: [mocap_importer](https://github.com/AClon314/mocap_importer_blender)
 
+A bunch of python scripts that wrap around various mocap libraries to provide a unified interface.
+Only tested on Linux. Not stable yet.
+
 ## solutions
 ### software:OpenSource
 
@@ -82,36 +85,42 @@ Addon: [mocap_importer](https://github.com/AClon314/mocap_importer_blender)
 </table>
 
 ## install
-```
+```sh
 pip install git+https://github.com/AClon314/mocap-wrapper
-mocap -I -I@ ..
+mocap -I
 ```
 
 ## usage
-```
+```sh
 mocap -i input.mp4 output.mp4
 ```
 
 ## dev
+You have to read these if you want to modify code.
+
+```sh
+LOGLVL=debug mocap -I
+```
+
+### [docker](docker/Dockerfile)
 ```sh
 # docker build -t mocap -f docker/Dockerfile .
 podman build -t mocap -f docker/Dockerfile . --security-opt label=disable
 ```
 
+### [requirements](src/mocap_wrapper/requirements/gvhmr.txt)
+1. use `mamba`/`conda` to install, so the commented lines are not installed.
+2. use `pip` to install the **rest** packages that startwith `# `. So if you want to do comments, you can use `## `or`#...`without space char.
+
 ### .npz struct
-key: `Armature`;`Algorithm`;`CustomKey`
-CustomKey: `personID`;`CoordinateSystem`;`MocapKey`
+key: `Armature`;`Algorithm`;`CustomKey`;`personID`;`CoordinateSystem`
 
 example: 
-- smplx;gvhmr;p0;global;pose = array([...], dtype=...)
-- smplx;wilor;p1;incam;pose = ...
+- smplx;gvhmr;pose;p0;global = array([...], dtype=...)
+- smplx;wilor;pose;p1;incam = ...
 - smplx;gvhmr;K = ...
 
-#### array
-atFrame;data(e.g.: 3d coord)
-- smplx;gvhmr;global;pose[2][33]: at the 3rd person, at frame 33
-
-#### MocapKey
+#### CustomKey
 - pose: thetas, θ
 - shape: betas, β
 - expression: psi, ψ

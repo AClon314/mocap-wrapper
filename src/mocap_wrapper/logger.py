@@ -7,7 +7,7 @@ from logging import getLogger
 from os import environ, path
 IS_DEBUG = False
 LOGLEVEL = environ.get('LOGLVL')
-if LOGLEVEL:
+if LOGLEVEL and LOGLEVEL.upper() == 'DEBUG':
     IS_DEBUG = True
 LOGLEVEL = (LOGLEVEL or 'INFO').upper()
 fmt = ''

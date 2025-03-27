@@ -1,3 +1,4 @@
+#! /bin/env -S conda run --live-stream -n mocap python
 # -*- coding: utf-8 -*-
 # @Time    : 2024/10/14
 # @Author  : wenshao
@@ -10,6 +11,7 @@ pip install trimesh
 pip install pyrender
 """
 
+import argparse
 import os
 import pdb
 import time
@@ -18,7 +20,11 @@ import trimesh
 import pyrender
 import numpy as np
 import torch
-os.environ['PYOPENGL_PLATFORM'] = 'egl'
+from sys import platform
+is_win = platform == "win32"
+is_linux = platform == "linux"
+if not is_win:
+    os.environ['PYOPENGL_PLATFORM'] = 'egl'  # linux fix
 
 
 def create_raymond_lights():
@@ -205,9 +211,10 @@ class Renderer:
             is_right=None,
     ):
 
-        renderer = pyrender.OffscreenRenderer(viewport_width=render_res[0],
-                                              viewport_height=render_res[1],
-                                              point_size=1.0)
+        renderer = pyrender.OffscreenRenderer(
+            viewport_width=render_res[0],
+            viewport_height=render_res[1],
+            point_size=1.0)
         # material = pyrender.MetallicRoughnessMaterial(
         #     metallicFactor=0.0,
         #     alphaMode='OPAQUE',
@@ -220,20 +227,21 @@ class Renderer:
             camera_translation = np.array([0, 0, camera_z * focal_length / render_res[1]])
         if is_right:
             mesh_base_color = mesh_base_color[::-1]
-        mesh = self.vertices_to_trimesh(vertices, np.array([0, 0, 0]), mesh_base_color, rot_axis, rot_angle,
-                                        is_right=is_right)
+        mesh = self.vertices_to_trimesh(
+            vertices, np.array([0, 0, 0]), mesh_base_color,
+            rot_axis, rot_angle, is_right=is_right)
         mesh = pyrender.Mesh.from_trimesh(mesh)
         # mesh = pyrender.Mesh.from_trimesh(mesh, material=material)
 
-        scene = pyrender.Scene(bg_color=[*scene_bg_color, 0.0],
-                               ambient_light=(0.3, 0.3, 0.3))
+        scene = pyrender.Scene(bg_color=[*scene_bg_color, 0.0], ambient_light=(0.3, 0.3, 0.3))
         scene.add(mesh, 'mesh')
 
         camera_pose = np.eye(4)
         camera_pose[:3, 3] = camera_translation
         camera_center = [render_res[0] / 2., render_res[1] / 2.]
-        camera = pyrender.IntrinsicsCamera(fx=focal_length, fy=focal_length,
-                                           cx=camera_center[0], cy=camera_center[1], zfar=1e12)
+        camera = pyrender.IntrinsicsCamera(
+            fx=focal_length, fy=focal_length,
+            cx=camera_center[0], cy=camera_center[1], zfar=1e12)
 
         # Create camera node and add it to pyRender scene
         camera_node = pyrender.Node(camera=camera, matrix=camera_pose)
@@ -326,11 +334,14 @@ def test_wilor_image_pipeline(img_path='assets/img.png'):
             scene_bg_color=(1, 1, 1),
             focal_length=scaled_focal_length,
         )
-        tmesh = renderer.vertices_to_trimesh(verts, cam_t.copy(), LIGHT_PURPLE, is_right=is_right)
+        tmesh = renderer.vertices_to_trimesh(
+            verts, cam_t.copy(), LIGHT_PURPLE, is_right=is_right)
         tmesh.export(os.path.join(save_dir, f'{os.path.basename(img_path)}_hand{i:02d}.obj'))
-        cam_view = renderer.render_rgba(verts, cam_t=cam_t, render_res=[image.shape[1], image.shape[0]],
-                                        is_right=is_right,
-                                        **misc_args)
+        cam_view = renderer.render_rgba(
+            verts, cam_t=cam_t,
+            render_res=[image.shape[1], image.shape[0]],
+            is_right=is_right,
+            **misc_args)
 
         # Overlay image
         render_image = render_image[:, :, :3] * (1 - cam_view[:, :, 3:]) + cam_view[:, :, :3] * cam_view[:, :, 3:]
@@ -401,9 +412,11 @@ def test_wilor_video_pipeline(video_path='assets/video.mp4'):
                 focal_length=scaled_focal_length,
             )
             # tmesh = renderer.vertices_to_trimesh(verts, cam_t.copy(), LIGHT_PURPLE, is_right=is_right)
-            cam_view = renderer.render_rgba(verts, cam_t=cam_t, render_res=[image.shape[1], image.shape[0]],
-                                            is_right=is_right,
-                                            **misc_args)
+            cam_view = renderer.render_rgba(
+                verts, cam_t=cam_t,
+                render_res=[image.shape[1], image.shape[0]],
+                is_right=is_right,
+                **misc_args)
 
             # Overlay image
             render_image = render_image[:, :, :3] * (1 - cam_view[:, :, 3:]) + cam_view[:, :, :3] * cam_view[:, :, 3:]
@@ -424,6 +437,16 @@ def test_wilor_video_pipeline(video_path='assets/video.mp4'):
     print(f"Video processing complete. Output saved to {output_path}")
 
 
+def main():
+    arg = argparse.ArgumentParser()
+    arg.add_argument('-i', '--input', metavar='in.mp4')
+    args, _ = arg.parse_known_args()
+    if args.input:
+        test_wilor_video_pipeline(args.input)
+        # test_wilor_image_pipeline("/home/n/photo/主从多核.jpg")
+    else:
+        arg.print_help()
+
+
 if __name__ == '__main__':
-    # test_wilor_image_pipeline("/home/n/photo/主从多核.jpg")
-    test_wilor_video_pipeline("/home/n/document/code/GVHMR/docs/example_video/tennis.mp4")
+    main()

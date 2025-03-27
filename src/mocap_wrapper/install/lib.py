@@ -169,6 +169,7 @@ async def mamba(
     3. if `cmd` then, run `cmd` in the env
 
     Args:
+        py_mgr (str): use `mamba` to install, use `pip` to run cmd and get **realtime** output!
         kwargs (dict): `subprocess.Popen` args
 
     Returns:
@@ -197,11 +198,12 @@ async def mamba(
             Log.warning(f"{_txt} not found as requirements.txt")
     else:
         txt = ''
+
+    py_bin = os.path.join(envs[env], 'bin')
+    pip = os.path.join(py_bin, 'pip')
+    python = os.path.join(py_bin, 'python')
     if pkgs or txt:
         if py_mgr == 'pip':
-            py_bin = os.path.join(envs[env], 'bin')
-            pip = os.path.join(py_bin, 'pip')
-            python = os.path.join(py_bin, 'python')
             p = await popen(f"{pip} install {_txt} {' '.join(pkgs)}", **kwargs)
         else:
             p = await popen(f"{py_mgr} install -y -n {env} {_txt} {' '.join(pkgs)}", **kwargs)
@@ -213,8 +215,8 @@ async def mamba(
         else:
             _c = '-c'
         if py_mgr == 'pip':
-            cmd = re_sub(r'^pip ', pip, cmd)
-            cmd = re_sub(r'^python ', python, cmd)
+            cmd = re_sub(r'^pip(?= )', pip, cmd)
+            cmd = re_sub(r'^python(?= )', python, cmd)
             for word in ['pip', 'python']:
                 if word in cmd:
                     Log.warning(f"Detected suspicious untranslated executable: {word}. If you encounter errors, you may want to modify the source code :)")

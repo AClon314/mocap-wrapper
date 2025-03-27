@@ -1,20 +1,23 @@
-# https://github.com/zju3dv/GVHMR/blob/main/tools/demo/demo.py
-from json import load
+#! /bin/env -S conda run --live-stream -n mocap python
+"""https://github.com/zju3dv/GVHMR/blob/main/tools/demo/demo.py"""
 from typing import Literal, Sequence, Set, Union
+from pathlib import Path
+from __init__ import chdir_gitRepo
+chdir_gitRepo('gvhmr')
 import gc
 import time
 import inspect
+import argparse
+
 import cv2
 import torch
 import pytorch_lightning as pl
 import numpy as np
-import argparse
-from hmr4d.utils.pylogger import Log
 import hydra
 from hydra import initialize_config_module, compose
-from pathlib import Path
 from pytorch3d.transforms import quaternion_to_matrix
 
+from hmr4d.utils.pylogger import Log
 from hmr4d.configs import register_store_gvhmr
 from hmr4d.utils.video_io_utils import (
     get_video_lwh,
@@ -120,14 +123,15 @@ Tracker.get_one_track = get_one_track_patch  # patched
 def parse_args_to_cfg():
     # Put all args to cfg
     parser = argparse.ArgumentParser()
-    parser.add_argument("--video", type=str, default="inputs/demo/dance_3.mp4")
-    parser.add_argument("--output_root", type=str, default='output', help="by default to output")
+    parser.add_argument("-i", "--input", type=str, metavar='in.mp4')
+    parser.add_argument("--output_root", type=str, default='output', metavar='output')
     parser.add_argument("-s", "--static_cam", action="store_true", help="If true, skip DPVO")
     parser.add_argument("--use_dpvo", action="store_true", help="If true, use DPVO. By default not using DPVO.")
     parser.add_argument(
         "--f_mm",
         type=int,
         default=None,
+        metavar='24',
         help="Focal length of fullframe camera in mm. Leave it as None to use default values."
         "For iPhone 15p, the [0.5x, 1x, 2x, 3x] lens have typical values [13, 24, 48, 77]."
         "If the camera zoom in a lot, you can try 135, 200 or even larger values.",
@@ -135,10 +139,10 @@ def parse_args_to_cfg():
     parser.add_argument("--render", action="store_true", help="render the incam/global result video")
     parser.add_argument("-p", "--persons", type=str, help="List of persons to process, e.g. '0,1,2'")
     parser.add_argument("--verbose", action="store_true", help="If true, draw intermediate results")
-    args = parser.parse_args()
+    args, _ = parser.parse_known_args()
 
     # Input
-    video_path = Path(args.video)
+    video_path = Path(args.input)
     assert video_path.exists(), f"Video not found at {video_path}"
     length, width, height = get_video_lwh(video_path)
     Log.info(f"[Input]: {video_path}")

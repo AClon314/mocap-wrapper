@@ -2,16 +2,21 @@ from mocap_wrapper.Gdown import google_drive
 from mocap_wrapper.install.lib import *
 from mocap_wrapper.install.smpl import i_smpl
 from mocap_wrapper.install.dpvo import i_dpvo
+DIR_GVHMR = path_expand(os.path.join(DIR, 'GVHMR'))
 Log = getLogger(__name__)
 
 
-def i_gvhmr_config(Dir=DIR, file='gvhmr.yaml'):
-    os.symlink(res_path(module='install', file=file), os.path.join(Dir, 'hmr4d', 'configs', file))
+def i_gvhmr_config(Dir=DIR_GVHMR, file='gvhmr.yaml'):
+    src = res_path(module='install', file=file)
+    dst = os.path.join(Dir, 'hmr4d', 'configs', file)
+    if os.path.exists(dst):
+        os.remove(dst)
+    os.symlink(src, dst)
 
 
-async def i_gvhmr_models(Dir=DIR, **kwargs):
+async def i_gvhmr_models(Dir=DIR_GVHMR, **kwargs):
     Log.info("📦 Download GVHMR pretrained models (📝 By downloading, you agree to the GVHMR's corresponding licences)")
-    Dir = path_expand(Dir)
+    # Dir = path_expand(Dir)
     URL_HUGGINGFACE = 'https://huggingface.co/camenduru/GVHMR/resolve/main/'
     LFS = {
         ('dpvo', 'dpvo.pth'): {
@@ -47,6 +52,7 @@ async def i_gvhmr_models(Dir=DIR, **kwargs):
     try:
         for out, dic in LFS.items():
             url = URL_HUGGINGFACE + '/'.join(out)
+            Log.info(f'md5={dic["md5"]}, url={url}, out={os.path.join(Dir, *out)}')
             t = download(url, md5=dic['md5'], out=os.path.join(Dir, *out))
             coros.append(t)
         for out, dic in LFS_SMPL.items():
@@ -74,17 +80,14 @@ async def i_gvhmr_models(Dir=DIR, **kwargs):
         Log.error(f"❌ please download GVHMR pretrained models manually from: 'https://drive.google.com/drive/folders/1eebJ13FUEXrKBawHpJroW0sNSxLjh9xD?usp=drive_link', error: {e}")
 
 
-async def i_gvhmr(Dir=DIR, env=ENV, **kwargs):
+async def i_gvhmr(Dir=DIR_GVHMR, env=ENV, **kwargs):
     Log.info("📦 Install GVHMR")
+    if not os.path.exists(Dir):
+        os.makedirs(Dir, exist_ok=True)
+        p = await popen('git clone https://github.com/zju3dv/GVHMR .', Raise=False, **kwargs)
     i_gvhmr_config(Dir)
     p = mamba(env=env, python='3.10', **kwargs)
-    Dir = path_expand(Dir)
-    d = ExistsPathList(chdir=Dir)
-    Dir = os.path.join(Dir, 'GVHMR')
-    if not os.path.exists(Dir):
-        p = await popen('git clone https://github.com/zju3dv/GVHMR', Raise=False, **kwargs)
-    d.chdir('GVHMR')
-    dir_checkpoints = path_expand(os.path.join('inputs', 'checkpoints'))
+    dir_checkpoints = path_expand(os.path.join(Dir, 'inputs', 'checkpoints'))
     os.makedirs(os.path.join(dir_checkpoints, 'body_models'), exist_ok=True)
 
     async def i_gvhmr_post():
@@ -95,7 +98,7 @@ async def i_gvhmr(Dir=DIR, env=ENV, **kwargs):
 
     async def git_mamba():
         p = await git_pull()
-        p = await mamba(f'pip install -e {os.getcwd()}', env=env, **kwargs)
+        p = await mamba(f'pip install -e {Dir}', env=env, **kwargs)
         return p
 
     tasks = [

@@ -6,7 +6,6 @@
 - path_expand, ExistsPathList, Single
 """
 import os
-from re import search
 import sys
 import toml
 import hashlib
@@ -21,7 +20,7 @@ from importlib.metadata import version as _version
 from worker import worker    # type: ignore
 from mocap_wrapper.logger import getLogger, PROGRESS_DL
 from types import SimpleNamespace
-from typing import Any, Callable, Coroutine, Dict, List, Literal, ParamSpec, Self, Sequence, Tuple, TypeVar, TypedDict, Union, Unpack, cast, get_args, overload
+from typing import Any, Callable, Coroutine, Dict, List, Literal, ParamSpec, Sequence, Tuple, TypeVar, TypedDict, Union, Unpack, cast, get_args, overload
 from typing_extensions import deprecated
 # config
 _TIME_OUT = timedelta(minutes=10).seconds
@@ -42,7 +41,7 @@ _OPT = {k: str(v) for k, v in _OPT.items()}
 _CHECK_KWARGS = True
 
 # export
-DIR = '.'       # fallback directory, don't edit
+DIR = '.'   # fallback to current dir
 TYPE_MODS = Literal['wilor', 'gvhmr']
 MODS = get_args(TYPE_MODS)
 DIR_SELF = os.path.dirname(os.path.abspath(__file__))
@@ -53,21 +52,19 @@ is_linux = platform == 'linux'
 is_win = platform == 'win32'
 is_mac = platform == 'darwin'
 QRCODE = """
-█▀▀▀▀▀█ ▄ █ ▀▀█▄ █▀▀▀ █▀▀▀▀▀█
-█ ███ █ ▄▄▄ █▄▀█▀▄  ▄ █ ███ █
-█ ▀▀▀ █ ▄█ ▄▄ █▄█▄ ▀█ █ ▀▀▀ █
-▀▀▀▀▀▀▀ ▀▄█▄▀ ▀▄▀ ▀ █ ▀▀▀▀▀▀▀
-▀█▀██ ▀▀█▀▄▀▄▀▄ ▄▀▄▄██▄▀▄█▄█▄
- ██ █ ▀   ▀ ▄▀███  ▄█▄█▀▀▄▀▀▄
-▀ █   ▀▀▄█▀ ▀▀▄ ▄▀ █ ▄▄▄▄ ▀ ▄
-▄█▀▀▀█▀▀█▄ █▀▀▀▀█▀█ █▀▄▄▀▄▀ ▄
-▄▀▀█ ▄▀▄▄▀█▀█▀▄ ▀██▄▀▄▄▄▄ █ ▄
-█ ▀▄ ▀▀██▀ ▄   █ ▀    █▀▀█  ▄
-▀  ▀▀▀▀▀██▀▄▄▀▄ ██▄▀█▀▀▀█▄█ ▄
-█▀▀▀▀▀█ ▀▄  ▀▀███ ▀██ ▀ █▄ ▄▄
-█ ███ █ █▄ ▄▄█▄▀▄█▄▄█▀▀▀▀ █▄█
-█ ▀▀▀ █ █▄█▄  ▄█▄▀▄▀█▀█▀▀█ █ 
-▀▀▀▀▀▀▀ ▀▀▀  ▀ ▀ ▀      ▀ ▀  """[1:]
+█▀▀▀▀▀█  ▀▀█▄ █ ▄ █▀▀▀▀▀█
+█ ███ █ ▄▀██▄▄█▄█ █ ███ █
+█ ▀▀▀ █ ▀▄█ ▀█▄ █ █ ▀▀▀ █
+▀▀▀▀▀▀▀ ▀▄▀▄▀ █▄▀ ▀▀▀▀▀▀▀
+▀█ ▄▄▀▀█▄▀█▄▄▀ █   ▄█▀▄  
+▀█▄██▀▀█▄▀▄ ▀ ▀█▄▄▄▄▄▄ ▀█
+▄▀▄█▀▄▀█▄▀██▄ █▄▀ ▀█ ▀ █▀
+█ ▀▀ ▀▀▄ ▀ ▄ ▀▀▀█ ▀▀ ▄██▀
+▀   ▀ ▀▀█▄▀▄▄▀▄ █▀▀▀██▀▄▀
+█▀▀▀▀▀█ █▄ ▀▄  ▄█ ▀ █ ▀ █
+█ ███ █  █▀█▄▀ ▀███▀▀█▀█▄
+█ ▀▀▀ █ ▄▀▄▄    █  ▀▄█▀ █
+▀▀▀▀▀▀▀ ▀ ▀▀  ▀ ▀ ▀▀▀▀  ▀"""[1:]
 
 
 def path_expand(path: Union[str, Path], absolute=True):
@@ -85,23 +82,33 @@ def res_path(pkg=__package__, module='requirements', file='requirements.txt'):
             return P.absolute()
 
 
-class ConfigTD(TypedDict, total=False):
+# I think python type system is not mature enough to handle this
+TYPE_KEYS_CONFIG = Union[Literal['search_dir'], str]
+
+
+class TYPE_CONFIG(TypedDict, total=False):
     search_dir: str
 
 
 class Config(dict):
-    default: ConfigTD = {
-        'search_dir': '.',
+    default: TYPE_CONFIG = {
+        'search_dir': path_expand(DIR),
     }
 
-    def __init__(self, /, *args, toml: Union[Path, str] = "config.toml", **kwargs: Unpack[ConfigTD]) -> None:
-        super().__init__(*args, **kwargs)
-        self.path = user_config_path(appname=PACKAGE, ensure_exists=True).joinpath(toml)
-        if not os.path.exists(self.path):
-            self.dump()
+    def __init__(self, /, *args: TYPE_CONFIG, file: Union[Path, str] = "config.toml", **kwargs: Unpack[TYPE_CONFIG]) -> None:
+        """
 
-    def __setattr__(self, name: str, value: Any) -> None:
-        super().__setattr__(name, value)
+        This will sync to config file:
+        ```python
+        CONFIG['search_dir'] = '.'
+        ```
+        """
+        self.update(self.default)
+        super().__init__(*args, **kwargs)
+        self.path = user_config_path(appname=PACKAGE, ensure_exists=True).joinpath(file)
+        if os.path.exists(self.path):
+            config = toml.load(self.path)
+            self.update(config)
         self.dump()
 
     def dump(self, file: Union[Path, str] = '') -> None:
@@ -109,16 +116,19 @@ class Config(dict):
         if not file:
             file = self.path
         with open(file, "w") as f:
-            toml.dump(self, f)
+            toml.dump(dict(self), f)    # dict() for not recursive
 
-    # 支持Pylance静态类型推断
-    def __class_getitem__(cls, key: str) -> Any:
-        # 此方法仅用于类型提示
-        pass
+    def __getitem__(self, key: TYPE_KEYS_CONFIG) -> Any:
+        return super().__getitem__(key)
+
+    def __setitem__(self, key: TYPE_KEYS_CONFIG, value: Any) -> None:
+        super().__setitem__(key, value)
+        if key in self.default.keys():
+            self.dump()
 
 
 CONFIG = Config()
-print(CONFIG)
+DIR = CONFIG['search_dir']
 
 
 def run_async(func: Coroutine, timeout=_TIME_OUT, loop=aio.get_event_loop()):
@@ -136,7 +146,7 @@ def get_coro_sig(coro) -> tuple[str, dict]:
     return func_name, args
 
 
-async def async_queue(duration=0.02):
+async def async_queue(duration=5.0):
     _len = 9
     states = {
         'PENDING': '🕒',
@@ -149,7 +159,7 @@ async def async_queue(duration=0.02):
         tasks = [
             f'{states.get(t._state, t._state)}{t.get_name()}' for t in tasks if 'async_queue' not in t.get_name()
         ]
-        q_now = '\n'.join(tasks)
+        q_now = '\t'.join(tasks)
         if q_now != q_last:
             q_last = q_now
             Log.info(f'{_len} in async queue: {q_now}')
@@ -569,7 +579,7 @@ async def download(
 
     [⚙️for more options](https://aria2.github.io/manual/en/html/aria2c.html#input-file)
     """
-    # TODO: queue design for run_1by1
+    # TODO: queue design for run_1by1, 同域名的下载，等待上一个下载完成后再开始下一个
     options = {**_OPT, **kwargs}
     Log.debug(f"options before: {options}")
 
