@@ -10,7 +10,7 @@ from mocap_wrapper.logger import getLogger
 
 Log = getLogger(__name__)
 ENV = 'mocap'
-PACKAGES = [('aria2', 'aria2c'), 'git', '7z']
+PACKAGES = [('aria2', 'aria2c'), 'git', '7z', 'ffmpeg']
 BINS = [p[1] if isinstance(p, tuple) else p for p in PACKAGES]
 PACKAGES = [p[0] if isinstance(p, tuple) else p for p in PACKAGES]
 TYPE_SHELLS = Literal['zsh', 'bash', 'ps']
@@ -214,12 +214,12 @@ async def mamba(
             _c = '/c'
         else:
             _c = '-c'
-        if py_mgr == 'pip':
+        if kwargs.get('mode', 'realtime') == 'realtime':
             cmd = re_sub(r'^pip(?= )', pip, cmd)
             cmd = re_sub(r'^python(?= )', python, cmd)
-            for word in ['pip', 'python']:
-                if word in cmd:
-                    Log.warning(f"Detected suspicious untranslated executable: {word}. If you encounter errors, you may want to modify the source code :)")
+            # for word in ['pip', 'python']:
+            #     if word in cmd:
+            #         Log.warning(f"Detected suspicious untranslated executable: {word}. If you encounter errors, you may want to modify the source code :)")
         else:
             cmd = ' '.join(filter(None, (py_mgr, 'run -n', env, SHELL, _c, f"'{cmd}'")))
         p = await popen(cmd, **kwargs)

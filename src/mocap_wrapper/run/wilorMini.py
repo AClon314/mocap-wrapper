@@ -25,6 +25,7 @@ is_win = platform == "win32"
 is_linux = platform == "linux"
 if not is_win:
     os.environ['PYOPENGL_PLATFORM'] = 'egl'  # linux fix
+IMG = ['jpg', 'jpeg', 'png', 'bmp', 'webp']
 
 
 def create_raymond_lights():
@@ -297,7 +298,7 @@ class Renderer:
             scene.add_node(node)
 
 
-def test_wilor_image_pipeline(img_path='assets/img.png'):
+def image_wilor(input='img.png', out_dir='output'):
     import cv2
     import torch
     import numpy as np
@@ -309,14 +310,13 @@ def test_wilor_image_pipeline(img_path='assets/img.png'):
     dtype = torch.float16
 
     pipe = WiLorHandPose3dEstimationPipeline(device=device, dtype=dtype, verbose=False)
-    image = cv2.imread(img_path)
+    image = cv2.imread(input)
     image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
     for _ in range(20):
         t0 = time.time()
         outputs = pipe.predict(image)
         print(time.time() - t0)
-    save_dir = "./output"
-    os.makedirs(save_dir, exist_ok=True)
+    os.makedirs(out_dir, exist_ok=True)
     renderer = Renderer(pipe.wilor_model.mano.faces)
 
     render_image = image.copy()
@@ -336,7 +336,7 @@ def test_wilor_image_pipeline(img_path='assets/img.png'):
         )
         tmesh = renderer.vertices_to_trimesh(
             verts, cam_t.copy(), LIGHT_PURPLE, is_right=is_right)
-        tmesh.export(os.path.join(save_dir, f'{os.path.basename(img_path)}_hand{i:02d}.obj'))
+        tmesh.export(os.path.join(out_dir, f'{os.path.basename(input)}_hand{i:02d}.obj'))
         cam_view = renderer.render_rgba(
             verts, cam_t=cam_t,
             render_res=[image.shape[1], image.shape[0]],
@@ -353,11 +353,11 @@ def test_wilor_image_pipeline(img_path='assets/img.png'):
             radius = 3
             x, y = pred_keypoints_2d[0][j]
             cv2.circle(render_image, (int(x), int(y)), radius, color, -1)
-    cv2.imwrite(os.path.join(save_dir, os.path.basename(img_path)), render_image)
-    print(os.path.join(save_dir, os.path.basename(img_path)))
+    cv2.imwrite(os.path.join(out_dir, os.path.basename(input)), render_image)
+    print(os.path.join(out_dir, os.path.basename(input)))
 
 
-def test_wilor_video_pipeline(video_path='assets/video.mp4'):
+def video_wilor(input='video.mp4', out_dir='output'):
     import cv2
     import torch
     import numpy as np
@@ -369,12 +369,11 @@ def test_wilor_video_pipeline(video_path='assets/video.mp4'):
     dtype = torch.float16
 
     pipe = WiLorHandPose3dEstimationPipeline(device=device, dtype=dtype)
-    save_dir = "./output"
-    os.makedirs(save_dir, exist_ok=True)
+    os.makedirs(out_dir, exist_ok=True)
     renderer = Renderer(pipe.wilor_model.mano.faces)
 
     # Open the video file
-    cap = cv2.VideoCapture(video_path)
+    cap = cv2.VideoCapture(input)
 
     # Get video properties
     fps = int(cap.get(cv2.CAP_PROP_FPS))
@@ -382,7 +381,7 @@ def test_wilor_video_pipeline(video_path='assets/video.mp4'):
     height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
 
     # Create VideoWriter object
-    output_path = os.path.join(save_dir, os.path.basename(video_path))
+    output_path = os.path.join(out_dir, '_' + os.path.basename(input))  # tmp
     fourcc = cv2.VideoWriter_fourcc(*'mp4v')
     vout = cv2.VideoWriter(output_path, fourcc, fps, (width, height))
 
@@ -394,9 +393,9 @@ def test_wilor_video_pipeline(video_path='assets/video.mp4'):
 
         # Convert frame to RGB
         image = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-        t0 = time.time()
+        # t0 = time.time()
         outputs = pipe.predict(image)
-        print(time.time() - t0)
+        # print(time.time() - t0)
         render_image = image.copy()
         render_image = render_image.astype(np.float32)[:, :, ::-1] / 255.0
 
@@ -427,7 +426,7 @@ def test_wilor_video_pipeline(video_path='assets/video.mp4'):
         vout.write(render_image)
 
         frame_count += 1
-        print(f"Processed frame {frame_count}")
+        # print(f"Processed frame {frame_count}")
 
     # Release everything
     cap.release()
@@ -440,10 +439,15 @@ def test_wilor_video_pipeline(video_path='assets/video.mp4'):
 def main():
     arg = argparse.ArgumentParser()
     arg.add_argument('-i', '--input', metavar='in.mp4')
+    arg.add_argument('-o', '--outdir', metavar='output', default='output')
     args, _ = arg.parse_known_args()
+
+    outdir = os.path.join(args.outdir, os.path.basename(args.input.split('.')[0]))
     if args.input:
-        test_wilor_video_pipeline(args.input)
-        # test_wilor_image_pipeline("/home/n/photo/主从多核.jpg")
+        if args.input.split('.')[-1].lower() in IMG:
+            image_wilor(args.input, outdir)
+        else:
+            video_wilor(args.input, outdir)
     else:
         arg.print_help()
 

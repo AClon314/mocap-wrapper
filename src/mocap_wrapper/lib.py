@@ -7,6 +7,7 @@
 """
 import os
 import sys
+import json
 import toml
 import hashlib
 import subprocess as sp
@@ -18,12 +19,12 @@ from platformdirs import user_config_path
 from importlib.resources import path as _res_path
 from importlib.metadata import version as _version
 from worker import worker    # type: ignore
-from mocap_wrapper.logger import getLogger, PROGRESS_DL
+from mocap_wrapper.logger import IS_DEBUG, getLogger, PROGRESS_DL
 from types import SimpleNamespace
-from typing import Any, Callable, Coroutine, Dict, List, Literal, ParamSpec, Sequence, Tuple, TypeVar, TypedDict, Union, Unpack, cast, get_args, overload
+from typing import Any, Callable, Coroutine, Dict, List, Literal, Optional, ParamSpec, Sequence, Tuple, TypeVar, TypedDict, Union, Unpack, cast, get_args, overload
 from typing_extensions import deprecated
 # config
-_TIME_OUT = timedelta(minutes=10).seconds
+_TIME_OUT = timedelta(minutes=20).seconds
 _RELAX = 15      # seconds for next http request, to prevent being 403 blocked
 _ARIA_PORTS = [6800, 16800]
 _OPT = {
@@ -146,6 +147,20 @@ def get_coro_sig(coro) -> tuple[str, dict]:
     return func_name, args
 
 
+def mkdir(dir):
+    if not os.path.exists(dir):
+        os.makedirs(dir)
+        Log.info(f'📁 Created: {dir}')
+
+
+def relink(src, dst, dst_is_dir=False):
+    """remove dst link and create a symlink"""
+    if os.path.islink(dst):
+        os.remove(dst)
+    os.symlink(src, dst, target_is_directory=dst_is_dir)
+    Log.info(f'🔗 symlink: {dst} → {src}')
+
+
 async def async_queue(duration=5.0):
     _len = 9
     states = {
@@ -262,6 +277,10 @@ def filter_kwargs(funcs: List[Union[Callable, object]], kwargs, check=_CHECK_KWA
     return d
 
 
+@copy_kwargs(aio.gather)
+async def gather(*args, **kwargs): return await aio.gather(*args, **kwargs)
+
+
 async def unzip(
     zip_path: Union[str, Path], From='', to=DIR, pwd='',
     overwrite_rule: Literal['always', 'skip', 'rename_new', 'rename_old'] = 'skip',
@@ -325,10 +344,9 @@ async def popen(
     if mode == 'realtime':
         while True:
             try:
-                await p.expect(['\r\n', '\r', '\n'], async_=True)
-                if p.before and p.after and isinstance(p.before, bytes) and isinstance(p.after, bytes):
-                    sys.stdout.buffer.write(p.before + p.after)
-                    # sys.stdout.flush()
+                await p.expect(['\r', '\n'], async_=True)
+                sys.stdout.buffer.write(p.before + p.after)  # type: ignore
+                # sys.stdout.flush()
             except pexpect.EOF:
                 break
             except pexpect.TIMEOUT:
@@ -353,6 +371,11 @@ async def popen(
         ...
     else:
         raise ValueError(f"Invalid mode: {mode}")
+    if p.exitstatus != 0:
+        if Raise:
+            raise ChildProcessError(f"{cmd}")
+        else:
+            Log.warning(f'{cmd} → {p.before}')
     return p
 
 
@@ -689,24 +712,110 @@ class Single():
         return Single.instance
 
 
-async def ffmpeg_split(
+async def ffmpeg(
     input: str,
-    output: str,
+    out: str,
+    fps: Optional[int] = None,
+    crf: Optional[int] = 20,    # 17 lossless,23,28
     start: str = '00:00:00',
-    duration: str = '00:00:10',
-    encode: Literal['copy', 'h264'] = 'copy',
+    duration: Optional[str] = None,
+    encode: Literal['copy', 'h264', 'av1'] = 'copy',
     overwrite=True,
     **kwargs
 ):
-    if encode == 'copy':
-        _codec = '-c copy'
-    elif encode == 'h264':
-        _codec = '-c:v libx264'  # -c:a aac
-    _y = ''
+    # TODO: use nvidia hardware acceleration
+
+    args = ''
     if overwrite:
-        _y = '-y'
-    cmd = f'ffmpeg {_y} -i "{input}" -ss {start} -t {duration} {_codec} "{output}"'
+        args += '-y '
+    if crf:
+        args += f'-crf {crf} '
+    if duration:
+        args += f'-ss {start} -t {duration} '
+    if encode != 'copy' and fps is None:
+        from fractions import Fraction
+        meta = await ffprobe(input)
+        frac = Fraction(meta['streams'][0]['avg_frame_rate'])
+        fps = round(frac.numerator / frac.denominator)
+        args += f'-r {fps} '
+    if encode == 'copy':
+        args += '-c copy '
+    elif encode == 'h264':
+        args += '-c:v libx264 -c:a aac '
+
+    cmd = filter(None, ['ffmpeg', '-i', f"{input}", args, f"{out}"])
+    cmd = ' '.join(cmd)
     return await popen(cmd, **kwargs)
+
+
+class Kw_ff_streams(TypedDict):
+    index: int
+    codec_name: Union[Literal['h264', 'h265', 'aac'], str]
+    codec_type: Literal['video', 'audio', 'subtitle']
+    width: int
+    height: int
+    r_frame_rate: str
+    avg_frame_rate: str
+
+
+class Kw_ffprobe(TypedDict):
+    streams: List[Kw_ff_streams]
+    format: dict
+
+
+async def ffprobe(input: str):
+    """
+    get metadata of a video
+
+    usage:
+    ```python
+    d = await ffprobe('x.mp4')
+    print(d['streams'][0]['r_frame_rate'])
+    ```
+    """
+    cmd = f'ffprobe -v quiet -print_format json -show_streams -show_format "{input}"'
+    p = await popen(cmd, mode='wait')
+    if isinstance(p.before, bytes):
+        text = p.before.decode().strip()
+        js: Kw_ffprobe = json.loads(text)
+        if IS_DEBUG:
+            json.dump(js, sys.stdout, ensure_ascii=False, indent=2)
+        return js
+    else:
+        raise RuntimeError(f"{cmd} → {p.before}")
+
+
+async def is_vbr(metadata: Kw_ffprobe, codec_type: Literal['video', 'audio'] = 'video'):
+    """is bitrate variable, fallback is True"""
+    for s in metadata['streams']:
+        if s['codec_type'] == codec_type:
+            IS = s['r_frame_rate'] != s['avg_frame_rate']
+            Log.debug(f"{metadata} is {'VBR' if IS else 'CBR'}, return {IS}")
+            return IS
+    return True
+
+
+async def ffmpeg_or_link(from_file: str, to_dir: str):
+    """if file is vbr, ffmpeg to re-encode  
+    else create soft symlink
+
+    Returns:
+        to_file (str): path of final video file
+    """
+    metadata = await ffprobe(from_file)
+    is_VBR = await is_vbr(metadata)
+    filename = os.path.basename(from_file)
+
+    to_dir = os.path.join(to_dir, filename.split('.')[0])   # output/xxx
+    mkdir(to_dir)
+    to_file = os.path.join(to_dir, filename)
+    if not os.path.exists(to_file):
+        if is_VBR:
+            await ffmpeg(from_file, to_file, encode='h264')
+        else:
+            relink(from_file, to_file)
+    return to_file
+
 
 Aria = None
 try:
@@ -759,7 +868,7 @@ try:
 
     if __name__ == '__main__':
         Log.debug('⛄')
-        # aio.run()
+        aio.run(ffprobe('/home/n/download/背越式跳高（慢动作）.mp4'))
 
 except ImportError as e:
     Log.error(f"⚠️ detect missing packages, please check your current conda environment. {e}")

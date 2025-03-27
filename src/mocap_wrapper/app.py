@@ -4,15 +4,14 @@ import argparse
 import asyncio as aio
 from typing import Coroutine, Sequence
 from mocap_wrapper.logger import IS_DEBUG
-from mocap_wrapper.lib import DIR, MODS, CONFIG, PACKAGE, TYPE_MODS, QRCODE, copy_kwargs, getLogger, path_expand, res_path, __version__
+from mocap_wrapper.lib import DIR, MODS, CONFIG, PACKAGE, TYPE_MODS, QRCODE, copy_kwargs, ffmpeg_or_link, gather, getLogger, mkdir, path_expand, res_path, __version__
 from mocap_wrapper.install.lib import ENV, install, async_queue, mamba
 DEFAULT: Sequence[TYPE_MODS] = ('wilor', 'gvhmr')
+OUTPUT_DIR = os.path.join(DIR, 'output')
 Log = getLogger(__name__)
 
 
-@copy_kwargs(aio.gather)
-async def gather(*args, **kwargs): return await aio.gather(*args, **kwargs)
-def version(): return f'{PACKAGE} {__version__} 👻, config: {CONFIG.path}'
+def version(): return f'{PACKAGE} {__version__} 👻, config: {CONFIG.path}, source: https://github.com/AClon314/mocap-wrapper'
 
 
 async def Python(mod: TYPE_MODS, *args: str):
@@ -21,7 +20,13 @@ async def Python(mod: TYPE_MODS, *args: str):
     if mod == 'wilor':
         mod = 'wilorMini'   # type: ignore
     py = res_path(module='run', file=f'{mod}.py')
-    return await mamba(f'python {py} {_arg}', env=ENV, py_mgr='pip')
+    return await mamba(f'python {py} {_arg}', env=ENV)
+
+
+async def run(mods: Sequence[TYPE_MODS], input: str, outdir: str):
+    video = await ffmpeg_or_link(input, outdir)
+    for m in mods:
+        IS = await Python(m, '--input', video, '--outdir', outdir)
 
 
 class ArgParser(argparse.ArgumentParser):
@@ -35,12 +40,13 @@ class ArgParser(argparse.ArgumentParser):
 
 def main():
     global DIR
-    arg = ArgParser(description=f'https://github.com/AClon314/mocap-wrapper, sincerelly thanks to gvhmr/wilor/wilor-mini devs and other developers that help each other ♥️, please consider donate♥️ if helps you a lot :)')
+    arg = ArgParser(description=f'sincerelly thanks to gvhmr/wilor/wilor-mini devs and others that help each other♥️ , please consider donate♥️ if helps you a lot :)')
     arg.add_argument('-v', '--version', action='store_true')
     arg.add_argument('-I', '--install', action='store_true')
     arg.add_argument('-b', '--by', nargs='*', default=False, metavar=MODS, help=f'install with/run by, default all installed, eg: `--by={",".join(DEFAULT)}`')
     arg.add_argument('-@', '--at', metavar=DIR, help='search_dir of git repos, eg: `--at=".."` if GVHMR is current work dir')
     arg.add_argument('-i', '--input', metavar='in.mp4')
+    arg.add_argument('-o', '--outdir', metavar=OUTPUT_DIR, default=OUTPUT_DIR)
 
     # arg.add_argument('--smpl', help='cookies:PHPSESSID to download smpl files. eg: `--smpl=26-digits_123456789_123456`')
     # arg.add_argument('--smplx', help='cookies:PHPSESSID to download smplx files. eg: `--smplx=26-digits_123456789_123456`')
@@ -51,9 +57,8 @@ def main():
 
     if args.at:
         DIR = CONFIG['search_dir'] = path_expand(args.at)
-    if not os.path.exists(DIR):
-        os.makedirs(DIR, exist_ok=True)
-        Log.info(f'📁 Created: {DIR}')
+    mkdir(DIR)
+    mkdir(args.outdir)
 
     if args.by:
         mods = []
@@ -67,8 +72,9 @@ def main():
         tasks.append(install(mods=mods))
         aio.run(gather(*tasks), debug=IS_DEBUG)
     if args.input:
-        for m in mods:
-            aio.run(Python(m, '-i', args.input))
+        aio.run(
+            run(mods, args.input, args.outdir),
+            debug=IS_DEBUG)
     if not any(vars(args).values()):
         arg.print_help()
 

@@ -8,6 +8,7 @@ import gc
 import time
 import inspect
 import argparse
+from os import symlink
 
 import cv2
 import torch
@@ -124,7 +125,7 @@ def parse_args_to_cfg():
     # Put all args to cfg
     parser = argparse.ArgumentParser()
     parser.add_argument("-i", "--input", type=str, metavar='in.mp4')
-    parser.add_argument("--output_root", type=str, default='output', metavar='output')
+    parser.add_argument("-o", "--outdir", type=str, default='output', metavar='output')
     parser.add_argument("-s", "--static_cam", action="store_true", help="If true, skip DPVO")
     parser.add_argument("--use_dpvo", action="store_true", help="If true, use DPVO. By default not using DPVO.")
     parser.add_argument(
@@ -163,8 +164,8 @@ def parse_args_to_cfg():
             overrides.append(f"persons={{{args.persons}}}")
 
         # Allow to change output root
-        if args.output_root is not None:
-            overrides.append(f"output_root={args.output_root}")
+        if args.outdir is not None:
+            overrides.append(f"output_root={args.outdir}")
         register_store_gvhmr()
         cfg = compose(config_name="gvhmr", overrides=overrides)
 
@@ -174,14 +175,16 @@ def parse_args_to_cfg():
     Path(cfg.preprocess_dir).mkdir(parents=True, exist_ok=True)
 
     # Copy raw-input-video to video_path
-    Log.info(f"[Copy Video] {video_path} -> {cfg.video_path}")
-    if not Path(cfg.video_path).exists() or get_video_lwh(video_path)[0] != get_video_lwh(cfg.video_path)[0]:
-        reader = get_video_reader(video_path)
-        writer = get_writer(cfg.video_path, fps=30, crf=CRF)
-        for img in tqdm(reader, total=get_video_lwh(video_path)[0], desc=f"Copy"):
-            writer.write_frame(img)
-        writer.close()
-        reader.close()
+    if not Path(cfg.video_path).exists():
+        symlink(video_path, cfg.video_path, target_is_directory=False)
+    # Log.info(f"[Copy Video] {video_path} -> {cfg.video_path}")
+    # if not Path(cfg.video_path).exists() or get_video_lwh(video_path)[0] != get_video_lwh(cfg.video_path)[0]:
+    #     reader = get_video_reader(video_path)
+    #     writer = get_writer(cfg.video_path, fps=30, crf=CRF)
+    #     for img in tqdm(reader, total=get_video_lwh(video_path)[0], desc=f"Copy"):
+    #         writer.write_frame(img)
+    #     writer.close()
+    #     reader.close()
 
     return cfg
 
@@ -262,7 +265,7 @@ def run_preprocess(cfg):
         else:
             Log.info(f"[Preprocess] slam results from {paths.slam}")
 
-    Log.info(f"[Preprocess] End. Time elapsed: {Log.time()-tic:.2f}s")
+    Log.info(f"[Preprocess] End. Time elapsed: {Log.time() - tic:.2f}s")
 
 
 def load_data_dict(cfg):
