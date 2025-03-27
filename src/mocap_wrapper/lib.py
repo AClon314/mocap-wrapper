@@ -320,7 +320,7 @@ async def unzip(
 async def popen(
     cmd: str,
     mode: Literal['realtime', 'wait', 'no-wait'] = 'realtime',
-    Raise=True,
+    Raise=False,
     timeout=_TIME_OUT,
     **kwargs
 ):
@@ -339,34 +339,29 @@ async def popen(
     Returns:
         process (pexpect.spawn): 
     """
+    PROGRESS_DL.stop()  # TODO: 重构进度条！技术债务
     Log.info(f'start {cmd}')
     p = pexpect.spawn(cmd, timeout=timeout, **kwargs)
+    FD = sys.stdout.fileno()
     if mode == 'realtime':
         while True:
             try:
-                await p.expect(['\r', '\n'], async_=True)
-                sys.stdout.buffer.write(p.before + p.after)  # type: ignore
-                # sys.stdout.flush()
+                os.write(FD, p.read_nonblocking(4096))  # type: ignore
+                await aio.sleep(0.01)
             except pexpect.EOF:
                 break
             except pexpect.TIMEOUT:
                 Log.warning(f"Timeout: {cmd}")
             except Exception:
-                if Raise:
-                    raise
-                else:
-                    Log.warning(f"{cmd} → {p.before}")
+                raise
     elif mode == 'wait':
         try:
             await p.expect(pexpect.EOF, async_=True)
         except pexpect.TIMEOUT:
             Log.warning(f"Timeout: {cmd}")
         except Exception:
-            if Raise:
-                Log.error(f'{cmd} → {p.before}')
-                raise
-            else:
-                Log.warning(f"{cmd} → {p.before}")
+            raise
+        # os.write(FD, p.before)  # type: ignore
     elif mode == 'no-wait':
         ...
     else:
@@ -376,6 +371,7 @@ async def popen(
             raise ChildProcessError(f"{cmd}")
         else:
             Log.warning(f'{cmd} → {p.before}')
+    PROGRESS_DL.start()
     return p
 
 
@@ -868,7 +864,8 @@ try:
 
     if __name__ == '__main__':
         Log.debug('⛄')
-        aio.run(ffprobe('/home/n/download/背越式跳高（慢动作）.mp4'))
+        aio.run(popen('python -c "from tqdm import tqdm; import time; import sys; [time.sleep(0.02) for _ in tqdm(range(100),file=sys.stdout)]"', Raise=False))
+        # aio.run(ffprobe('/home/n/download/背越式跳高（慢动作）.mp4'))
 
 except ImportError as e:
     Log.error(f"⚠️ detect missing packages, please check your current conda environment. {e}")

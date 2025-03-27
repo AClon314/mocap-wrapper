@@ -5,13 +5,14 @@ import atexit
 import logging
 from logging import getLogger
 from os import environ, path
+from typing import Any
 IS_DEBUG = False
 LOGLEVEL = environ.get('LOGLVL')
 if LOGLEVEL and LOGLEVEL.upper() == 'DEBUG':
     IS_DEBUG = True
 LOGLEVEL = (LOGLEVEL or 'INFO').upper()
 fmt = ''
-config = {
+config: dict[str, Any] = {
     'level': LOGLEVEL,
     'datefmt': '%H:%M:%S',
 }
@@ -21,7 +22,6 @@ connectionpool_logger = getLogger("urllib3.connectionpool")
 connectionpool_logger.setLevel(logging.CRITICAL)
 
 try:
-    from rich import print
     from rich.text import Text
     # from rich.console import Console
     from rich.logging import RichHandler
