@@ -793,6 +793,11 @@ async def ffmpeg_or_link(from_file: str, to_dir: str):
     """if file is vbr, ffmpeg to re-encode  
     else create soft symlink
 
+    Args:
+        from_file (str): input video file
+        to_dir (str): output directory, e.g.: `output/AAA/...`
+        prefix (str): prefix for output filename, e.g.: `_in_AAA.mp4`
+
     Returns:
         to_file (str): path of final video file
     """

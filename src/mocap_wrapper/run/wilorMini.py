@@ -10,7 +10,8 @@ you need to install trimesh and pyrender if you want to render mesh
 pip install trimesh
 pip install pyrender
 """
-
+IS_RENDER = True
+OUTDIR = 'output'
 import argparse
 import os
 import pdb
@@ -25,7 +26,11 @@ is_win = platform == "win32"
 is_linux = platform == "linux"
 if not is_win:
     os.environ['PYOPENGL_PLATFORM'] = 'egl'  # linux fix
-IMG = ['jpg', 'jpeg', 'png', 'bmp', 'webp']
+_IMG = ['jpg', 'jpeg', 'png', 'bmp', 'webp']
+_PREFIX = '_out_'
+
+
+def prefix(path) -> str: return os.path.splitext(os.path.basename(path))[0]
 
 
 def create_raymond_lights():
@@ -60,9 +65,9 @@ def create_raymond_lights():
     return nodes
 
 
-def get_light_poses(n_lights=5, elevation=np.pi / 3, dist=12):
+def get_light_poses(n_lights: float = 5, elevation=np.pi / 3, dist: float = 12):
     # get lights in a circle around origin at elevation
-    thetas = elevation * np.ones(n_lights)
+    thetas = elevation * np.ones(n_lights)  # type: ignore
     phis = 2 * np.pi * np.arange(n_lights) / n_lights
     poses = []
     trans = make_translation(torch.tensor([0, 0, dist]))
@@ -146,7 +151,7 @@ def rotz(theta):
 
 class Renderer:
 
-    def __init__(self, faces: np.array):
+    def __init__(self, faces: np.ndarray):
         """
         Wrapper around the pyrender renderer to render MANO meshes.
         Args:
@@ -155,20 +160,21 @@ class Renderer:
         """
 
         # add faces that make the hand mesh watertight
-        faces_new = np.array([[92, 38, 234],
-                              [234, 38, 239],
-                              [38, 122, 239],
-                              [239, 122, 279],
-                              [122, 118, 279],
-                              [279, 118, 215],
-                              [118, 117, 215],
-                              [215, 117, 214],
-                              [117, 119, 214],
-                              [214, 119, 121],
-                              [119, 120, 121],
-                              [121, 120, 78],
-                              [120, 108, 78],
-                              [78, 108, 79]])
+        faces_new = np.array(
+            [[92, 38, 234],
+             [234, 38, 239],
+             [38, 122, 239],
+             [239, 122, 279],
+             [122, 118, 279],
+             [279, 118, 215],
+             [118, 117, 215],
+             [215, 117, 214],
+             [117, 119, 214],
+             [214, 119, 121],
+             [119, 120, 121],
+             [121, 120, 78],
+             [120, 108, 78],
+             [78, 108, 79]])
         faces = np.concatenate([faces, faces_new], axis=0)
         self.faces = faces
         self.faces_left = self.faces[:, [0, 2, 1]]
@@ -198,7 +204,7 @@ class Renderer:
 
     def render_rgba(
             self,
-            vertices: np.array,
+            vertices: np.ndarray,
             cam_t=None,
             rot=None,
             rot_axis=[1, 0, 0],
@@ -298,7 +304,7 @@ class Renderer:
             scene.add_node(node)
 
 
-def image_wilor(input='img.png', out_dir='output'):
+def image_wilor(input='img.png', out_dir=OUTDIR):
     import cv2
     import torch
     import numpy as np
@@ -320,47 +326,49 @@ def image_wilor(input='img.png', out_dir='output'):
     outputs = pipe.predict(image)
 
     os.makedirs(out_dir, exist_ok=True)
-    renderer = Renderer(pipe.wilor_model.mano.faces)
+    file = prefix(input)
+    torch.save(outputs, os.path.join(out_dir, file + '.pt'))
+    if IS_RENDER:
+        renderer = Renderer(pipe.wilor_model.mano.faces)
 
-    render_image = image.copy()
-    render_image = render_image.astype(np.float32)[:, :, ::-1] / 255.0
-    pred_keypoints_2d_all = []
-    for i, out in enumerate(outputs):
-        verts = out["wilor_preds"]['pred_vertices'][0]
-        is_right = out['is_right']
-        cam_t = out["wilor_preds"]['pred_cam_t_full'][0]
-        scaled_focal_length = out["wilor_preds"]['scaled_focal_length']
-        pred_keypoints_2d = out["wilor_preds"]["pred_keypoints_2d"]
-        pred_keypoints_2d_all.append(pred_keypoints_2d)
-        misc_args = dict(
-            mesh_base_color=LIGHT_PURPLE,
-            scene_bg_color=(1, 1, 1),
-            focal_length=scaled_focal_length,
-        )
-        tmesh = renderer.vertices_to_trimesh(
-            verts, cam_t.copy(), LIGHT_PURPLE, is_right=is_right)
-        tmesh.export(os.path.join(out_dir, f'{os.path.basename(input)}_hand{i:02d}.obj'))
-        cam_view = renderer.render_rgba(
-            verts, cam_t=cam_t,
-            render_res=[image.shape[1], image.shape[0]],
-            is_right=is_right,
-            **misc_args)
+        render_image = image.copy()
+        render_image = render_image.astype(np.float32)[:, :, ::-1] / 255.0
+        pred_keypoints_2d_all = []
+        for i, out in enumerate(outputs):
+            verts = out["wilor_preds"]['pred_vertices'][0]
+            is_right = out['is_right']
+            cam_t = out["wilor_preds"]['pred_cam_t_full'][0]
+            scaled_focal_length = out["wilor_preds"]['scaled_focal_length']
+            pred_keypoints_2d = out["wilor_preds"]["pred_keypoints_2d"]
+            pred_keypoints_2d_all.append(pred_keypoints_2d)
+            misc_args = dict(
+                mesh_base_color=LIGHT_PURPLE,
+                scene_bg_color=(1, 1, 1),
+                focal_length=scaled_focal_length,
+            )
+            tmesh = renderer.vertices_to_trimesh(
+                verts, cam_t.copy(), LIGHT_PURPLE, is_right=is_right)
+            tmesh.export(os.path.join(out_dir, f'{file}_hand{i:02d}.obj'))
+            cam_view = renderer.render_rgba(
+                verts, cam_t=cam_t,
+                render_res=[image.shape[1], image.shape[0]],
+                is_right=is_right,
+                **misc_args)
 
-        # Overlay image
-        render_image = render_image[:, :, :3] * (1 - cam_view[:, :, 3:]) + cam_view[:, :, :3] * cam_view[:, :, 3:]
+            # Overlay image
+            render_image = render_image[:, :, :3] * (1 - cam_view[:, :, 3:]) + cam_view[:, :, :3] * cam_view[:, :, 3:]
 
-    render_image = (255 * render_image).astype(np.uint8)
-    for pred_keypoints_2d in pred_keypoints_2d_all:
-        for j in range(pred_keypoints_2d[0].shape[0]):
-            color = (0, 0, 255)
-            radius = 3
-            x, y = pred_keypoints_2d[0][j]
-            cv2.circle(render_image, (int(x), int(y)), radius, color, -1)
-    cv2.imwrite(os.path.join(out_dir, os.path.basename(input)), render_image)
-    print(os.path.join(out_dir, os.path.basename(input)))
+        render_image = (255 * render_image).astype(np.uint8)
+        for pred_keypoints_2d in pred_keypoints_2d_all:
+            for j in range(pred_keypoints_2d[0].shape[0]):
+                color = (0, 0, 255)
+                radius = 3
+                x, y = pred_keypoints_2d[0][j]
+                cv2.circle(render_image, (int(x), int(y)), radius, color, -1)
+        cv2.imwrite(os.path.join(out_dir, _PREFIX + file + '.webp'), render_image)
 
 
-def video_wilor(input='video.mp4', out_dir='output', is_render=False):
+def video_wilor(input='video.mp4', out_dir=OUTDIR):
     import cv2
     import torch
     import numpy as np
@@ -384,9 +392,9 @@ def video_wilor(input='video.mp4', out_dir='output', is_render=False):
     height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
 
     # Create VideoWriter object
-    output_path = os.path.join(out_dir, '_' + os.path.basename(input))  # tmp
+    output_path = os.path.join(out_dir, _PREFIX + prefix(input))  # tmp
     fourcc = cv2.VideoWriter_fourcc(*'mp4v')
-    vout = cv2.VideoWriter(output_path, fourcc, fps, (width, height)) if is_render else None
+    vout = cv2.VideoWriter(output_path, fourcc, fps, (width, height)) if IS_RENDER else None
 
     frame_count = 0
     while cap.isOpened():
@@ -400,9 +408,9 @@ def video_wilor(input='video.mp4', out_dir='output', is_render=False):
         outputs = pipe.predict(image)
         # print(time.time() - t0)
 
-        torch.save(outputs, os.path.join(out_dir, f'{os.path.basename(input)}_hand{frame_count:02d}.pt'))
-        break
-        if is_render:
+        file = prefix(input)
+        torch.save(outputs, os.path.join(out_dir, f'{file}_hand{frame_count:02d}.pt'))
+        if IS_RENDER:
             render_image = image.copy()
             render_image = render_image.astype(np.float32)[:, :, ::-1] / 255.0
 
@@ -446,12 +454,12 @@ def video_wilor(input='video.mp4', out_dir='output', is_render=False):
 def main():
     arg = argparse.ArgumentParser()
     arg.add_argument('-i', '--input', metavar='in.mp4')
-    arg.add_argument('-o', '--outdir', metavar='output', default='output')
+    arg.add_argument('-o', '--outdir', metavar=OUTDIR, default=OUTDIR)
     args, _ = arg.parse_known_args()
 
-    outdir = os.path.join(args.outdir, os.path.basename(args.input.split('.')[0]))
+    outdir = os.path.join(args.outdir, prefix(args.input))
     if args.input:
-        if args.input.split('.')[-1].lower() in IMG:
+        if args.input.split('.')[-1].lower() in _IMG:
             image_wilor(args.input, outdir)
         else:
             video_wilor(args.input, outdir)

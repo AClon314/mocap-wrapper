@@ -4,7 +4,7 @@ import argparse
 import asyncio as aio
 from typing import Coroutine, Sequence
 from mocap_wrapper.logger import IS_DEBUG, PROGRESS_DL
-from mocap_wrapper.lib import DIR, MODS, CONFIG, PACKAGE, TYPE_MODS, QRCODE, copy_kwargs, ffmpeg_or_link, gather, getLogger, mkdir, path_expand, res_path, __version__
+from mocap_wrapper.lib import DIR, MODS, CONFIG, PACKAGE, TYPE_MODS, QRCODE, ffmpeg_or_link, gather, getLogger, mkdir, path_expand, res_path, __version__
 from mocap_wrapper.install.lib import ENV, install, async_queue, mamba
 DEFAULT: Sequence[TYPE_MODS] = ('wilor', 'gvhmr')
 OUTPUT_DIR = os.path.join(DIR, 'output')
