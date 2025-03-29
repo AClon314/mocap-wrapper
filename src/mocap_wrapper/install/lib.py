@@ -2,6 +2,7 @@
 - shell package manager(apt/dnf/brew/winget)
 - python package manager(pip/mamba/conda)
 """
+from ast import pattern
 from sys import path as PATH
 from shutil import which, copy as cp
 from mocap_wrapper.lib import *
@@ -169,7 +170,7 @@ async def mamba(
     3. if `cmd` then, run `cmd` in the env
 
     Args:
-        py_mgr (str): use `mamba` to install, use `pip` to run cmd and get **realtime** output!
+        py_mgr (str): use `mamba` to install.
         kwargs (dict): `subprocess.Popen` args
 
     Returns:
@@ -200,11 +201,11 @@ async def mamba(
         txt = ''
 
     py_bin = os.path.join(envs[env], 'bin')
-    pip = os.path.join(py_bin, 'pip')
-    python = os.path.join(py_bin, 'python')
+    PY = ['pip', 'python']  # TODO: cache re.compile
+    PY = {p: os.path.join(py_bin, p) for p in PY}
     if pkgs or txt:
         if py_mgr == 'pip':
-            p = await popen(f"{pip} install {_txt} {' '.join(pkgs)}", **kwargs)
+            p = await popen(f"{PY['pip']} install {_txt} {' '.join(pkgs)}", **kwargs)
         else:
             p = await popen(f"{py_mgr} install -y -n {env} {_txt} {' '.join(pkgs)}", **kwargs)
 
@@ -214,13 +215,15 @@ async def mamba(
             _c = '/c'
         else:
             _c = '-c'
-        if kwargs.get('mode', 'realtime') == 'realtime':
-            cmd = re_sub(r'^pip(?= )', pip, cmd)
-            cmd = re_sub(r'^python(?= )', python, cmd)
-            # for word in ['pip', 'python']:
-            #     if word in cmd:
-            #         Log.warning(f"Detected suspicious untranslated executable: {word}. If you encounter errors, you may want to modify the source code :)")
-        else:
+
+        is_sub = False
+        for k, v in PY.items():
+            pattern = re_compile(rf'^{k}(?= )')
+            if pattern.match(cmd):
+                cmd = re_sub(pattern, v, cmd)
+                is_sub = True
+                break
+        if not is_sub:
             cmd = ' '.join(filter(None, (py_mgr, 'run -n', env, SHELL, _c, f"'{cmd}'")))
         p = await popen(cmd, **kwargs)
     return True  # TODO: return failed list
@@ -303,6 +306,7 @@ PKG_MGR = get_pkg_mgr()
 PY_MGR = get_py_mgr()
 try:
     from mocap_wrapper.Gdown import google_drive
+    from regex import sub as re_sub, match as re_match, compile as re_compile, MULTILINE
     if __name__ == '__main__':
         aio.run(install(mods=['gvhmr', ]))
 except ImportError:

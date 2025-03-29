@@ -339,7 +339,6 @@ async def popen(
     Returns:
         process (pexpect.spawn): 
     """
-    PROGRESS_DL.stop()  # TODO: 重构进度条！技术债务
     Log.info(f'start {cmd}')
     p = pexpect.spawn(cmd, timeout=timeout, **kwargs)
     FD = sys.stdout.fileno()
@@ -371,7 +370,6 @@ async def popen(
             raise ChildProcessError(f"{cmd}")
         else:
             Log.warning(f'{cmd} → {p.before}')
-    PROGRESS_DL.start()
     return p
 
 
@@ -818,8 +816,6 @@ try:
     import aria2p
     import aiohttp
     import pexpect
-    from regex import sub as re_sub, compile as re_compile, MULTILINE
-
     Aria = try_aria_port()
 
     async def is_resumable_file(url: str, timeout=_TIME_OUT):

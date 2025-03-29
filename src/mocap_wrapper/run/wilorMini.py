@@ -312,10 +312,13 @@ def image_wilor(input='img.png', out_dir='output'):
     pipe = WiLorHandPose3dEstimationPipeline(device=device, dtype=dtype, verbose=False)
     image = cv2.imread(input)
     image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
-    for _ in range(20):
-        t0 = time.time()
-        outputs = pipe.predict(image)
-        print(time.time() - t0)
+
+    # for _ in range(20):
+    #     t0 = time.time()
+    #     outputs = pipe.predict(image)
+    #     print(time.time() - t0)
+    outputs = pipe.predict(image)
+
     os.makedirs(out_dir, exist_ok=True)
     renderer = Renderer(pipe.wilor_model.mano.faces)
 
@@ -357,7 +360,7 @@ def image_wilor(input='img.png', out_dir='output'):
     print(os.path.join(out_dir, os.path.basename(input)))
 
 
-def video_wilor(input='video.mp4', out_dir='output'):
+def video_wilor(input='video.mp4', out_dir='output', is_render=False):
     import cv2
     import torch
     import numpy as np
@@ -383,7 +386,7 @@ def video_wilor(input='video.mp4', out_dir='output'):
     # Create VideoWriter object
     output_path = os.path.join(out_dir, '_' + os.path.basename(input))  # tmp
     fourcc = cv2.VideoWriter_fourcc(*'mp4v')
-    vout = cv2.VideoWriter(output_path, fourcc, fps, (width, height))
+    vout = cv2.VideoWriter(output_path, fourcc, fps, (width, height)) if is_render else None
 
     frame_count = 0
     while cap.isOpened():
@@ -396,29 +399,33 @@ def video_wilor(input='video.mp4', out_dir='output'):
         # t0 = time.time()
         outputs = pipe.predict(image)
         # print(time.time() - t0)
-        render_image = image.copy()
-        render_image = render_image.astype(np.float32)[:, :, ::-1] / 255.0
 
-        for i, out in enumerate(outputs):
-            verts = out["wilor_preds"]['pred_vertices'][0]
-            is_right = out['is_right']
-            cam_t = out["wilor_preds"]['pred_cam_t_full'][0]
-            scaled_focal_length = out["wilor_preds"]['scaled_focal_length']
+        torch.save(outputs, os.path.join(out_dir, f'{os.path.basename(input)}_hand{frame_count:02d}.pt'))
+        break
+        if is_render:
+            render_image = image.copy()
+            render_image = render_image.astype(np.float32)[:, :, ::-1] / 255.0
 
-            misc_args = dict(
-                mesh_base_color=LIGHT_PURPLE,
-                scene_bg_color=(1, 1, 1),
-                focal_length=scaled_focal_length,
-            )
-            # tmesh = renderer.vertices_to_trimesh(verts, cam_t.copy(), LIGHT_PURPLE, is_right=is_right)
-            cam_view = renderer.render_rgba(
-                verts, cam_t=cam_t,
-                render_res=[image.shape[1], image.shape[0]],
-                is_right=is_right,
-                **misc_args)
+            for i, out in enumerate(outputs):
+                verts = out["wilor_preds"]['pred_vertices'][0]
+                is_right = out['is_right']
+                cam_t = out["wilor_preds"]['pred_cam_t_full'][0]
+                scaled_focal_length = out["wilor_preds"]['scaled_focal_length']
 
-            # Overlay image
-            render_image = render_image[:, :, :3] * (1 - cam_view[:, :, 3:]) + cam_view[:, :, :3] * cam_view[:, :, 3:]
+                misc_args = dict(
+                    mesh_base_color=LIGHT_PURPLE,
+                    scene_bg_color=(1, 1, 1),
+                    focal_length=scaled_focal_length,
+                )
+                # tmesh = renderer.vertices_to_trimesh(verts, cam_t.copy(), LIGHT_PURPLE, is_right=is_right)
+                cam_view = renderer.render_rgba(
+                    verts, cam_t=cam_t,
+                    render_res=[image.shape[1], image.shape[0]],
+                    is_right=is_right,
+                    **misc_args)
+
+                # Overlay image
+                render_image = render_image[:, :, :3] * (1 - cam_view[:, :, 3:]) + cam_view[:, :, :3] * cam_view[:, :, 3:]
 
         render_image = (255 * render_image).astype(np.uint8)
 
@@ -430,7 +437,7 @@ def video_wilor(input='video.mp4', out_dir='output'):
 
     # Release everything
     cap.release()
-    vout.release()
+    vout.release() if vout else None
     cv2.destroyAllWindows()
 
     print(f"Video processing complete. Output saved to {output_path}")

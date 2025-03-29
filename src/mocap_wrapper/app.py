@@ -3,7 +3,7 @@ import os
 import argparse
 import asyncio as aio
 from typing import Coroutine, Sequence
-from mocap_wrapper.logger import IS_DEBUG
+from mocap_wrapper.logger import IS_DEBUG, PROGRESS_DL
 from mocap_wrapper.lib import DIR, MODS, CONFIG, PACKAGE, TYPE_MODS, QRCODE, copy_kwargs, ffmpeg_or_link, gather, getLogger, mkdir, path_expand, res_path, __version__
 from mocap_wrapper.install.lib import ENV, install, async_queue, mamba
 DEFAULT: Sequence[TYPE_MODS] = ('wilor', 'gvhmr')
@@ -72,6 +72,7 @@ def main():
         tasks.append(install(mods=mods))
         aio.run(gather(*tasks), debug=IS_DEBUG)
     if args.input:
+        PROGRESS_DL.stop()  # TODO: 重构进度条！技术债务
         aio.run(
             run(mods, args.input, args.outdir),
             debug=IS_DEBUG)
