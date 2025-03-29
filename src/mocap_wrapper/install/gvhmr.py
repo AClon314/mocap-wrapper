@@ -102,7 +102,7 @@ async def i_gvhmr(Dir=DIR_GVHMR, env=ENV, **kwargs):
     tasks = [
         git_mamba(),
         i_gvhmr_post(),
-        i_dpvo(Dir=os.path.join(Dir, 'third-party/DPVO'), env=env, **kwargs),
+        # i_dpvo(Dir=os.path.join(Dir, 'third-party/DPVO'), env=env, **kwargs),
         i_gvhmr_models(Dir=dir_checkpoints, **kwargs)
     ]
     tasks = await aio.gather(*tasks)
