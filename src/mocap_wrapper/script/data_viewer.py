@@ -135,11 +135,11 @@ def flatten_data(files):
             expand_dict(load(f), prefix=_prefix)
             # globals().update(_FLAT)
         except Exception as e:
-            print(f'Error {f}: {e}')
+            print(e)
     return _FLAT
 
 
-def convert_npt(files: list, outname=_OUTNAME, Print=False):
+def convert_npt(files: list, outname=_OUTNAME, save=True, Print=False):
     """```python
     _GLOBAL = convert_npt(files=[])
     globals().update(_GLOBAL)
@@ -149,10 +149,11 @@ def convert_npt(files: list, outname=_OUTNAME, Print=False):
     metadata = json_dumps(_FLAT, indent=2)
     if Print:
         print(metadata)
-    np.savez_compressed(outname, **_FLAT)
-    if outname:
-        with open(outname + '.json', 'w') as f:
-            f.write(metadata)
+    if save:
+        np.savez_compressed(outname, **_FLAT)
+        if outname:
+            with open(outname + '.json', 'w') as f:
+                f.write(metadata)
     return _FLAT
 
 

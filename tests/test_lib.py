@@ -37,7 +37,7 @@ async def test_download(urls, kwargs):
 )
 async def test_unzip(From, to):
     p = await unzip(From, to, dry_run=DRY_RUN)
-    assert p.returncode == 0, p
+    assert p.exitstatus == 0, p
     # os.rmdir(to)
 
 
@@ -69,8 +69,35 @@ async def test_resume(urls):
 
 
 async def test_popen():
-    p, out, err = await Popen_wait('echo "Hello World!"')
+    p, out, err = await popen('echo "Hello World!"')
     assert p.returncode == 0, p
+
+
+@pytest.mark.parametrize(
+    "video",
+    [
+        '/home/n/download/背越式跳高（慢动作）.mp4',
+    ]
+)
+async def test_ffmpeg(video):
+    print(video)
+    p = await ffmpeg_or_link(from_file=video, to_dir='output')
+    print(p)
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        '0:0:0.0,0:0:5.0',
+        '0:0:0.0+0.5',
+        '62,120',
+        '62+0:1',
+        '10'
+    ]
+)
+def test_range_time(text):
+    Range = range_time(text)
+    Log.info(Range)
 
 
 @pytest.fixture(scope="function", autouse=True)

@@ -210,7 +210,7 @@ async def mamba(
             p = await popen(f"{py_mgr} install -y -n {env} {_txt} {' '.join(pkgs)}", **kwargs)
 
     if cmd:
-        cmd = re_sub(r"'(['])", r"\\\1", cmd)
+        cmd = re.sub(r"'(['])", r"\\\1", cmd)
         if is_win:
             _c = '/c'
         else:
@@ -218,9 +218,9 @@ async def mamba(
 
         is_sub = False
         for k, v in PY.items():
-            pattern = re_compile(rf'^{k}(?= )')
+            pattern = re.compile(rf'^{k}(?= )')
             if pattern.match(cmd):
-                cmd = re_sub(pattern, v, cmd)
+                cmd = re.sub(pattern, v, cmd)
                 is_sub = True
                 break
         if not is_sub:
@@ -242,8 +242,8 @@ def txt_pip_retry(txt: Union[str, Path], tmp_dir=DIR, env=ENV):
     cp(txt, tmp)
     with open(tmp, 'r', encoding='UTF-8') as f:
         raw = f.read()
-    raw = re_sub(r'^(?!#).*', '', raw, flags=MULTILINE)
-    raw = re_sub(r'^# ', '', raw, flags=MULTILINE)
+    raw = re.sub(r'^(?!#).*', '', raw, flags=re.MULTILINE)
+    raw = re.sub(r'^# ', '', raw, flags=re.MULTILINE)
     with open(tmp, 'w', encoding='UTF-8') as f:
         f.write(raw)
     p = mamba(py_mgr='pip', txt=tmp, env=env)
@@ -306,7 +306,6 @@ PKG_MGR = get_pkg_mgr()
 PY_MGR = get_py_mgr()
 try:
     from mocap_wrapper.Gdown import google_drive
-    from regex import sub as re_sub, match as re_match, compile as re_compile, MULTILINE
     if __name__ == '__main__':
         aio.run(install(mods=['gvhmr', ]))
 except ImportError:

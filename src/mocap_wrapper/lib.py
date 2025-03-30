@@ -14,7 +14,7 @@ import subprocess as sp
 import asyncio as aio
 from pathlib import Path
 from sys import platform
-from datetime import timedelta
+from datetime import timedelta, datetime
 from platformdirs import user_config_path
 from importlib.resources import path as _res_path
 from importlib.metadata import version as _version
@@ -706,7 +706,8 @@ class Single():
         return Single.instance
 
 
-async def ffmpeg(
+@deprecated('Use `ffmpeg` instead')
+async def ffmpeg_(
     input: str,
     out: str,
     fps: Optional[int] = None,
@@ -728,7 +729,7 @@ async def ffmpeg(
         args += f'-ss {start} -t {duration} '
     if encode != 'copy' and fps is None:
         from fractions import Fraction
-        meta = await ffprobe(input)
+        meta = ffprobe(input, timeout=_RELAX)
         frac = Fraction(meta['streams'][0]['avg_frame_rate'])
         fps = round(frac.numerator / frac.denominator)
         args += f'-r {fps} '
@@ -737,7 +738,7 @@ async def ffmpeg(
     elif encode == 'h264':
         args += '-c:v libx264 -c:a aac '
 
-    cmd = filter(None, ['ffmpeg', '-i', f"{input}", args, f"{out}"])
+    cmd = filter(None, ['ffmpeg', '-hide_banner', '-i', f"{input}", args, f"{out}"])
     cmd = ' '.join(cmd)
     return await popen(cmd, **kwargs)
 
@@ -757,7 +758,8 @@ class Kw_ffprobe(TypedDict):
     format: dict
 
 
-async def ffprobe(input: str):
+@deprecated('Use `ffprobe` instead')
+async def ffprobe_(input: str):
     """
     get metadata of a video
 
@@ -771,7 +773,7 @@ async def ffprobe(input: str):
     p = await popen(cmd, mode='wait')
     if isinstance(p.before, bytes):
         text = p.before.decode().strip()
-        js: Kw_ffprobe = json.loads(text)
+        js = json.loads(text)
         if IS_DEBUG:
             json.dump(js, sys.stdout, ensure_ascii=False, indent=2)
         return js
@@ -779,7 +781,7 @@ async def ffprobe(input: str):
         raise RuntimeError(f"{cmd} → {p.before}")
 
 
-async def is_vbr(metadata: Kw_ffprobe, codec_type: Literal['video', 'audio'] = 'video'):
+def is_vbr(metadata: dict[str, Any], codec_type: Literal['video', 'audio'] = 'video'):
     """is bitrate variable, fallback is True"""
     for s in metadata['streams']:
         if s['codec_type'] == codec_type:
@@ -789,28 +791,84 @@ async def is_vbr(metadata: Kw_ffprobe, codec_type: Literal['video', 'audio'] = '
     return True
 
 
-async def ffmpeg_or_link(from_file: str, to_dir: str):
+def range_time(Str: str):
+    """convert str to timedelta
+
+    Args:
+        Str (str): <start>+<duration> or <start>,<end>
+        e.g.:
+        - 00:00:00+00:00:05
+        - 0:0:0+0:5
+        - 61+0.5    # 61s ~ 61.5s
+        - 10       # 0s ~ 10s
+    """
+    TIME_FORMAT = '%H:%M:%S.%f'
+    _range = re.split(r'[+,]', Str)
+    if len(_range) == 1:
+        start = timedelta(seconds=0)
+        _range.insert(0, start)
+    if len(_range) != 2:
+        Log.warning(f"Invalid time range: {Str}, please use <start>+<duration> or <start>,<end>")
+    for i, str_time in enumerate(_range):
+        if not isinstance(str_time, str):
+            continue
+        Try = str_time.split(':')
+        _len = min(len(Try), 3)
+        a = 9 - 3 * _len
+        b = len(TIME_FORMAT) if '.' in str_time else -3
+        if len(Try) == 1:
+            sec = float(Try[0])
+            t = timedelta(seconds=sec)
+        else:
+            _t = datetime.strptime(str_time, TIME_FORMAT[a:b])
+            t = timedelta(hours=_t.hour, minutes=_t.minute, seconds=_t.second, milliseconds=_t.microsecond)
+        if i == 0:
+            start = t
+        elif i == 1:
+            if ',' in Str:
+                end = t
+                duration = end - start
+            else:
+                duration = t
+                # end = start + duration
+    Log.info(f"{start}+{duration} from {Str}")
+    return start, duration
+
+
+async def ffmpeg_or_link(from_file: str, to_dir: str, Range=''):
     """if file is vbr, ffmpeg to re-encode  
     else create soft symlink
 
     Args:
         from_file (str): input video file
         to_dir (str): output directory, e.g.: `output/AAA/...`
-        prefix (str): prefix for output filename, e.g.: `_in_AAA.mp4`
+        Range (str): see `range_time()`
 
     Returns:
         to_file (str): path of final video file
     """
-    metadata = await ffprobe(from_file)
-    is_VBR = await is_vbr(metadata)
-    filename = os.path.basename(from_file)
-
-    to_dir = os.path.join(to_dir, filename.split('.')[0])   # output/xxx
+    if Range:
+        is_ffmpeg = True
+        r = [r.total_seconds() for r in range_time(Range)]
+        kw = {'ss': r[0], 't': r[1]}
+    else:
+        metadata = ffprobe(from_file)
+        is_ffmpeg = is_vbr(metadata)
+    filename = os.path.splitext(os.path.basename(from_file))[0]
+    to_dir = os.path.join(to_dir, filename)   # output/xxx
+    to_file = os.path.join(to_dir, filename + '.mp4')
     mkdir(to_dir)
-    to_file = os.path.join(to_dir, filename)
+
     if not os.path.exists(to_file):
-        if is_VBR:
-            await ffmpeg(from_file, to_file, encode='h264')
+        if is_ffmpeg:
+            p = (
+                ffmpeg.input(from_file)
+                .output(filename=to_file, vcodec='libx264', acodec='aac', **kw)
+                .run_async())
+            poll = None
+            while poll is None:
+                poll = p.poll()
+                await aio.sleep(0.2)
         else:
             relink(from_file, to_file)
     return to_file
@@ -818,9 +876,12 @@ async def ffmpeg_or_link(from_file: str, to_dir: str):
 
 Aria = None
 try:
+    import regex as re
     import aria2p
     import aiohttp
     import pexpect
+    import ffmpeg
+    from ffmpeg import probe as ffprobe
     Aria = try_aria_port()
 
     async def is_resumable_file(url: str, timeout=_TIME_OUT):

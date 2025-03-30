@@ -1,10 +1,11 @@
 rich
 numpy
-gdown
+gdown   # optinal?
 aiohttp
 pexpect
 ## mamba failed:
 regex
 aria2p
+typed-ffmpeg
 python-worker
 netscape-cookies

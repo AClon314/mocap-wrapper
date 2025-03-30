@@ -408,13 +408,13 @@ def savez(npz, new_data, mode: Literal['w', 'a'] = 'a'):
 def torch_to_numpy(
     pred: dict,
     file: Union[Path, str] = 'gvhmr.npz',
-    person=0,
+    ID=0,
 ):
     """
     Convert `'pred'` torch tensors (.pt) to numpy (.npz) and save to out_path.
     """
     pred_np = {}
-    tmp = ('smplx', 'gvhmr', f'person{person}')
+    tmp = ('smplx', 'gvhmr', f'person{ID}')
     keyname = {
         'smpl_params_global': (*tmp, 'global'),
         'smpl_params_incam': (*tmp, 'incam'),
@@ -542,7 +542,7 @@ def main(Persons: Union[Sequence[int], Set[int], None] = None):
         Log.info(f"[Person {p}] from {Persons}")
         pred = per_person(cfg)
         # === pkl === #
-        torch_to_numpy(pred, cfg.npz_path, person=p)
+        torch_to_numpy(pred, cfg.npz_path, ID=p)
 
 
 if __name__ == "__main__":

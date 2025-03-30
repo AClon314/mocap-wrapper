@@ -23,8 +23,8 @@ async def Python(mod: TYPE_MODS, *args: str):
     return await mamba(f'python {py} {_arg}', env=ENV)
 
 
-async def run(mods: Sequence[TYPE_MODS], input: str, outdir: str):
-    video = await ffmpeg_or_link(input, outdir)
+async def run(mods: Sequence[TYPE_MODS], input: str, outdir: str, Range=''):
+    video = await ffmpeg_or_link(input, outdir, Range=Range)
     for m in mods:
         IS = await Python(m, '--input', video, '--outdir', outdir)
 
@@ -47,7 +47,8 @@ def main():
     arg.add_argument('-@', '--at', metavar=DIR, help='search_dir of git repos, eg: `--at=".."` if GVHMR is current work dir')
     arg.add_argument('-i', '--input', metavar='in.mp4')
     arg.add_argument('-o', '--outdir', metavar=OUTPUT_DIR, default=OUTPUT_DIR)
-    arg.add_argument('--bbox', action='store_true', help='expand pickle for bbox viewer in web/html')
+    arg.add_argument('-r', '--range', metavar='[a,b]or[a,duration]', default='', help='video time range, eg: `--range=0:0:1,0:2` is 1s~2s, `--range=10` is 0s~10s')
+    arg.add_argument('--bbox', action='store_true', help='expand pickle for bbox viewer in blender')
 
     # arg.add_argument('--smpl', help='cookies:PHPSESSID to download smpl files. eg: `--smpl=26-digits_123456789_123456`')
     # arg.add_argument('--smplx', help='cookies:PHPSESSID to download smplx files. eg: `--smplx=26-digits_123456789_123456`')
@@ -75,7 +76,7 @@ def main():
     if args.input:
         PROGRESS_DL.stop()  # TODO: 重构进度条！技术债务
         aio.run(
-            run(mods, args.input, args.outdir),
+            run(mods, args.input, args.outdir, Range=args.range),
             debug=IS_DEBUG)
     if args.bbox:
         from mocap_wrapper.script.data_viewer import main

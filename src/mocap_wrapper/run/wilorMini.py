@@ -16,6 +16,7 @@ import argparse
 import os
 import pdb
 import time
+from typing import Literal
 
 import trimesh
 import pyrender
@@ -302,6 +303,40 @@ class Renderer:
             if scene.has_node(node):
                 continue
             scene.add_node(node)
+
+
+def savez(npz, new_data, mode: Literal['w', 'a'] = 'a'):
+    if mode == 'a' and os.path.exists(npz):
+        new_data = {**np.load(npz, allow_pickle=True), **new_data}
+    np.savez_compressed(npz, **new_data)
+
+
+def torch_to_numpy(
+    pred: dict,
+    file='gvhmr.npz',
+    ID=0,
+):
+    """
+    Convert `'pred'` torch tensors (.pt) to numpy (.npz) and save to out_path.
+    """
+    pred_np = {}
+    tmp = ('smplx', 'wilor', f'hand{ID}')
+    keyname = {
+        'wilor_preds': (*tmp, 'incam'),
+    }
+    keyname_deep = {
+        'hand_pose': 'pose',
+        'global_orient': 'rotate',
+        # 'transl': 'trans',
+        'betas': 'shape',
+    }
+
+    for K, K_ in keyname.items():
+        for k, k_ in keyname_deep.items():
+            key = ';'.join([*K_[:2], k_, *K_[2:]])
+            pred_np[key] = pred[K][k].cpu().numpy()
+
+    savez(file, pred_np)
 
 
 def image_wilor(input='img.png', out_dir=OUTDIR):
