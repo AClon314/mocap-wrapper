@@ -1,7 +1,7 @@
 #! /bin/env -S conda run --live-stream -n mocap python
 # -*- coding: utf-8 -*-
 # @Time    : 2024/10/14
-# @Author  : wenshao
+# @Author  : wenshao(original), AClon314(modified)
 # @Project : WiLoR-mini
 # @FileName: test_wilor_pipeline.py
 # https://github.com/warmshao/WiLoR-mini/blob/main/tests/test_pipelines.py
@@ -10,28 +10,24 @@ you need to install trimesh and pyrender if you want to render mesh
 pip install trimesh
 pip install pyrender
 """
-IS_RENDER = True
+IS_RENDER = False
 OUTDIR = 'output'
-import argparse
 import os
-import pdb
-import time
-from typing import Literal
-
-import trimesh
-import pyrender
-import numpy as np
-import torch
+import argparse
+import logging
+from typing import Any, Literal, Optional, get_args
 from sys import platform
 is_win = platform == "win32"
 is_linux = platform == "linux"
+import numpy as np
+from rich.progress import Progress
 if not is_win:
     os.environ['PYOPENGL_PLATFORM'] = 'egl'  # linux fix
 _IMG = ['jpg', 'jpeg', 'png', 'bmp', 'webp']
 _PREFIX = '_out_'
-
-
-def prefix(path) -> str: return os.path.splitext(os.path.basename(path))[0]
+_TYPE_PRED = Literal['bbox', 'betas', 'global_orient', 'hand_pose', 'pred_cam', 'pred_cam_t_full', 'pred_keypoints_2d', 'pred_keypoints_3d', 'pred_vertices', 'scaled_focal_length', ]
+_PRED: tuple[str] = get_args(_TYPE_PRED)
+def no_ext_filename(path) -> str: return os.path.splitext(os.path.basename(path))[0]
 
 
 def create_raymond_lights():
@@ -311,41 +307,42 @@ def savez(npz, new_data, mode: Literal['w', 'a'] = 'a'):
     np.savez_compressed(npz, **new_data)
 
 
-def torch_to_numpy(
-    pred: dict,
-    file='gvhmr.npz',
-    ID=0,
+def export(
+    preds: list[dict[str, np.ndarray | float | int]],
+    file='mocap_wilor.npz',
 ):
     """
-    Convert `'pred'` torch tensors (.pt) to numpy (.npz) and save to out_path.
+    save `.npz` to file.
+
+    keyname = 'smplx;wilor;hand{ID};prop[0];prop[1];...;props[n]'
     """
-    pred_np = {}
-    tmp = ('smplx', 'wilor', f'hand{ID}')
-    keyname = {
-        'wilor_preds': (*tmp, 'incam'),
-    }
-    keyname_deep = {
-        'hand_pose': 'pose',
-        'global_orient': 'rotate',
-        # 'transl': 'trans',
-        'betas': 'shape',
-    }
+    data = {}
+    prefix = 'smplx;wilor'
 
-    for K, K_ in keyname.items():
-        for k, k_ in keyname_deep.items():
-            key = ';'.join([*K_[:2], k_, *K_[2:]])
-            pred_np[key] = pred[K][k].cpu().numpy()
+    for i, hand in enumerate(preds):
+        LR = 'R' if hand.pop('is_right') > 0.5 else 'L'
+        for k, v in hand.items():
+            key = ';'.join([prefix, f'hand_{i}{LR}', k])
+            data[key] = v
+    savez(file, data)
 
-    savez(file, pred_np)
+
+def Import():
+    from wilor_mini.pipelines.wilor_hand_pose3d_estimation_pipeline import WiLorHandPose3dEstimationPipeline, get_logger
+
+    def __init__patch(self, **kwargs):
+        self.verbose = kwargs.get("verbose", False)
+        if self.verbose:
+            self.logger = get_logger(self.__class__.__name__, lv=logging.INFO)
+        else:
+            self.logger = get_logger(self.__class__.__name__, lv=logging.ERROR)
+        self.init_models(**kwargs)
+    WiLorHandPose3dEstimationPipeline.__init__ = __init__patch
+    return WiLorHandPose3dEstimationPipeline
 
 
 def image_wilor(input='img.png', out_dir=OUTDIR):
-    import cv2
-    import torch
-    import numpy as np
-    import os
-    from wilor_mini.pipelines.wilor_hand_pose3d_estimation_pipeline import WiLorHandPose3dEstimationPipeline
-
+    WiLorHandPose3dEstimationPipeline = Import()
     LIGHT_PURPLE = (0.25098039, 0.274117647, 0.65882353)
     device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
     dtype = torch.float16
@@ -353,28 +350,27 @@ def image_wilor(input='img.png', out_dir=OUTDIR):
     pipe = WiLorHandPose3dEstimationPipeline(device=device, dtype=dtype, verbose=False)
     image = cv2.imread(input)
     image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
-
-    # for _ in range(20):
-    #     t0 = time.time()
-    #     outputs = pipe.predict(image)
-    #     print(time.time() - t0)
-    outputs = pipe.predict(image)
+    pred = pipe.predict(image)
 
     os.makedirs(out_dir, exist_ok=True)
-    file = prefix(input)
-    torch.save(outputs, os.path.join(out_dir, file + '.pt'))
+    file = no_ext_filename(input)
+    # torch.save(outputs, os.path.join(out_dir, file + '.pt'))
+    if len(pred) > 0:
+        for i, p in enumerate(pred[0]):
+            export(p, os.path.join(out_dir, f'mocap_{no_ext_filename(input)}.npz'), who=i)
     if IS_RENDER:
         renderer = Renderer(pipe.wilor_model.mano.faces)
 
         render_image = image.copy()
         render_image = render_image.astype(np.float32)[:, :, ::-1] / 255.0
         pred_keypoints_2d_all = []
-        for i, out in enumerate(outputs):
-            verts = out["wilor_preds"]['pred_vertices'][0]
+        for i, out in enumerate(pred):
+            wilor_preds = out["wilor_preds"]
             is_right = out['is_right']
-            cam_t = out["wilor_preds"]['pred_cam_t_full'][0]
-            scaled_focal_length = out["wilor_preds"]['scaled_focal_length']
-            pred_keypoints_2d = out["wilor_preds"]["pred_keypoints_2d"]
+            verts = wilor_preds['pred_vertices'][0]
+            cam_t = wilor_preds['pred_cam_t_full'][0]
+            scaled_focal_length = wilor_preds['scaled_focal_length']
+            pred_keypoints_2d = wilor_preds["pred_keypoints_2d"]
             pred_keypoints_2d_all.append(pred_keypoints_2d)
             misc_args = dict(
                 mesh_base_color=LIGHT_PURPLE,
@@ -403,13 +399,8 @@ def image_wilor(input='img.png', out_dir=OUTDIR):
         cv2.imwrite(os.path.join(out_dir, _PREFIX + file + '.webp'), render_image)
 
 
-def video_wilor(input='video.mp4', out_dir=OUTDIR):
-    import cv2
-    import torch
-    import numpy as np
-    import os
-    from wilor_mini.pipelines.wilor_hand_pose3d_estimation_pipeline import WiLorHandPose3dEstimationPipeline
-
+def video_wilor(input='video.mp4', out_dir=OUTDIR, progress: Optional[Progress] = None):
+    WiLorHandPose3dEstimationPipeline = Import()
     LIGHT_PURPLE = (0.25098039, 0.274117647, 0.65882353)
     device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
     dtype = torch.float16
@@ -425,13 +416,20 @@ def video_wilor(input='video.mp4', out_dir=OUTDIR):
     fps = int(cap.get(cv2.CAP_PROP_FPS))
     width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
     height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+    total = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+    filename = no_ext_filename(input)
+    file = filename + '.mp4'
+    task = progress.add_task(
+        f"📹︎ →🏃 Video {file}", start=True, total=100) if progress else None
 
     # Create VideoWriter object
-    output_path = os.path.join(out_dir, _PREFIX + prefix(input))  # tmp
+    output_path = os.path.join(out_dir, _PREFIX + file)  # tmp
     fourcc = cv2.VideoWriter_fourcc(*'mp4v')
     vout = cv2.VideoWriter(output_path, fourcc, fps, (width, height)) if IS_RENDER else None
 
+    preds: list[dict] = []  # hands, frames
     frame_count = 0
+    _len = -1
     while cap.isOpened():
         ret, frame = cap.read()
         if not ret:
@@ -439,21 +437,48 @@ def video_wilor(input='video.mp4', out_dir=OUTDIR):
 
         # Convert frame to RGB
         image = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-        # t0 = time.time()
-        outputs = pipe.predict(image)
-        # print(time.time() - t0)
+        _pred = pipe.predict(image)  # hands per frame
 
-        file = prefix(input)
-        torch.save(outputs, os.path.join(out_dir, f'{file}_hand{frame_count:02d}.pt'))
+        # ==data remapping==
+        _len = len(_pred)
+        lens = len(preds)
+        print(f"Changed: {_len} hands @ frame {frame_count}") if _len != lens else None
+        _lack = max(_len - lens, 0)
+        if _lack > 0:
+            preds.extend([{}] * _lack)
+        for i, hand in enumerate(_pred):
+            pred = preds[i]
+            wilor_preds: dict[str, np.ndarray] = hand["wilor_preds"]
+            wilor_preds['bbox'] = hand['hand_bbox']
+            wilor_preds = {K: np.expand_dims(v, axis=0) for K, v in wilor_preds.items()}
+
+            if len(pred) == 0:
+                _hand = {
+                    'start': frame_count,
+                    'is_right': hand['is_right'],
+                    **wilor_preds
+                }
+                preds[i] = _hand
+            else:
+                if hand['is_right'] != pred['is_right']:
+                    print(f"hand {i} is_right changed @ {frame_count}")
+                for K in _PRED:
+                    if K in pred.keys() and K in wilor_preds.keys():
+                        pred[K] = np.concatenate((pred[K], wilor_preds[K]), axis=0)
+                    else:
+                        print(f"hand {i} {K} not in pred @ {frame_count}, {pred.keys()}")
+        # ==data remapping end==
+
         if IS_RENDER:
             render_image = image.copy()
             render_image = render_image.astype(np.float32)[:, :, ::-1] / 255.0
 
-            for i, out in enumerate(outputs):
-                verts = out["wilor_preds"]['pred_vertices'][0]
+            for i, out in enumerate(_pred):
+                wilor_preds = out["wilor_preds"]
                 is_right = out['is_right']
-                cam_t = out["wilor_preds"]['pred_cam_t_full'][0]
-                scaled_focal_length = out["wilor_preds"]['scaled_focal_length']
+                verts = wilor_preds['pred_vertices'][0]
+                cam_t = wilor_preds['pred_cam_t_full'][0]
+                scaled_focal_length = wilor_preds['scaled_focal_length']
 
                 misc_args = dict(
                     mesh_base_color=LIGHT_PURPLE,
@@ -470,37 +495,53 @@ def video_wilor(input='video.mp4', out_dir=OUTDIR):
                 # Overlay image
                 render_image = render_image[:, :, :3] * (1 - cam_view[:, :, 3:]) + cam_view[:, :, :3] * cam_view[:, :, 3:]
 
-        render_image = (255 * render_image).astype(np.uint8)
+            render_image = (255 * render_image).astype(np.uint8)
 
-        # Write the frame to the output video
-        vout.write(render_image)
+            # Write the frame to the output video
+            vout.write(render_image)
 
         frame_count += 1
-        # print(f"Processed frame {frame_count}")
+        progress.update(task, completed=frame_count) if progress and not task is None else None
 
     # Release everything
     cap.release()
     vout.release() if vout else None
     cv2.destroyAllWindows()
 
-    print(f"Video processing complete. Output saved to {output_path}")
+    export(preds, os.path.join(out_dir, f'mocap_{filename}.npz'))
 
 
-def main():
+def argParser():
     arg = argparse.ArgumentParser()
     arg.add_argument('-i', '--input', metavar='in.mp4')
     arg.add_argument('-o', '--outdir', metavar=OUTDIR, default=OUTDIR)
+    arg.add_argument('--render', action='store_true', help='render hands mesh to video')
     args, _ = arg.parse_known_args()
+    if args.render:
+        global IS_RENDER
+        IS_RENDER = True
+    if not args.input:
+        arg.print_help()
+        exit(1)
+    return args, _, arg
 
-    outdir = os.path.join(args.outdir, prefix(args.input))
+
+def wilor(args: argparse.Namespace, arg: argparse.ArgumentParser):
     if args.input:
-        if args.input.split('.')[-1].lower() in _IMG:
-            image_wilor(args.input, outdir)
-        else:
-            video_wilor(args.input, outdir)
+        outdir = os.path.join(args.outdir, no_ext_filename(args.input))
+        with Progress() as p:
+            if args.input.split('.')[-1].lower() in _IMG:
+                image_wilor(input=args.input, out_dir=outdir)
+            else:
+                video_wilor(input=args.input, out_dir=outdir, progress=p)
     else:
         arg.print_help()
 
 
 if __name__ == '__main__':
-    main()
+    args, _, arg = argParser()
+    import cv2
+    import torch
+    import pyrender
+    import trimesh
+    wilor(args, arg)

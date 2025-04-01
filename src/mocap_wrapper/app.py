@@ -1,5 +1,6 @@
 #!/bin/python
 import os
+import atexit
 import argparse
 import asyncio as aio
 from typing import Coroutine, Sequence
@@ -23,10 +24,10 @@ async def Python(mod: TYPE_MODS, *args: str):
     return await mamba(f'python {py} {_arg}', env=ENV)
 
 
-async def run(mods: Sequence[TYPE_MODS], input: str, outdir: str, Range=''):
+async def run(mods: Sequence[TYPE_MODS], input: str, outdir: str, Range='', args: Sequence[str] = []):
     video = await ffmpeg_or_link(input, outdir, Range=Range)
     for m in mods:
-        IS = await Python(m, '--input', video, '--outdir', outdir)
+        IS = await Python(m, '--input', video, '-o', outdir, *args)
 
 
 class ArgParser(argparse.ArgumentParser):
@@ -38,8 +39,14 @@ class ArgParser(argparse.ArgumentParser):
         aio.run(gather(*tasks))
 
 
+def cleanup():
+    PROGRESS_DL.start()
+    PROGRESS_DL.stop()
+
+
 def main():
     global DIR
+    atexit.register(cleanup)
     arg = ArgParser(description=f'sincerelly thanks to gvhmr/wilor/wilor-mini devs and others that help each other♥️ , please consider donate♥️ if helps you a lot :)')
     arg.add_argument('-v', '--version', action='store_true')
     arg.add_argument('-I', '--install', action='store_true')
@@ -48,7 +55,7 @@ def main():
     arg.add_argument('-i', '--input', metavar='in.mp4')
     arg.add_argument('-o', '--outdir', metavar=OUTPUT_DIR, default=OUTPUT_DIR)
     arg.add_argument('-r', '--range', metavar='[a,b]or[a,duration]', default='', help='video time range, eg: `--range=0:0:1,0:2` is 1s~2s, `--range=10` is 0s~10s')
-    arg.add_argument('--bbox', action='store_true', help='expand pickle for bbox viewer in blender')
+    arg.add_argument('--bbox', action='store_true', help='expand pickle for bbox viewer in blender (unfinished)')
 
     # arg.add_argument('--smpl', help='cookies:PHPSESSID to download smpl files. eg: `--smpl=26-digits_123456789_123456`')
     # arg.add_argument('--smplx', help='cookies:PHPSESSID to download smplx files. eg: `--smplx=26-digits_123456789_123456`')
@@ -76,11 +83,11 @@ def main():
     if args.input:
         PROGRESS_DL.stop()  # TODO: 重构进度条！技术债务
         aio.run(
-            run(mods, args.input, args.outdir, Range=args.range),
+            run(mods, args.input, args.outdir, Range=args.range, args=_args),
             debug=IS_DEBUG)
     if args.bbox:
-        from mocap_wrapper.script.data_viewer import main
-        main()
+        from mocap_wrapper.script.data_viewer import convert
+        convert()
     if not any(vars(args).values()):
         arg.print_help()
 

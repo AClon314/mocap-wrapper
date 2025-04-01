@@ -157,7 +157,7 @@ def convert_npt(files: list, outname=_OUTNAME, save=True, Print=False):
     return _FLAT
 
 
-def main():
+def convert():
     global _FILE
     arg = argparse.ArgumentParser()
     arg.add_argument('-i', '--input', nargs='+', type=str, help='input file')
@@ -169,4 +169,4 @@ def main():
 
 
 if __name__ == '__main__':
-    main()
+    convert()

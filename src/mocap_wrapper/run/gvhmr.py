@@ -2,126 +2,20 @@
 """https://github.com/zju3dv/GVHMR/blob/main/tools/demo/demo.py"""
 from typing import Literal, Sequence, Set, Union
 from pathlib import Path
-from __init__ import chdir_gitRepo
+try:
+    from mocap_wrapper.run import chdir_gitRepo, continuous
+except ImportError:
+    from __init__ import chdir_gitRepo, continuous
 chdir_gitRepo('gvhmr')
 import gc
-import time
 import inspect
 import argparse
 from os import symlink
-
-import cv2
-import torch
-import pytorch_lightning as pl
-import numpy as np
-import hydra
-from hydra import initialize_config_module, compose
-from pytorch3d.transforms import quaternion_to_matrix
-
-from hmr4d.utils.pylogger import Log
-from hmr4d.configs import register_store_gvhmr
-from hmr4d.utils.video_io_utils import (
-    get_video_lwh,
-    read_video_np,
-    save_video,
-    merge_videos_horizontal,
-    get_writer,
-    get_video_reader,
-)
-from hmr4d.utils.seq_utils import (  # patched
-    get_frame_id_list_from_mask,
-    linear_interpolate_frame_ids,
-    frame_id_to_mask,
-    rearrange_by_mask,
-)
-from hmr4d.utils.vis.cv2_utils import draw_bbx_xyxy_on_image_batch, draw_coco17_skeleton_batch
-
-from hmr4d.utils.preproc import Tracker, Extractor, VitPoseExtractor, SimpleVO
-
-from hmr4d.utils.geo.hmr_cam import get_bbx_xys_from_xyxy, estimate_K, convert_K_to_K4, create_camera_sensor
-from hmr4d.utils.geo_transform import compute_cam_angvel
-from hmr4d.model.gvhmr.gvhmr_pl_demo import DemoPL
-from hmr4d.utils.net_utils import detach_to_cpu, to_cuda, moving_average_smooth  # patched
-from hmr4d.utils.smplx_utils import make_smplx
-from hmr4d.utils.vis.renderer import Renderer, get_global_cameras_static, get_ground_params_from_points
-from tqdm import tqdm
-from hmr4d.utils.geo_transform import apply_T_on_points, compute_T_ayfz2ay
-from einops import einsum, rearrange
-
-
 CRF = 23  # 17 is lossless, every +6 halves the mp4 size
 person_count = None
 
 
-def vram_gb(): return torch.cuda.memory_allocated() / 1024 ** 3
-
-
-def free_ram():
-    vram_before = vram_gb()
-
-    stack = inspect.stack()
-    caller = stack[1]
-    gc.collect()
-    torch.cuda.empty_cache()
-
-    vram_release = vram_gb() - vram_before
-    msg = f"[Free VRAM] {vram_release:.2f} GB at\t{caller.filename}:{caller.lineno}"
-    if vram_release < -0.01:
-        Log.info(msg)
-    elif vram_release > 0.01:
-        Log.warning(msg)
-    else:
-        ...
-        # Log.warning(f'(DEBUG: Need removed) {msg}')
-
-
-def load_yolo_track(cfg):
-    global person_count
-    file = cfg.paths.yolo_track + '.npz'
-
-    data = np.load(file, allow_pickle=True)
-    id_to_frame_ids = data['id_to_frame_ids'].item()
-    id_to_bbx_xyxys = data['id_to_bbx_xyxys'].item()
-    id_sorted = data['id_sorted']
-
-    person_count = len(id_sorted)
-    if not person_count:
-        Log.info(f'How many people in the video? {person_count}')
-    return id_to_frame_ids, id_to_bbx_xyxys, id_sorted
-
-
-def get_one_track_patch(self, video_path, cfg):
-    track_path = cfg.paths.yolo_track + '.npz'
-    if Path(track_path).exists():
-        id_to_frame_ids, id_to_bbx_xyxys, id_sorted = load_yolo_track(cfg)
-    else:
-        # track
-        track_history = self.track(video_path)
-
-        # parse track_history & use top1 track
-        id_to_frame_ids, id_to_bbx_xyxys, id_sorted = self.sort_track_length(track_history, video_path)
-        np.savez_compressed(cfg.paths.yolo_track, id_to_frame_ids=id_to_frame_ids, id_to_bbx_xyxys=id_to_bbx_xyxys, id_sorted=id_sorted)
-    track_id = id_sorted[cfg.person]
-    frame_ids = torch.tensor(id_to_frame_ids[track_id])  # (N,)
-    bbx_xyxys = torch.tensor(id_to_bbx_xyxys[track_id])  # (N, 4)
-
-    # interpolate missing frames
-    mask = frame_id_to_mask(frame_ids, get_video_lwh(video_path)[0])
-    bbx_xyxy_one_track = rearrange_by_mask(bbx_xyxys, mask)  # (F, 4), missing filled with 0
-    missing_frame_id_list = get_frame_id_list_from_mask(~mask)  # list of list
-    bbx_xyxy_one_track = linear_interpolate_frame_ids(bbx_xyxy_one_track, missing_frame_id_list)
-    assert (bbx_xyxy_one_track.sum(1) != 0).all()
-
-    bbx_xyxy_one_track = moving_average_smooth(bbx_xyxy_one_track, window_size=5, dim=0)
-    bbx_xyxy_one_track = moving_average_smooth(bbx_xyxy_one_track, window_size=5, dim=0)
-
-    return bbx_xyxy_one_track
-
-
-Tracker.get_one_track = get_one_track_patch  # patched
-
-
-def parse_args_to_cfg():
+def argParser():
     # Put all args to cfg
     parser = argparse.ArgumentParser()
     parser.add_argument("-i", "--input", type=str, metavar='in.mp4')
@@ -141,7 +35,53 @@ def parse_args_to_cfg():
     parser.add_argument("-p", "--persons", type=str, help="List of persons to process, e.g. '0,1,2'")
     parser.add_argument("--verbose", action="store_true", help="If true, draw intermediate results")
     args, _ = parser.parse_known_args()
+    if not args.input:
+        parser.print_help()
+        exit(1)
+    return args
 
+
+if __name__ == "__main__":
+    cfg = argParser()
+
+import cv2
+import torch
+import pytorch_lightning as pl
+import numpy as np
+import hydra
+from hydra import initialize_config_module, compose
+from pytorch3d.transforms import quaternion_to_matrix
+from einops import einsum, rearrange
+from tqdm import tqdm
+from hmr4d.utils.pylogger import Log
+from hmr4d.configs import register_store_gvhmr
+from hmr4d.utils.video_io_utils import (
+    get_video_lwh,
+    read_video_np,
+    save_video,
+    merge_videos_horizontal,
+    get_writer,
+    get_video_reader,
+)
+from hmr4d.utils.seq_utils import (  # patched
+    get_frame_id_list_from_mask,
+    linear_interpolate_frame_ids,
+    frame_id_to_mask,
+    rearrange_by_mask,
+)
+from hmr4d.utils.vis.cv2_utils import draw_bbx_xyxy_on_image_batch, draw_coco17_skeleton_batch
+from hmr4d.utils.preproc import Tracker, Extractor, VitPoseExtractor, SimpleVO
+from hmr4d.utils.geo.hmr_cam import get_bbx_xys_from_xyxy, estimate_K, convert_K_to_K4, create_camera_sensor
+from hmr4d.utils.geo_transform import compute_cam_angvel
+from hmr4d.model.gvhmr.gvhmr_pl_demo import DemoPL
+from hmr4d.utils.net_utils import detach_to_cpu, to_cuda, moving_average_smooth  # patched
+from hmr4d.utils.smplx_utils import make_smplx
+from hmr4d.utils.vis.renderer import Renderer, get_global_cameras_static, get_ground_params_from_points
+from hmr4d.utils.geo_transform import apply_T_on_points, compute_T_ayfz2ay
+def vram_gb(): return torch.cuda.memory_allocated() / 1024 ** 3
+
+
+def parse_args_to_cfg(args=argParser()):
     # Input
     video_path = Path(args.input)
     assert video_path.exists(), f"Video not found at {video_path}"
@@ -187,6 +127,89 @@ def parse_args_to_cfg():
     #     reader.close()
 
     return cfg
+
+
+def free_ram():
+    vram_before = vram_gb()
+
+    stack = inspect.stack()
+    caller = stack[1]
+    gc.collect()
+    torch.cuda.empty_cache()
+
+    vram_release = vram_gb() - vram_before
+    msg = f"[Free VRAM] {vram_release:.2f} GB at\t{caller.filename}:{caller.lineno}"
+    if vram_release < -0.01:
+        Log.info(msg)
+    elif vram_release > 0.01:
+        Log.warning(msg)
+    else:
+        ...
+        # Log.warning(f'(DEBUG: Need removed) {msg}')
+
+
+def save_bbox(cfg, id_frames, id_bbox_xyxy, ids):
+    """TODO: replace yolo_track.npz"""
+    for p, i in enumerate(ids):
+        ranges = continuous(id_frames[i])
+        if len(ranges) > 1:
+            Log.warning(f"Person {p} has multiple ranges: {ranges}")
+        start = str(ranges[0][0])
+        key = ';'.join(['smplx;gvhmr', f'person{p}', 'bbox', start])
+        savez(cfg.npz_path, {key: id_bbox_xyxy[i]}, mode='a')
+
+
+def load_yolo_track(cfg):
+    global person_count
+    file = cfg.paths.yolo_track + '.npz'
+
+    data = np.load(file, allow_pickle=True)
+    id_frames = data['id_frames'].item()
+    id_bbox_xyxy = data['id_bbox_xyxy'].item()
+    ids = data['ids']
+    save_bbox(cfg, id_frames, id_bbox_xyxy, ids)
+
+    person_count = len(ids)
+    if not person_count:
+        Log.info(f'How many people in the video? {person_count}')
+
+    return id_frames, id_bbox_xyxy, ids
+
+
+def get_one_track_patch(self, video_path, cfg):
+    track_path = cfg.paths.yolo_track
+    if Path(track_path + '.npz').exists():
+        id_frames, id_bbox_xyxy, ids = load_yolo_track(cfg)
+    else:
+        # track
+        track_history = self.track(video_path)
+
+        # parse track_history & use top1 track
+        id_frames, id_bbox_xyxy, ids = self.sort_track_length(track_history, video_path)
+        savez(track_path, {'id_frames': id_frames, 'id_bbox_xyxy': id_bbox_xyxy, 'ids': ids}, mode='w')
+    save_bbox(cfg, id_frames, id_bbox_xyxy, ids)
+    id_track = ids[cfg.person]
+    frames = torch.tensor(id_frames[id_track])  # (N,)
+    bbox_xyxy = torch.tensor(id_bbox_xyxy[id_track])  # (N, 4)
+
+    # interpolate missing frames
+    mask = frame_id_to_mask(frames, get_video_lwh(video_path)[0])
+    bbx_xyxy_one_track = rearrange_by_mask(bbox_xyxy, mask)  # (F, 4), missing filled with 0
+    missing_frame_id_list = get_frame_id_list_from_mask(~mask)  # list of list
+    bbx_xyxy_one_track = linear_interpolate_frame_ids(bbx_xyxy_one_track, missing_frame_id_list)
+    assert (bbx_xyxy_one_track.sum(1) != 0).all()
+
+    bbx_xyxy_one_track = moving_average_smooth(bbx_xyxy_one_track, window_size=5, dim=0)
+    bbx_xyxy_one_track = moving_average_smooth(bbx_xyxy_one_track, window_size=5, dim=0)
+
+    return bbx_xyxy_one_track
+
+
+Tracker.get_one_track = get_one_track_patch  # patched
+
+
+if __name__ == "__main__":
+    cfg = parse_args_to_cfg()
 
 
 @torch.no_grad()
@@ -405,35 +428,35 @@ def savez(npz, new_data, mode: Literal['w', 'a'] = 'a'):
     np.savez_compressed(npz, **new_data)
 
 
-def torch_to_numpy(
+def export(
     pred: dict,
-    file: Union[Path, str] = 'gvhmr.npz',
-    ID=0,
+    file: Union[Path, str] = 'mocap_gvhmr.npz',
+    who=0,
 ):
     """
-    Convert `'pred'` torch tensors (.pt) to numpy (.npz) and save to out_path.
+    Convert `'pred'` torch tensors (.pt) to numpy (.npz) and save to `file`.
+
+    keyname = 'smplx;gvhmr;customKey;person{ID};global'
     """
-    pred_np = {}
-    tmp = ('smplx', 'gvhmr', f'person{ID}')
-    keyname = {
-        'smpl_params_global': (*tmp, 'global'),
-        'smpl_params_incam': (*tmp, 'incam'),
-    }
-    keyname_deep = {
-        'body_pose': 'pose',
-        'global_orient': 'rotate',
-        'transl': 'trans',
-        'betas': 'shape',
+    data = {}
+    prefix = 'smplx;gvhmr'
+    key_who = f'person{who}'
+    filter = {
+        'smpl_params_global': 'global',
+        'smpl_params_incam': 'incam',
     }
 
-    for K, K_ in keyname.items():
-        for k, k_ in keyname_deep.items():
-            key = ';'.join([*K_[:2], k_, *K_[2:]])
-            pred_np[key] = pred[K][k].cpu().numpy()
+    for K, _K in filter.items():
+        if hasattr(pred[K], 'keys'):
+            for k in pred[K].keys():
+                key = ';'.join([prefix, key_who, k, _K])
+                data[key] = pred[K][k].cpu().numpy()
+        else:
+            # 基本不会执行这里
+            key = ';'.join([prefix, '', K])
+            data[key] = pred[K].cpu().numpy()
 
-    savez(file, pred_np)
-    # with open(out_path, 'wb') as handle:
-    #     pickle.dump(pred_np, handle, protocol=pickle.HIGHEST_PROTOCOL)
+    savez(file, data)
 
 
 def find_camera_extrinsics(verts_world, verts_camera):
@@ -520,8 +543,7 @@ def per_person(cfg):
     return pred
 
 
-def main(Persons: Union[Sequence[int], Set[int], None] = None):
-    cfg = parse_args_to_cfg()
+def gvhmr(cfg, Persons: Union[Sequence[int], Set[int], None] = None):
     # Log.info(f"[GPU]: {torch.cuda.get_device_name()}")
     Log.info(f'[GPU]: {torch.cuda.get_device_properties("cuda")}')
 
@@ -541,9 +563,8 @@ def main(Persons: Union[Sequence[int], Set[int], None] = None):
         cfg.person = p
         Log.info(f"[Person {p}] from {Persons}")
         pred = per_person(cfg)
-        # === pkl === #
-        torch_to_numpy(pred, cfg.npz_path, ID=p)
+        export(pred, cfg.npz_path, who=p)
 
 
 if __name__ == "__main__":
-    main()
+    gvhmr(cfg)

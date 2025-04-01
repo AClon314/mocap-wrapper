@@ -14,6 +14,7 @@ import subprocess as sp
 import asyncio as aio
 from pathlib import Path
 from sys import platform
+from fractions import Fraction
 from datetime import timedelta, datetime
 from platformdirs import user_config_path
 from importlib.resources import path as _res_path
@@ -835,7 +836,7 @@ def range_time(Str: str):
     return start, duration
 
 
-async def ffmpeg_or_link(from_file: str, to_dir: str, Range=''):
+async def ffmpeg_or_link(from_file: str, to_dir: str, Range='', fps_times=5):
     """if file is vbr, ffmpeg to re-encode  
     else create soft symlink
 
@@ -843,16 +844,24 @@ async def ffmpeg_or_link(from_file: str, to_dir: str, Range=''):
         from_file (str): input video file
         to_dir (str): output directory, e.g.: `output/AAA/...`
         Range (str): see `range_time()`
+        fps_times (int): round to times of fps_times, by default leads to 5,10,15,20 fps...
 
     Returns:
         to_file (str): path of final video file
     """
+    kw: dict[str, Any] = {}
+    metadata = ffprobe(from_file)
+    from_fps = Fraction(metadata['streams'][0]['r_frame_rate'])
+    to_fps = round(from_fps.numerator / from_fps.denominator / fps_times) * fps_times
+    from_fps = from_fps.numerator / from_fps.denominator
     if Range:
         is_ffmpeg = True
         r = [r.total_seconds() for r in range_time(Range)]
-        kw = {'ss': r[0], 't': r[1]}
+        kw.update({'ss': r[0], 't': r[1]})
+    elif from_fps != to_fps:
+        is_ffmpeg = True
+        kw.update({'r': to_fps})
     else:
-        metadata = ffprobe(from_file)
         is_ffmpeg = is_vbr(metadata)
     filename = os.path.splitext(os.path.basename(from_file))[0]
     to_dir = os.path.join(to_dir, filename)   # output/xxx
@@ -864,6 +873,7 @@ async def ffmpeg_or_link(from_file: str, to_dir: str, Range=''):
             p = (
                 ffmpeg.input(from_file)
                 .output(filename=to_file, vcodec='libx264', acodec='aac', **kw)
+                .global_args(hide_banner=not IS_DEBUG)
                 .run_async())
             poll = None
             while poll is None:

@@ -32,15 +32,17 @@ Only tested on Linux. Not stable yet.
   <tr>
     <td rowspan="3"><a href="https://paperswithcode.com/task/3d-hand-pose-estimation" title="3d-hand-pose-estimation 3D手部姿态估计">hand</a></td>
     <td><a href="https://github.com/rolpotamias/WiLoR">WiLoR</a>(<a href="https://github.com/warmshao/WiLoR-mini">🚧mini</a>)</td>
-    <td>fast, VRAM > 2.5GB</td>
+    <td>fast, VRAM > 2.5GB, but no constant tracking for video(just no yolo)</td>
+  </tr>
+  <tr>
+    <td><a href="https://github.com/humansensinglab/Hamba">Hamba</a></td>
+    <td>after I complete wilor</td>
   </tr>
   <tr>
     <td><a href="https://github.com/amathislab/hoisdf">HOISDF</a></td>
     <td>better on occulusion</td>
   </tr>
-  <tr>
-    <td><a href="https://github.com/humansensinglab/Hamba">Hamba</a></td>
-    <td>waiting code release</td>
+  
 
   <tr>
     <td rowspan="1"><a href="https://paperswithcode.com/task/facial-landmark-detection" title="facial-landmark-detection 面部特征点检测">face</a></td>
@@ -113,16 +115,21 @@ podman build -t mocap -f docker/Dockerfile . --security-opt label=disable
 2. use `pip` to install the **rest** packages that startwith `# `. So if you want to do comments, you can use `## `or`#...`without space char.
 
 ### .npz struct
-key: `Armature`;`Algorithm`;`CustomKey`;`personID`;`CoordinateSystem`
+key: `Armature mapping from`;`Algorithm run`;`who`;`prop[0]`;`prop[1]`...
 
 example: 
-- smplx;gvhmr;pose;p0;global = array([...], dtype=...)
-- smplx;wilor;pose;p1;incam = ...
-- smplx;gvhmr;K = ...
+- smplx;gvhmr;person0;body_pose;global = array([...], dtype=...)
+- smplx;wilor;person1;hand_pose;incam = ...
+- smplx;wilor;person1;bbox_xyXY;1 = ... , start from frame 1
+- smplx;gvhmr;;K = ... , can leave blank
 
-#### CustomKey
+ps:
+the blender addon use `Armature mapping **to**`
+
+#### prop[0]
 - pose: thetas, θ
-- shape: betas, β
+- betas: shape, β
 - expression: psi, ψ
 - trans(lation) 平移
-- rotate: globalOrient 旋转
+- global_orient: rotate 旋转
+- bbox: yolo_bbox_xyXY

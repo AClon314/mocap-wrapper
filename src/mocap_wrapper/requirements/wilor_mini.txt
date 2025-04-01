@@ -10,6 +10,7 @@ ultralytics>=8.1.34
 opencv
 huggingface_hub
 scikit-image
+rich
 
 trimesh # these 2 takes up 38MB
 pyrender
