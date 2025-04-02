@@ -787,7 +787,7 @@ def is_vbr(metadata: dict[str, Any], codec_type: Literal['video', 'audio'] = 'vi
     for s in metadata['streams']:
         if s['codec_type'] == codec_type:
             IS = s['r_frame_rate'] != s['avg_frame_rate']
-            Log.debug(f"{metadata} is {'VBR' if IS else 'CBR'}, return {IS}")
+            Log.debug(f"{'VBR' if IS else 'CBR'} from {metadata}")
             return IS
     return True
 
@@ -849,6 +849,35 @@ async def ffmpeg_or_link(from_file: str, to_dir: str, Range='', fps_times=5):
     Returns:
         to_file (str): path of final video file
     """
+    kw, is_ffmpeg_from = need_ffmpeg(from_file, Range, fps_times)
+    filename = os.path.splitext(os.path.basename(from_file))[0]
+    to_dir = os.path.join(to_dir, filename)   # output/xxx
+    to_file = os.path.join(to_dir, filename + '.mp4')
+    mkdir(to_dir)
+
+    is_ffmpeg_to = os.path.exists(to_file)
+    if is_ffmpeg_to:
+        _, is_ffmpeg_to = need_ffmpeg(to_file, fps_times=fps_times)
+    else:
+        is_ffmpeg_to = True
+
+    if is_ffmpeg_to:
+        if is_ffmpeg_from:
+            p = (
+                ffmpeg.input(from_file)
+                .output(filename=to_file, vcodec='libx264', acodec='aac', **kw)
+                .global_args(hide_banner=not IS_DEBUG)
+                .run_async())
+            poll = None
+            while poll is None:
+                poll = p.poll()
+                await aio.sleep(0.2)
+        else:
+            relink(from_file, to_file)
+    return to_file
+
+
+def need_ffmpeg(from_file, Range='', fps_times=5):
     kw: dict[str, Any] = {}
     metadata = ffprobe(from_file)
     from_fps = Fraction(metadata['streams'][0]['r_frame_rate'])
@@ -863,25 +892,7 @@ async def ffmpeg_or_link(from_file: str, to_dir: str, Range='', fps_times=5):
         kw.update({'r': to_fps})
     else:
         is_ffmpeg = is_vbr(metadata)
-    filename = os.path.splitext(os.path.basename(from_file))[0]
-    to_dir = os.path.join(to_dir, filename)   # output/xxx
-    to_file = os.path.join(to_dir, filename + '.mp4')
-    mkdir(to_dir)
-
-    if not os.path.exists(to_file):
-        if is_ffmpeg:
-            p = (
-                ffmpeg.input(from_file)
-                .output(filename=to_file, vcodec='libx264', acodec='aac', **kw)
-                .global_args(hide_banner=not IS_DEBUG)
-                .run_async())
-            poll = None
-            while poll is None:
-                poll = p.poll()
-                await aio.sleep(0.2)
-        else:
-            relink(from_file, to_file)
-    return to_file
+    return kw, is_ffmpeg
 
 
 Aria = None

@@ -25,8 +25,8 @@ if not is_win:
     os.environ['PYOPENGL_PLATFORM'] = 'egl'  # linux fix
 _IMG = ['jpg', 'jpeg', 'png', 'bmp', 'webp']
 _PREFIX = '_out_'
-_TYPE_PRED = Literal['bbox', 'betas', 'global_orient', 'hand_pose', 'pred_cam', 'pred_cam_t_full', 'pred_keypoints_2d', 'pred_keypoints_3d', 'pred_vertices', 'scaled_focal_length', ]
-_PRED: tuple[str] = get_args(_TYPE_PRED)
+_TYPE_WILOR = Literal['bbox', 'betas', 'global_orient', 'hand_pose', 'pred_cam', 'pred_cam_t_full', 'pred_keypoints_2d', 'pred_keypoints_3d', 'pred_vertices', 'scaled_focal_length', ]
+_WILOR_KEYS: tuple[str] = get_args(_TYPE_WILOR)
 def no_ext_filename(path) -> str: return os.path.splitext(os.path.basename(path))[0]
 
 
@@ -321,10 +321,55 @@ def export(
 
     for i, hand in enumerate(preds):
         LR = 'R' if hand.pop('is_right') > 0.5 else 'L'
+        start = hand.pop('start')
         for k, v in hand.items():
-            key = ';'.join([prefix, f'hand_{i}{LR}', k])
+            key = ';'.join([prefix, f'hand{i}{LR}', k, f'{start}'])
             data[key] = v
     savez(file, data)
+
+
+def data_remap(From, to, frame):
+    """
+    remap preds data for `export()`
+    TODO: 每一帧手的 ID/左右标识 不一样, 用上一帧bbox来就近匹配
+
+    ```python
+    preds: list[dict] = []  # hands, frames
+    frame_count = 0
+    while cap.isOpened():
+        ret, frame = cap.read()
+        if not ret:
+            break
+        _pred = pipe.predict(image)  # hands per frame
+        data_remap(_pred, preds, frame_count)
+    ```"""
+    _len = len(From)
+    lens = len(to)
+    print(f"Changed: {_len} hands @ frame {frame}") if _len != lens else None
+    _lack = max(_len - lens, 0)
+    if _lack > 0:
+        to.extend([{}] * _lack)
+    for i, hand in enumerate(From):
+        pred = to[i]
+        wilor_preds: dict[str, np.ndarray] = hand["wilor_preds"]
+        wilor_preds['bbox'] = hand['hand_bbox']
+        wilor_preds = {K: np.expand_dims(v, axis=0) for K, v in wilor_preds.items()}
+
+        if len(pred) == 0:
+            _hand = {
+                'start': frame,
+                'is_right': hand['is_right'],
+                **wilor_preds
+            }
+            to[i] = _hand
+        else:
+            if hand['is_right'] != pred['is_right']:
+                print(f"hand{i} is_right changed @ {frame}")
+            for K in _WILOR_KEYS:
+                if K in pred.keys() and K in wilor_preds.keys():
+                    pred[K] = np.concatenate((pred[K], wilor_preds[K]), axis=0)
+                else:
+                    print(f"hand{i} {K} not in pred @ {frame}, {pred.keys()}")
 
 
 def Import():
@@ -420,7 +465,7 @@ def video_wilor(input='video.mp4', out_dir=OUTDIR, progress: Optional[Progress] 
     filename = no_ext_filename(input)
     file = filename + '.mp4'
     task = progress.add_task(
-        f"📹︎ →🏃 Video {file}", start=True, total=100) if progress else None
+        f"📹︎ →✋ Video {file}", start=True, total=total) if progress else None
 
     # Create VideoWriter object
     output_path = os.path.join(out_dir, _PREFIX + file)  # tmp
@@ -429,45 +474,15 @@ def video_wilor(input='video.mp4', out_dir=OUTDIR, progress: Optional[Progress] 
 
     preds: list[dict] = []  # hands, frames
     frame_count = 0
-    _len = -1
     while cap.isOpened():
         ret, frame = cap.read()
         if not ret:
             break
-
         # Convert frame to RGB
         image = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+
         _pred = pipe.predict(image)  # hands per frame
-
-        # ==data remapping==
-        _len = len(_pred)
-        lens = len(preds)
-        print(f"Changed: {_len} hands @ frame {frame_count}") if _len != lens else None
-        _lack = max(_len - lens, 0)
-        if _lack > 0:
-            preds.extend([{}] * _lack)
-        for i, hand in enumerate(_pred):
-            pred = preds[i]
-            wilor_preds: dict[str, np.ndarray] = hand["wilor_preds"]
-            wilor_preds['bbox'] = hand['hand_bbox']
-            wilor_preds = {K: np.expand_dims(v, axis=0) for K, v in wilor_preds.items()}
-
-            if len(pred) == 0:
-                _hand = {
-                    'start': frame_count,
-                    'is_right': hand['is_right'],
-                    **wilor_preds
-                }
-                preds[i] = _hand
-            else:
-                if hand['is_right'] != pred['is_right']:
-                    print(f"hand {i} is_right changed @ {frame_count}")
-                for K in _PRED:
-                    if K in pred.keys() and K in wilor_preds.keys():
-                        pred[K] = np.concatenate((pred[K], wilor_preds[K]), axis=0)
-                    else:
-                        print(f"hand {i} {K} not in pred @ {frame_count}, {pred.keys()}")
-        # ==data remapping end==
+        data_remap(_pred, preds, frame_count)
 
         if IS_RENDER:
             render_image = image.copy()
@@ -516,14 +531,14 @@ def argParser():
     arg.add_argument('-i', '--input', metavar='in.mp4')
     arg.add_argument('-o', '--outdir', metavar=OUTDIR, default=OUTDIR)
     arg.add_argument('--render', action='store_true', help='render hands mesh to video')
-    args, _ = arg.parse_known_args()
+    args, _args = arg.parse_known_args()
     if args.render:
         global IS_RENDER
         IS_RENDER = True
     if not args.input:
         arg.print_help()
         exit(1)
-    return args, _, arg
+    return args, _args, arg
 
 
 def wilor(args: argparse.Namespace, arg: argparse.ArgumentParser):

@@ -77,15 +77,15 @@ async def test_popen():
     "video",
     [
         '/home/n/download/背越式跳高（慢动作）.mp4',
-        '/home/n/document/code/mocap/output/hands_wave/hands_wave.mp4',
+        '/home/n/download/跳水.mp4'
     ]
 )
-async def test_ffmpeg(video, dry_run=True):
+async def test_ffmpeg(video, dry_run=False):
     print(video)
     if dry_run:
         p = ffprobe(video)
     else:
-        p = await ffmpeg_or_link(from_file=video, to_dir='output')
+        p = await ffmpeg_or_link(from_file=video, to_dir='../output')
     Log.info(p)
 
 
