@@ -20,7 +20,8 @@ from platformdirs import user_config_path
 from importlib.resources import path as _res_path
 from importlib.metadata import version as _version
 from worker import worker    # type: ignore
-from mocap_wrapper.logger import IS_DEBUG, getLogger, PROGRESS_DL
+from logging import getLogger
+from mocap_wrapper.logger import IS_DEBUG, PROGRESS_DL
 from types import SimpleNamespace
 from typing import Any, Callable, Coroutine, Dict, List, Literal, Optional, ParamSpec, Sequence, Tuple, TypeVar, TypedDict, Union, Unpack, cast, get_args, overload
 from typing_extensions import deprecated
@@ -340,28 +341,30 @@ async def popen(
     Returns:
         process (pexpect.spawn): 
     """
-    Log.info(f'start {cmd}')
+    Log.info(f"{mode}: '{cmd}'")
     p = pexpect.spawn(cmd, timeout=timeout, **kwargs)
     FD = sys.stdout.fileno()
     if mode == 'realtime':
-        while True:
+        while p.isalive():
             try:
                 os.write(FD, p.read_nonblocking(4096))  # type: ignore
                 await aio.sleep(0.01)
             except pexpect.EOF:
-                break
+                if not p.isalive():
+                    break
             except pexpect.TIMEOUT:
                 Log.warning(f"Timeout: {cmd}")
             except Exception:
                 raise
     elif mode == 'wait':
-        try:
-            await p.expect(pexpect.EOF, async_=True)
-        except pexpect.TIMEOUT:
-            Log.warning(f"Timeout: {cmd}")
-        except Exception:
-            raise
-        # os.write(FD, p.before)  # type: ignore
+        while p.isalive():
+            try:
+                await p.expect(pexpect.EOF, async_=True)
+            except pexpect.TIMEOUT:
+                Log.warning(f"Timeout: {cmd}")
+            except Exception:
+                raise
+            # os.write(FD, p.before)  # type: ignore
     elif mode == 'no-wait':
         ...
     else:
@@ -370,7 +373,7 @@ async def popen(
         if Raise:
             raise ChildProcessError(f"{cmd}")
         else:
-            Log.warning(f'{cmd} → {p.before}')
+            Log.warning(f'{p.exitstatus} from "{cmd}" → {p.before}')
     return p
 
 
@@ -947,7 +950,8 @@ try:
 
     if __name__ == '__main__':
         Log.debug('⛄')
-        aio.run(popen('python -c "from tqdm import tqdm; import time; import sys; [time.sleep(0.02) for _ in tqdm(range(100),file=sys.stdout)]"', Raise=False))
+        PROGRESS_DL.stop()
+        aio.run(popen('python -c "from tqdm import tqdm; import time; import sys; [time.sleep(0.02) for _ in tqdm(range(100),file=sys.stdout)]"', mode='realtime'))
         # aio.run(ffprobe('/home/n/download/背越式跳高（慢动作）.mp4'))
 
 except ImportError as e:

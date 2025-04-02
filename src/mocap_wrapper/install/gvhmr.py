@@ -1,4 +1,4 @@
-from mocap_wrapper.Gdown import google_drive
+from mocap_wrapper.install.Gdown import google_drive
 from mocap_wrapper.install.lib import *
 from mocap_wrapper.install.smpl import i_smpl
 from mocap_wrapper.install.dpvo import i_dpvo

@@ -2,7 +2,6 @@
 - shell package manager(apt/dnf/brew/winget)
 - python package manager(pip/mamba/conda)
 """
-from ast import pattern
 from sys import path as PATH
 from shutil import which, copy as cp
 from mocap_wrapper.lib import *
@@ -305,7 +304,7 @@ SHELL = get_shell()
 PKG_MGR = get_pkg_mgr()
 PY_MGR = get_py_mgr()
 try:
-    from mocap_wrapper.Gdown import google_drive
+    from mocap_wrapper.install.Gdown import google_drive
     if __name__ == '__main__':
         aio.run(install(mods=['gvhmr', ]))
 except ImportError:

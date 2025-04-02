@@ -20,7 +20,8 @@ from sys import platform
 is_win = platform == "win32"
 is_linux = platform == "linux"
 import numpy as np
-from rich.progress import Progress
+from rich.progress import (
+    Progress, TextColumn, BarColumn, TaskProgressColumn, MofNCompleteColumn, TimeElapsedColumn, TimeRemainingColumn)
 if not is_win:
     os.environ['PYOPENGL_PLATFORM'] = 'egl'  # linux fix
 _IMG = ['jpg', 'jpeg', 'png', 'bmp', 'webp']
@@ -465,7 +466,7 @@ def video_wilor(input='video.mp4', out_dir=OUTDIR, progress: Optional[Progress] 
     filename = no_ext_filename(input)
     file = filename + '.mp4'
     task = progress.add_task(
-        f"📹︎ →✋ Video {file}", start=True, total=total) if progress else None
+        f"📹︎ →✋ {file}", total=total) if progress else None
 
     # Create VideoWriter object
     output_path = os.path.join(out_dir, _PREFIX + file)  # tmp
@@ -544,7 +545,15 @@ def argParser():
 def wilor(args: argparse.Namespace, arg: argparse.ArgumentParser):
     if args.input:
         outdir = os.path.join(args.outdir, no_ext_filename(args.input))
-        with Progress() as p:
+        with Progress(
+            TextColumn("[bold red]{task.description}"),
+            BarColumn(),
+            TaskProgressColumn(),
+            MofNCompleteColumn(),
+            TimeElapsedColumn(),
+            TimeRemainingColumn(),
+            # TextColumn('{task.speed:.3f} frame/s'),
+        ) as p:
             if args.input.split('.')[-1].lower() in _IMG:
                 image_wilor(input=args.input, out_dir=outdir)
             else:
@@ -555,8 +564,9 @@ def wilor(args: argparse.Namespace, arg: argparse.ArgumentParser):
 
 if __name__ == '__main__':
     args, _, arg = argParser()
-    import cv2
-    import torch
-    import pyrender
-    import trimesh
+import cv2
+import torch
+import pyrender
+import trimesh
+if __name__ == '__main__':
     wilor(args, arg)

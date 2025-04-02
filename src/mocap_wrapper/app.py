@@ -4,7 +4,7 @@ import atexit
 import argparse
 import asyncio as aio
 from typing import Coroutine, Sequence
-from mocap_wrapper.logger import IS_DEBUG, PROGRESS_DL
+from mocap_wrapper.logger import IS_DEBUG, cleanup
 from mocap_wrapper.lib import DIR, MODS, CONFIG, PACKAGE, TYPE_MODS, QRCODE, ffmpeg_or_link, gather, getLogger, mkdir, path_expand, res_path, __version__
 from mocap_wrapper.install.lib import ENV, install, async_queue, mamba
 DEFAULT: Sequence[TYPE_MODS] = ('wilor', 'gvhmr')
@@ -37,11 +37,6 @@ class ArgParser(argparse.ArgumentParser):
         super().print_help(file)
         tasks = [Python(m, '--help')for m in DEFAULT]
         aio.run(gather(*tasks))
-
-
-def cleanup():
-    PROGRESS_DL.start()
-    PROGRESS_DL.stop()
 
 
 def main():
@@ -81,7 +76,7 @@ def main():
         tasks.append(install(mods=mods))
         aio.run(gather(*tasks), debug=IS_DEBUG)
     if args.input:
-        PROGRESS_DL.stop()  # TODO: 重构进度条！技术债务
+        cleanup()
         aio.run(
             run(mods, args.input, args.outdir, Range=args.range, args=_args),
             debug=IS_DEBUG)
