@@ -27,7 +27,7 @@ def Type(v): return str(type(v))[8:-2]
 def sub(str): return re.sub(r'[^a-zA-Z0-9_]', '_', str)
 def prefix(file) -> str: return os.path.splitext(os.path.basename(file))[0]
 def is_dict(v): return hasattr(v, 'keys')
-def is_list(v): return hasattr(v, '__iter__') and not is_dict(v) and not isinstance(v, str)
+def is_list(v): return hasattr(v, '__getitem__') and not is_dict(v) and not isinstance(v, str)
 def load_np(file): return np.load(file, allow_pickle=True)
 def load_pt(file): return torch.load(file)
 
@@ -48,7 +48,7 @@ def load(file):
     else:
         raise ValueError(f'Unsupported file type: {file}')
     print(f'load as {Type(data)} from {file}')
-    return data, file
+    return data
 
 
 def tree_node(v):
@@ -82,6 +82,7 @@ def expand_dict(data, prefix='', depth=0) -> dict[str, Any]:
     depth += 1
 
     if is_list(data):
+        print(f'list: {prefix} len: {len(data)}')
         for i, x in enumerate(data):
             expand_dict(x, f'{prefix}列{i}{_SEP}', depth)
     elif is_dict(data):
@@ -93,14 +94,9 @@ def expand_dict(data, prefix='', depth=0) -> dict[str, Any]:
             if is_dict(v):
                 expand_dict(v, f'{prefix}{k}{_SEP}', depth)
             else:
-                if isinstance(v, torch.Tensor):
-                    for i, x in enumerate(v.shape):
-                        if x == 1:
-                            v = v.squeeze(0)
-                elif isinstance(v, np.ndarray):
-                    for i, x in enumerate(v.shape):
-                        if x == 1:
-                            v = np.squeeze(v, 0)
+                if isinstance(v, torch.Tensor) or isinstance(v, np.ndarray):
+                    while v.shape[0] == 1:
+                        v = v.squeeze(0)
                 if len(_FLAT.keys()) >= _MAX_KEYS:
                     print(f'too many keys, keys.len: {len(_FLAT.keys())}')
                     return {}

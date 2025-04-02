@@ -22,6 +22,7 @@ is_linux = platform == "linux"
 import numpy as np
 from rich.progress import (
     Progress, TextColumn, BarColumn, TaskProgressColumn, MofNCompleteColumn, TimeElapsedColumn, TimeRemainingColumn)
+from __init__ import squeeze
 if not is_win:
     os.environ['PYOPENGL_PLATFORM'] = 'egl'  # linux fix
 _IMG = ['jpg', 'jpeg', 'png', 'bmp', 'webp']
@@ -325,24 +326,26 @@ def export(
         start = hand.pop('start')
         for k, v in hand.items():
             key = ';'.join([prefix, f'hand{i}{LR}', k, f'{start}'])
+            if not isinstance(v, np.ndarray):
+                print(f"key cast as np.ndarray: {key}")
+                v = np.array(v)
             data[key] = v
     savez(file, data)
 
 
-def data_remap(From, to, frame):
+def data_remap(From, to, frame=0):
     """
     remap preds data for `export()`
     TODO: 每一帧手的 ID/左右标识 不一样, 用上一帧bbox来就近匹配
 
     ```python
-    preds: list[dict] = []  # hands, frames
+    preds: list[dict] = []
     frame_count = 0
     while cap.isOpened():
-        ret, frame = cap.read()
-        if not ret:
-            break
-        _pred = pipe.predict(image)  # hands per frame
+        ...
+        _pred = pipe.predict(image)
         data_remap(_pred, preds, frame_count)
+    export(preds, os.path.join(out_dir, f'mocap_{filename}.npz'))
     ```"""
     _len = len(From)
     lens = len(to)
@@ -354,7 +357,7 @@ def data_remap(From, to, frame):
         pred = to[i]
         wilor_preds: dict[str, np.ndarray] = hand["wilor_preds"]
         wilor_preds['bbox'] = hand['hand_bbox']
-        wilor_preds = {K: np.expand_dims(v, axis=0) for K, v in wilor_preds.items()}
+        wilor_preds = {K: np.expand_dims(squeeze(v, key=K), axis=0) for K, v in wilor_preds.items()}
 
         if len(pred) == 0:
             _hand = {
@@ -397,13 +400,11 @@ def image_wilor(input='img.png', out_dir=OUTDIR):
     image = cv2.imread(input)
     image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
     pred = pipe.predict(image)
-
+    filename = no_ext_filename(input)
     os.makedirs(out_dir, exist_ok=True)
-    file = no_ext_filename(input)
-    # torch.save(outputs, os.path.join(out_dir, file + '.pt'))
-    if len(pred) > 0:
-        for i, p in enumerate(pred[0]):
-            export(p, os.path.join(out_dir, f'mocap_{no_ext_filename(input)}.npz'), who=i)
+    preds = []
+    data_remap(pred, preds)
+    export(preds, os.path.join(out_dir, f'mocap_{filename}.npz'))
     if IS_RENDER:
         renderer = Renderer(pipe.wilor_model.mano.faces)
 
@@ -425,7 +426,7 @@ def image_wilor(input='img.png', out_dir=OUTDIR):
             )
             tmesh = renderer.vertices_to_trimesh(
                 verts, cam_t.copy(), LIGHT_PURPLE, is_right=is_right)
-            tmesh.export(os.path.join(out_dir, f'{file}_hand{i:02d}.obj'))
+            tmesh.export(os.path.join(out_dir, f'{filename}_hand{i:02d}.obj'))
             cam_view = renderer.render_rgba(
                 verts, cam_t=cam_t,
                 render_res=[image.shape[1], image.shape[0]],
@@ -442,7 +443,7 @@ def image_wilor(input='img.png', out_dir=OUTDIR):
                 radius = 3
                 x, y = pred_keypoints_2d[0][j]
                 cv2.circle(render_image, (int(x), int(y)), radius, color, -1)
-        cv2.imwrite(os.path.join(out_dir, _PREFIX + file + '.webp'), render_image)
+        cv2.imwrite(os.path.join(out_dir, _PREFIX + filename + '.webp'), render_image)
 
 
 def video_wilor(input='video.mp4', out_dir=OUTDIR, progress: Optional[Progress] = None):

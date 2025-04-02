@@ -2,6 +2,7 @@ import os
 import sys
 import toml
 import argparse
+import numpy as np
 from platformdirs import user_config_path
 from typing import Literal, Sequence
 MAPPING = {
@@ -94,6 +95,14 @@ def invert_ranges(ranges: Sequence[tuple], total_range: tuple) -> list[tuple]:
         inverted.append((prev_end, total_end))
 
     return inverted
+
+
+def squeeze(v: np.ndarray, axis=0, key=''):
+    shape_old = v.shape
+    while len(v.shape) > axis and v.shape[axis] == 1:  # TODO: maybe buggy
+        v = np.squeeze(v, axis=axis)
+    print(f"key squeezed: {key}, {v.shape} ←\t{shape_old}") if shape_old != v.shape else None
+    return v
 
 
 class ArgParser(argparse.ArgumentParser):
