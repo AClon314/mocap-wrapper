@@ -98,10 +98,12 @@ def invert_ranges(ranges: Sequence[tuple], total_range: tuple) -> list[tuple]:
 
 
 def squeeze(v: np.ndarray, axis=0, key=''):
+    if not isinstance(v, np.ndarray):
+        return v
     shape_old = v.shape
     while len(v.shape) > axis and v.shape[axis] == 1:  # TODO: maybe buggy
         v = np.squeeze(v, axis=axis)
-    print(f"key squeezed: {key}, {v.shape} ←\t{shape_old}") if shape_old != v.shape else None
+    print(f"🧽 key squeezed: {key}, {v.shape} ← {shape_old}") if shape_old != v.shape else None
     return v
 
 

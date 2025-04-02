@@ -3,26 +3,45 @@ from mocap_wrapper.logger import PG_DL, IS_DEBUG, LOGLEVEL
 ```"""
 import atexit
 import logging
-from logging import getLogger
-from typing import Any
 from os import environ, path
 IS_DEBUG = False
-LOGLEVEL = environ.get('LOGLVL')
-if LOGLEVEL and LOGLEVEL.upper() == 'DEBUG':
+_LOGLEVEL = environ.get('LOGLVL')
+if _LOGLEVEL and _LOGLEVEL.upper() == 'DEBUG':
     IS_DEBUG = True
-LOGLEVEL = (LOGLEVEL or 'INFO').upper()
-fmt = ''
-config: dict[str, Any] = {
-    'level': LOGLEVEL,
-    'datefmt': '%H:%M:%S',
+_LOGLEVEL = (_LOGLEVEL or 'INFO').upper()[0]
+_DATEFMT = '%H:%M:%S'
+_LEVEL_PREFIX = {
+    logging.DEBUG: '🐛DEBUG',
+    logging.INFO: '💬 INFO',
+    logging.WARNING: '⚠️  WARN',
+    logging.ERROR: '❌ERROR',
+    logging.CRITICAL: '⛔⛔CRITICAL',
+    logging.FATAL: '☠️FATAL',
 }
+LEVEL_STR_INT = {
+    'D': logging.DEBUG,
+    'I': logging.INFO,
+    'W': logging.WARNING,
+    'E': logging.ERROR,
+    'C': logging.CRITICAL,
+    'F': logging.FATAL,
+}
+LOGLVL = LEVEL_STR_INT.get(_LOGLEVEL, logging.INFO)
+
+
+class CustomFormatter(logging.Formatter):
+    def format(self, record):
+        record.levelname = _LEVEL_PREFIX.get(record.levelno, record.levelname)
+        return super().format(record)
+
 
 try:
     from rich.text import Text
     # from rich.console import Console
     from rich.logging import RichHandler
     from rich.progress import Progress, TextColumn
-    config['handlers'] = [RichHandler(rich_tracebacks=True)]
+    HANDLER = RichHandler(rich_tracebacks=True)
+    HANDLER.setFormatter(CustomFormatter(datefmt=_DATEFMT))
 
     class SpeedColumn(TextColumn):
         def __init__(self, unit='steps/s', *args, **kwargs) -> None:
@@ -67,19 +86,25 @@ try:
 except ImportError:
     print(f'{path.basename(__file__)}\t⚠️ rich not installed，fallback to logging.StreamHandler')
     from logging import StreamHandler
-    config['handlers'] = [StreamHandler()]
-    fmt = ' %(filename)s:%(lineno)d\t'
-logging.basicConfig(
-    **config,
-    format=fmt + '%(funcName)s: %(message)s',
-)
+    HANDLER = StreamHandler()
+    HANDLER.setFormatter(CustomFormatter('%(filename)s:%(lineno)d\t%(funcName)s: %(message)s', datefmt=_DATEFMT))
+
+
+def getLogger(name=__name__):
+    Log = logging.getLogger(name)
+    Log.setLevel(LOGLVL)
+    Log.addHandler(HANDLER)
+    Log.propagate = False
+    return Log
+
 
 if __name__ == '__main__':
     Log = getLogger(__name__)
     Log.debug('Hello, world!')
-    task = PROGRESS_DL.add_task('test', total=10)
+    # task = PROGRESS_DL.add_task('test', total=10)
     from time import sleep
     for i in range(10):
-        PROGRESS_DL.update(task, advance=1)
+        # PROGRESS_DL.update(task, advance=1)
+        Log.info(f'Progress: {i + 1}/10')
         sleep(0.1)
-    cleanup()
+    # cleanup()
