@@ -71,7 +71,12 @@ try:
             return Text(text=text)
 
     def cleanup():
-        """start then **STOP** progress bar"""
+        """
+        start then **STOP** progress bar
+
+        ps: I don't like rich.Console, on linux it makes the scroll bar unuseable, could cause flickering progress.
+        Every time you `stop()` brings side effect: breaking 2 new blank lines.
+        """
         if 'PROGRESS_DL' in globals():
             PROGRESS_DL.start()
             PROGRESS_DL.stop()

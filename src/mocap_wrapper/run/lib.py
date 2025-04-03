@@ -5,9 +5,14 @@ import argparse
 import numpy as np
 from platformdirs import user_config_path
 from typing import Literal, Sequence
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))  # relative import
+from logger import getLogger, cleanup
+cleanup()
 MAPPING = {
     'gvhmr': 'GVHMR',
 }
+TYPE_RANGE = tuple[int, int]
+Log = getLogger(__name__)
 
 
 def chdir_gitRepo(mod: Literal['gvhmr']):
@@ -19,9 +24,6 @@ def chdir_gitRepo(mod: Literal['gvhmr']):
         os.chdir(dst)
     else:
         raise FileNotFoundError(f'config.toml not found in {config_path}')
-
-
-TYPE_RANGE = tuple[int, int]
 
 
 def continuous(List: Sequence[int]) -> list[tuple[int, int]]:
@@ -103,7 +105,7 @@ def squeeze(v: np.ndarray, axis=0, key=''):
     shape_old = v.shape
     while len(v.shape) > axis and v.shape[axis] == 1:  # TODO: maybe buggy
         v = np.squeeze(v, axis=axis)
-    print(f"🧽 key squeezed: {key}, {v.shape} ← {shape_old}") if shape_old != v.shape else None
+    Log.debug(f"🧽 key squeezed: {key}, {v.shape} ← {shape_old}") if shape_old != v.shape else None
     return v
 
 

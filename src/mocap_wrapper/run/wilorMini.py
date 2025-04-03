@@ -14,15 +14,14 @@ IS_RENDER = False
 OUTDIR = 'output'
 import os
 import argparse
-import logging
+import numpy as np
 from typing import Any, Literal, Optional, get_args
+from lib import squeeze
+from rich.progress import (
+    Progress, TextColumn, BarColumn, TaskProgressColumn, MofNCompleteColumn, TimeElapsedColumn, TimeRemainingColumn)
 from sys import platform
 is_win = platform == "win32"
 is_linux = platform == "linux"
-import numpy as np
-from rich.progress import (
-    Progress, TextColumn, BarColumn, TaskProgressColumn, MofNCompleteColumn, TimeElapsedColumn, TimeRemainingColumn)
-from lib import squeeze
 if not is_win:
     os.environ['PYOPENGL_PLATFORM'] = 'egl'  # linux fix
 _IMG = ['jpg', 'jpeg', 'png', 'bmp', 'webp']
@@ -382,9 +381,9 @@ def Import():
     def __init__patch(self, **kwargs):
         self.verbose = kwargs.get("verbose", False)
         if self.verbose:
-            self.logger = get_logger(self.__class__.__name__, lv=logging.INFO)
+            self.logger = get_logger(self.__class__.__name__, lv=20)
         else:
-            self.logger = get_logger(self.__class__.__name__, lv=logging.ERROR)
+            self.logger = get_logger(self.__class__.__name__, lv=40)
         self.init_models(**kwargs)
     WiLorHandPose3dEstimationPipeline.__init__ = __init__patch
     return WiLorHandPose3dEstimationPipeline

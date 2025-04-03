@@ -520,6 +520,8 @@ def per_person(cfg):
         model = model.eval().cuda()
         tic = Log.sync_time()
         pred = model.predict(data, static_cam=cfg.static_cam)
+        pred['smpl_params_global']['body_pose'] = pred['smpl_params_global']['body_pose'].reshape(-1, 21, 3)
+        pred['smpl_params_incam']['body_pose'] = pred['smpl_params_incam']['body_pose'].reshape(-1, 21, 3)
         pred = detach_to_cpu(pred)
         data_time = data["length"] / 30
         Log.info(f"[HMR4D] Elapsed: {Log.sync_time() - tic:.2f}s for data-length={data_time:.1f}s")
