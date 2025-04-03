@@ -45,8 +45,8 @@ _CHECK_KWARGS = True
 
 # export
 DIR = '.'   # fallback to current dir
-TYPE_MODS = Literal['wilor', 'gvhmr']
-MODS = get_args(TYPE_MODS)
+TYPE_RUNS = Literal['wilor', 'gvhmr']
+RUNS = get_args(TYPE_RUNS)
 DIR_SELF = os.path.dirname(os.path.abspath(__file__))
 PACKAGE = __package__ if __package__ else os.path.basename(DIR_SELF)
 __version__ = _version(PACKAGE)
@@ -91,11 +91,15 @@ TYPE_KEYS_CONFIG = Union[Literal['search_dir'], str]
 
 class TYPE_CONFIG(TypedDict, total=False):
     search_dir: str
+    gvhmr: bool
+    wilor: bool
 
 
 class Config(dict):
     default: TYPE_CONFIG = {
         'search_dir': path_expand(DIR),
+        'gvhmr': False,
+        'wilor': False,
     }
 
     def __init__(self, /, *args: TYPE_CONFIG, file: Union[Path, str] = "config.toml", **kwargs: Unpack[TYPE_CONFIG]) -> None:
@@ -112,6 +116,9 @@ class Config(dict):
         if os.path.exists(self.path):
             config = toml.load(self.path)
             self.update(config)
+            # except toml.TomlDecodeError as e:
+            #     # TODO: auto recover from this exception
+            #     Log.warning(f"Load failed {self.path}: {e}")
         self.dump()
 
     def dump(self, file: Union[Path, str] = '') -> None:

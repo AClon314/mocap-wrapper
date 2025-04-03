@@ -3,9 +3,9 @@
 from typing import Literal, Sequence, Set, Union
 from pathlib import Path
 try:
-    from mocap_wrapper.run import chdir_gitRepo, continuous
+    from mocap_wrapper.run.lib import chdir_gitRepo, continuous
 except ImportError:
-    from __init__ import chdir_gitRepo, continuous
+    from lib import chdir_gitRepo, continuous
 chdir_gitRepo('gvhmr')
 import gc
 import inspect

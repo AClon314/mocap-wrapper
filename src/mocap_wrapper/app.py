@@ -3,30 +3,29 @@ import os
 import atexit
 import argparse
 import asyncio as aio
-from typing import Coroutine, Sequence
+from typing import Any, Coroutine, Sequence
 from mocap_wrapper.logger import IS_DEBUG, cleanup
-from mocap_wrapper.lib import DIR, MODS, CONFIG, PACKAGE, TYPE_MODS, QRCODE, ffmpeg_or_link, gather, getLogger, mkdir, path_expand, res_path, __version__
+from mocap_wrapper.lib import DIR, RUNS, CONFIG, PACKAGE, TYPE_RUNS, QRCODE, ffmpeg_or_link, gather, getLogger, mkdir, path_expand, res_path, __version__
 from mocap_wrapper.install.lib import ENV, install, async_queue, mamba
-DEFAULT: Sequence[TYPE_MODS] = ('wilor', 'gvhmr')
+DEFAULT: Sequence[TYPE_RUNS] = ('wilor', 'gvhmr')
 OUTPUT_DIR = os.path.join(DIR, 'output')
 Log = getLogger(__name__)
+def version(): return f'{PACKAGE} {__version__} 👻\tconfig: {CONFIG.path}\tcode: https://github.com/AClon314/mocap-wrapper'
+# TODO： 兼容notebook环境pip，避免循环导入，解耦模块
 
 
-def version(): return f'{PACKAGE} {__version__} 👻, config: {CONFIG.path}, source: https://github.com/AClon314/mocap-wrapper'
-
-
-async def Python(mod: TYPE_MODS, *args: str):
+async def Python(run: TYPE_RUNS, *args: str):
     # TODO: run at same time if vram > 6gb, or 1 by 1 based if vram < 4gb
     _arg = ' '.join(args)
-    if mod == 'wilor':
-        mod = 'wilorMini'   # type: ignore
-    py = res_path(module='run', file=f'{mod}.py')
+    if run == 'wilor':
+        run = 'wilorMini'   # type: ignore
+    py = res_path(module='run', file=f'{run}.py')
     return await mamba(f'python {py} {_arg}', env=ENV)
 
 
-async def run(mods: Sequence[TYPE_MODS], input: str, outdir: str, Range='', args: Sequence[str] = []):
+async def run(runs: Sequence[TYPE_RUNS], input: str, outdir: str, Range='', args: Sequence[str] = []):
     video = await ffmpeg_or_link(input, outdir, Range=Range)
-    for m in mods:
+    for m in runs:
         IS = await Python(m, '--input', video, '-o', outdir, *args)
 
 
@@ -39,53 +38,78 @@ class ArgParser(argparse.ArgumentParser):
         aio.run(gather(*tasks))
 
 
-def main():
-    global DIR
-    atexit.register(cleanup)
+def argParser():
+    print(version())
     arg = ArgParser(description=f'sincerelly thanks to gvhmr/wilor/wilor-mini devs and others that help each other♥️ , please consider donate♥️ if helps you a lot :)')
     arg.add_argument('-v', '--version', action='store_true')
-    arg.add_argument('-I', '--install', action='store_true')
-    arg.add_argument('-b', '--by', nargs='*', default=False, metavar=MODS, help=f'install with/run by, default all installed, eg: `--by={",".join(DEFAULT)}`')
+    arg.add_argument('-I', '--install', action='store_true', help='force to re-install runs')
+    arg.add_argument('-b', '--by', nargs='*', default=False, metavar=RUNS, help=f'install with/run by, default all installed, eg: `--by={",".join(DEFAULT)}`')
     arg.add_argument('-@', '--at', metavar=DIR, help='search_dir of git repos, eg: `--at=".."` if GVHMR is current work dir')
-    arg.add_argument('-i', '--input', metavar='in.mp4')
+    arg.add_argument('-i', '--input', nargs='*', metavar='in.mp4')
     arg.add_argument('-o', '--outdir', metavar=OUTPUT_DIR, default=OUTPUT_DIR)
     arg.add_argument('-r', '--range', metavar='[a,b]or[a,duration]', default='', help='video time range, eg: `--range=0:0:1,0:2` is 1s~2s, `--range=10` is 0s~10s')
-    arg.add_argument('--bbox', action='store_true', help='expand pickle for bbox viewer in blender (unfinished)')
+    arg.add_argument('--euler', action='store_true', help='use euler_XYZ for bones rotations for export data')
+    arg.add_argument('--convert', action='store_true', help='convert all input .npy/.npz/.pt/.pkl into .npz for blender addon')
 
     # arg.add_argument('--smpl', help='cookies:PHPSESSID to download smpl files. eg: `--smpl=26-digits_123456789_123456`')
     # arg.add_argument('--smplx', help='cookies:PHPSESSID to download smplx files. eg: `--smplx=26-digits_123456789_123456`')
     # arg.add_argument('--user-agent', help='From your logged in browser. eg: `--user-agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.36 Edge/16.16299"`')
-
-    print(version())
     args, _args = arg.parse_known_args()
+    return args, _args
 
-    if args.at:
-        DIR = CONFIG['search_dir'] = path_expand(args.at)
+
+def mocap(
+    inputs: list[str], outdir: str,
+    Range: str, at: str, by: Sequence[TYPE_RUNS],
+    is_npt, _args: list[str]
+):
+    atexit.register(cleanup)
+    global DIR
+    if at:
+        DIR = CONFIG['search_dir'] = path_expand(at)
     mkdir(DIR)
-    mkdir(args.outdir)
+    mkdir(outdir)
 
-    if args.by:
-        mods = []
-        for m in args.by:
-            mods += m.split(',')
-    else:
-        mods = DEFAULT
-
-    if args.install != False or args.install == []:
-        tasks: list[Coroutine] = [async_queue()]
-        tasks.append(install(mods=mods))
-        aio.run(gather(*tasks), debug=IS_DEBUG)
-    if args.input:
+    tasks: list[Coroutine[Any, Any, Any]] = [async_queue()]
+    for i in by:
+        if CONFIG[i] != True or not os.path.exists(CONFIG[i]):
+            tasks.append(install(runs=by))
+            aio.run(gather(*tasks), debug=IS_DEBUG)
+    if inputs:
         cleanup()
-        aio.run(
-            run(mods, args.input, args.outdir, Range=args.range, args=_args),
-            debug=IS_DEBUG)
-    if args.bbox:
-        from mocap_wrapper.script.data_viewer import convert
-        convert()
-    if not any(vars(args).values()):
-        arg.print_help()
+        for i in inputs:
+            # TODO: auto parallelize if vram > 6gb
+            aio.run(
+                run(by, i, outdir, Range=Range, args=_args),
+                debug=IS_DEBUG)
+    if is_npt:
+        from mocap_wrapper.script.data_viewer import convert_npt
+        convert_npt(inputs, outdir, save=True, Print=True)
+
+
+def script_entry():
+    args, _args = argParser()
+    if args.by:
+        by = []
+        for r in args.by:
+            by += r.split(',')
+    else:
+        by = DEFAULT
+
+    if args.install:
+        for r in by:
+            CONFIG[r] = False
+
+    mocap(
+        inputs=args.input,
+        outdir=args.outdir,
+        Range=args.range,
+        at=args.at,
+        by=by,
+        is_npt=args.convert,
+        _args=_args
+    )
 
 
 if __name__ == "__main__":
-    main()
+    script_entry()

@@ -22,7 +22,7 @@ is_linux = platform == "linux"
 import numpy as np
 from rich.progress import (
     Progress, TextColumn, BarColumn, TaskProgressColumn, MofNCompleteColumn, TimeElapsedColumn, TimeRemainingColumn)
-from __init__ import squeeze
+from lib import squeeze
 if not is_win:
     os.environ['PYOPENGL_PLATFORM'] = 'egl'  # linux fix
 _IMG = ['jpg', 'jpeg', 'png', 'bmp', 'webp']

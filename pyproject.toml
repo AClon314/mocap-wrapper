@@ -42,4 +42,4 @@ Download = "http://github.com/AClon314/mocap-wrapper/releases"
 Homepage = "http://github.com/AClon314/mocap-wrapper"
 
 [project.scripts]
-mocap = "mocap_wrapper:app.main"
+mocap = "mocap_wrapper:app.script_entry"

@@ -263,7 +263,7 @@ async def git_pull(**kwargs):
     return p
 
 
-async def install(mods, **kwargs):
+async def install(runs: Sequence[TYPE_RUNS], **kwargs):
     global Aria
     tasks = []
 
@@ -284,15 +284,15 @@ async def install(mods, **kwargs):
     if PY_MGR == 'pip':
         run_async(i_mamba())
 
-    if 'gvhmr' in mods:
+    if 'gvhmr' in runs:
         from mocap_wrapper.install.gvhmr import i_gvhmr
         tasks.append(i_gvhmr(**kwargs))
-    if 'wilor' in mods:
+    if 'wilor' in runs:
         from mocap_wrapper.install.wilor_mini import i_wilor_mini
         tasks.append(i_wilor_mini(**kwargs))
 
-    tasks = await aio.gather(*tasks)
-    return tasks
+    ret = await aio.gather(*tasks)
+    return ret
 
 
 async def clean():
@@ -306,7 +306,7 @@ PY_MGR = get_py_mgr()
 try:
     from mocap_wrapper.install.Gdown import google_drive
     if __name__ == '__main__':
-        aio.run(install(mods=['gvhmr', ]))
+        aio.run(install(runs=['gvhmr', ]))
 except ImportError:
     Log.error(f"⚠️ detect missing packages, please check your current conda environment.")
     raise

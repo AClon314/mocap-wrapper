@@ -1,5 +1,9 @@
 #! /bin/env python
-"""data viewer for NPT, Numpy Pickle pyTorch"""
+"""data viewer for NPT, Numpy Pickle pyTorch
+```python
+from data_viewer import convert_npt
+```
+"""
 try:
     import re
     import os
@@ -153,16 +157,17 @@ def convert_npt(files: list, outname=_OUTNAME, save=True, Print=False):
     return _FLAT
 
 
-def convert():
-    global _FILE
+def argParser():
     arg = argparse.ArgumentParser()
     arg.add_argument('-i', '--input', nargs='+', type=str, help='input file')
     arg.add_argument('-o', '--output', type=str, metavar=_OUTNAME, default=_OUTNAME, help='.npz filename')
     args = arg.parse_args()
+    global _FILE
     if args.input:
         _FILE += args.input
     convert_npt(_FILE, outname=args.output)
+    return args
 
 
 if __name__ == '__main__':
-    convert()
+    argParser()
