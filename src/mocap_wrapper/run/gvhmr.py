@@ -3,9 +3,9 @@
 from typing import Literal, Sequence, Set, Union
 from pathlib import Path
 try:
-    from mocap_wrapper.run.lib import chdir_gitRepo, continuous
+    from mocap_wrapper.run.lib import chdir_gitRepo, continuous, to_quat
 except ImportError:
-    from lib import chdir_gitRepo, continuous
+    from lib import chdir_gitRepo, continuous, to_quat
 chdir_gitRepo('gvhmr')
 import gc
 import inspect
@@ -20,8 +20,8 @@ def argParser():
     parser = argparse.ArgumentParser()
     parser.add_argument("-i", "--input", type=str, metavar='in.mp4')
     parser.add_argument("-o", "--outdir", type=str, default='output', metavar='output')
-    parser.add_argument("-s", "--static_cam", action="store_true", help="If true, skip DPVO")
-    parser.add_argument("--use_dpvo", action="store_true", help="If true, use DPVO. By default not using DPVO.")
+    parser.add_argument("-s", "--static_cam", action="store_true", help="skip DPVO")
+    parser.add_argument("--use_dpvo", action="store_true", help="use DPVO. By default not using DPVO.")
     parser.add_argument(
         "--f_mm",
         type=int,
@@ -33,11 +33,17 @@ def argParser():
     )
     parser.add_argument("--render", action="store_true", help="render the incam/global result video")
     parser.add_argument("-p", "--persons", type=str, help="List of persons to process, e.g. '0,1,2'")
-    parser.add_argument("--verbose", action="store_true", help="If true, draw intermediate results")
+    parser.add_argument("--euler", action="store_true", help="use euler angles on bones rotation. Default is quaternion.")
+    parser.add_argument("--verbose", action="store_true", help="draw intermediate results")
     args, _ = parser.parse_known_args()
     if not args.input:
         parser.print_help()
         exit(1)
+
+    global IS_EULER
+    IS_EULER = False
+    if args.euler:
+        IS_EULER = True
     return args
 
 
@@ -520,8 +526,7 @@ def per_person(cfg):
         model = model.eval().cuda()
         tic = Log.sync_time()
         pred = model.predict(data, static_cam=cfg.static_cam)
-        pred['smpl_params_global']['body_pose'] = pred['smpl_params_global']['body_pose'].reshape(-1, 21, 3)
-        pred['smpl_params_incam']['body_pose'] = pred['smpl_params_incam']['body_pose'].reshape(-1, 21, 3)
+        data_remap(pred)
         pred = detach_to_cpu(pred)
         data_time = data["length"] / 30
         Log.info(f"[HMR4D] Elapsed: {Log.sync_time() - tic:.2f}s for data-length={data_time:.1f}s")
@@ -543,6 +548,14 @@ def per_person(cfg):
             merge_videos_horizontal([paths.incam_video, paths.global_video], paths.incam_global_horiz_video)
     free_ram()
     return pred
+
+
+def data_remap(pred):
+    for K in ('smpl_params_global', 'smpl_params_incam'):
+        pred[K]['body_pose'] = pred[K]['body_pose'].reshape(-1, 21, 3)
+        if not IS_EULER:
+            for K1 in ['global_orient', 'body_pose']:
+                pred[K][K1] = to_quat(pred[K][K1])
 
 
 def gvhmr(cfg, Persons: Union[Sequence[int], Set[int], None] = None):

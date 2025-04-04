@@ -11,7 +11,7 @@ if _LOGLEVEL and _LOGLEVEL.upper() == 'DEBUG':
 _LOGLEVEL = (_LOGLEVEL or 'INFO').upper()[0]
 _DATEFMT = '%H:%M:%S'
 _LEVEL_PREFIX = {
-    logging.DEBUG: '🐛DEBUG',
+    logging.DEBUG: '🔍DEBUG',
     logging.INFO: '💬 INFO',
     logging.WARNING: '⚠️  WARN',
     logging.ERROR: '❌ERROR',

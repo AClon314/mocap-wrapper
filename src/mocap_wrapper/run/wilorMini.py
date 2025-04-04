@@ -16,7 +16,7 @@ import os
 import argparse
 import numpy as np
 from typing import Any, Literal, Optional, get_args
-from lib import squeeze
+from lib import squeeze, euler_to_quat, to_quat
 from rich.progress import (
     Progress, TextColumn, BarColumn, TaskProgressColumn, MofNCompleteColumn, TimeElapsedColumn, TimeRemainingColumn)
 from sys import platform
@@ -357,7 +357,9 @@ def data_remap(From, to, frame=0):
         wilor_preds: dict[str, np.ndarray] = hand["wilor_preds"]
         wilor_preds['bbox'] = hand['hand_bbox']
         wilor_preds = {K: np.expand_dims(squeeze(v, key=K), axis=0) for K, v in wilor_preds.items()}
-
+        if not IS_EULER:
+            for K in ['global_orient', 'hand_pose']:
+                wilor_preds[K] = to_quat(wilor_preds[K])
         if len(pred) == 0:
             _hand = {
                 'start': frame,
@@ -531,11 +533,16 @@ def argParser():
     arg = argparse.ArgumentParser()
     arg.add_argument('-i', '--input', metavar='in.mp4')
     arg.add_argument('-o', '--outdir', metavar=OUTDIR, default=OUTDIR)
+    arg.add_argument('--euler', action='store_true', help='use euler angles on bones rotation. Default is quaternion.')
     arg.add_argument('--render', action='store_true', help='render hands mesh to video')
     args, _args = arg.parse_known_args()
     if args.render:
         global IS_RENDER
         IS_RENDER = True
+    global IS_EULER
+    IS_EULER = False
+    if args.euler:
+        IS_EULER = True
     if not args.input:
         arg.print_help()
         exit(1)
