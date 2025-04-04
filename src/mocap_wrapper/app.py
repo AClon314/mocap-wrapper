@@ -48,7 +48,7 @@ def argParser():
     arg.add_argument('-i', '--input', nargs='*', metavar='in.mp4')
     arg.add_argument('-o', '--outdir', metavar=OUTPUT_DIR, default=OUTPUT_DIR)
     arg.add_argument('-r', '--range', metavar='[a,b]or[a,duration]', default='', help='video time range, eg: `--range=0:0:1,0:2` is 1s~2s, `--range=10` is 0s~10s')
-    arg.add_argument('--euler', action='store_true', help='use euler_XYZ for bones rotations for export data')
+    # arg.add_argument('--euler', action='store_true', help='use euler_XYZ for bones rotations for export data')
     arg.add_argument('--convert', action='store_true', help='convert all input .npy/.npz/.pt/.pkl into .npz for blender addon')
 
     # arg.add_argument('--smpl', help='cookies:PHPSESSID to download smpl files. eg: `--smpl=26-digits_123456789_123456`')

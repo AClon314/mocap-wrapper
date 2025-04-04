@@ -3,15 +3,15 @@ import sys
 import toml
 import argparse
 import numpy as np
-try:
-    from typing_extensions import deprecated
-except ImportError:
-    from warnings import deprecated
+from typing_extensions import deprecated
 from platformdirs import user_config_path
 from types import ModuleType
 from typing import Literal, Sequence, TypeVar
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))  # relative import
-from logger import getLogger, cleanup
+try:
+    from ..logger import getLogger, cleanup
+except ImportError:
+    from logger import getLogger, cleanup   # type: ignore
 cleanup()
 MAPPING = {
     'gvhmr': 'GVHMR',
@@ -305,15 +305,17 @@ def euler_to_quat(arr: TN) -> TN: return RotMat_to_quat(Rodrigues(arr))
 def Axis(is_torch=False): return 'dim' if is_torch else 'axis'
 
 
-def to_quat(euler: TN) -> TN:
+def Quat(euler: TN) -> TN:
     """euler to quat
     Args:
         arr (TN): 输入张量/数组，shape为(...,3)，对应[roll, pitch, yaw]（弧度）
     Returns:
         quat: normalized [w,x,y,z], shape==(...,4)
     """
-    lib = Lib(euler)  # 自动检测库类型
+    if euler.shape[-1] == 4:
+        return euler
     assert euler.shape[-1] == 3, f"Last dimension should be 3, but found {euler.shape}"
+    lib = Lib(euler)  # 自动检测库类型
     is_torch = lib.__name__ == 'torch'
 
     # 计算半角三角函数（支持广播）
@@ -340,13 +342,15 @@ def to_quat(euler: TN) -> TN:
     return quat / Norm(quat, dim=-1, keepdim=True)
 
 
-def to_euler(quat: TN) -> TN:
+def Euler(quat: TN) -> TN:
     """union quat to euler
     Args:
         quat (TN): [w,x,y,z], shape==(...,4)
     Returns:
         euler: [roll_x, pitch_y, yaw_z] in arc system, shape==(...,3)
     """
+    if quat.shape[-1] == 3:
+        return quat
     assert quat.shape[-1] == 4, f"Last dimension should be 4, but found {quat.shape}"
     lib = Lib(quat)  # 自动检测库类型
     is_torch = lib.__name__ == 'torch'
@@ -386,7 +390,7 @@ class ArgParser(argparse.ArgumentParser):
 
 if __name__ == '__main__':
     arr = np.array([0, 0, 1])
-    _arr = to_quat(arr)
+    _arr = Quat(arr)
     print(_arr)
-    _arr = to_euler(_arr)
+    _arr = Euler(_arr)
     print(_arr)

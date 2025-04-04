@@ -3,9 +3,9 @@
 from typing import Literal, Sequence, Set, Union
 from pathlib import Path
 try:
-    from mocap_wrapper.run.lib import chdir_gitRepo, continuous, to_quat
+    from mocap_wrapper.run.lib import chdir_gitRepo, continuous, Quat
 except ImportError:
-    from lib import chdir_gitRepo, continuous, to_quat
+    from lib import chdir_gitRepo, continuous, Quat
 chdir_gitRepo('gvhmr')
 import gc
 import inspect
@@ -456,6 +456,9 @@ def export(
         if hasattr(pred[K], 'keys'):
             for k in pred[K].keys():
                 key = ';'.join([prefix, key_who, k, _K])
+                if not IS_EULER:
+                    for k in ['global_orient', 'body_pose']:
+                        pred[K][k] = Quat(pred[K][k])
                 data[key] = pred[K][k].cpu().numpy()
         else:
             # 基本不会执行这里
@@ -553,9 +556,6 @@ def per_person(cfg):
 def data_remap(pred):
     for K in ('smpl_params_global', 'smpl_params_incam'):
         pred[K]['body_pose'] = pred[K]['body_pose'].reshape(-1, 21, 3)
-        if not IS_EULER:
-            for K1 in ['global_orient', 'body_pose']:
-                pred[K][K1] = to_quat(pred[K][K1])
 
 
 def gvhmr(cfg, Persons: Union[Sequence[int], Set[int], None] = None):
