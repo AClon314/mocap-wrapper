@@ -3,11 +3,13 @@
 # mocap-wrapper
 Addon: [mocap_importer](https://github.com/AClon314/mocap_importer_blender)
 
-A bunch of python scripts that wrap around various mocap libraries to provide a unified interface.
+A bunch of python scripts that wrap around various mocap libraries to provide a unified interface.  
 Only tested on Linux. Not stable yet.
 
+sincerelly thanks to gvhmr/wilor/wilor-mini developers and others that help each other♥️
 ## solutions
 ### software:OpenSource
+hand: no constant tracking for video(just no yolo, ready for photo but not video)
 
 <table>
   <tr>
@@ -17,36 +19,40 @@ Only tested on Linux. Not stable yet.
   </tr>
   <tr>
     <td rowspan="3"><a href="https://paperswithcode.com/task/3d-human-pose-estimation" title="3d-human-pose-estimation 3D人体姿态估计">body</a></td>
-    <td><a href="https://github.com/zju3dv/GVHMR" title="Implementing">🚧GVHMR</a></td>
+    <td><a href="https://github.com/zju3dv/GVHMR" title="Implementing">✅GVHMR</a></td>
     <td>VRAM > 3GB </td>
   </tr>
   <tr>
-    <td><a href="https://github.com/yufu-wang/tram" title="">TRAM</a></td>
+    <td><a href="https://github.com/yufu-wang/tram" title="">🕒TRAM</a></td>
     <td>suit for fast-motion, but VRAM > 6GB</td>
   </tr>
   <tr>
-    <td><a href="https://physicalmotionrestoration.github.io/" title="">Plug-and-Play</a></td>
+    <td><a href="https://physicalmotionrestoration.github.io/" title="">🕒Plug-and-Play</a></td>
     <td>waiting code release</td>
   </tr>
 
   <tr>
-    <td rowspan="3"><a href="https://paperswithcode.com/task/3d-hand-pose-estimation" title="3d-hand-pose-estimation 3D手部姿态估计">hand</a></td>
+    <td rowspan="4"><a href="https://paperswithcode.com/task/3d-hand-pose-estimation" title="3d-hand-pose-estimation 3D手部姿态估计">hand</a></td>
     <td><a href="https://github.com/rolpotamias/WiLoR">WiLoR</a>(<a href="https://github.com/warmshao/WiLoR-mini">🚧mini</a>)</td>
-    <td>fast, VRAM > 2.5GB, but no constant tracking for video(just no yolo)</td>
+    <td>fast, VRAM > 2.5GB</td>
   </tr>
   <tr>
-    <td><a href="https://github.com/humansensinglab/Hamba">Hamba</a></td>
-    <td>after I complete wilor</td>
+    <td><a href="https://github.com/humansensinglab/Hamba">🕒Hamba</a></td>
+    <td>2025</td>
+  </tr>
+   <tr>
+    <td><a href="https://github.com/geopavlakos/hamer">🕒HaMeR</a></td>
+    <td>2024</td>
   </tr>
   <tr>
-    <td><a href="https://github.com/amathislab/hoisdf">HOISDF</a></td>
+    <td><a href="https://github.com/amathislab/hoisdf">🕒HOISDF</a></td>
     <td>better on occulusion</td>
   </tr>
   
 
   <tr>
     <td rowspan="1"><a href="https://paperswithcode.com/task/facial-landmark-detection" title="facial-landmark-detection 面部特征点检测">face</a></td>
-    <td><a href="https://github.com/andresprados/SPIGA">SPIGA</a></td>
+    <td><a href="https://github.com/andresprados/SPIGA">🕒SPIGA</a></td>
     <td></td>
   </tr>
 </table>
