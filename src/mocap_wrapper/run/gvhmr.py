@@ -1,11 +1,31 @@
 #! /bin/env -S conda run --live-stream -n mocap python
-"""https://github.com/zju3dv/GVHMR/blob/main/tools/demo/demo.py"""
+"""
+⚠️ This [file](https://github.com/zju3dv/GVHMR/blob/main/tools/demo/demo.py) is protected under the GVHMR license agreement, not the AGPL of this repository. See: https://github.com/zju3dv/GVHMR/blob/main/LICENSE
+
+Copyright 2022-2023 3D Vision Group at the State Key Lab of CAD&CG,  
+Zhejiang University. All Rights Reserved. 
+
+For more information see <https://github.com/zju3dv/GVHMR> 
+If you use this software, please cite the corresponding publications   
+listed on the above website. 
+
+Permission to use, copy, modify and distribute this software and its 
+documentation for educational, research and non-profit purposes only. 
+Any modification based on this work must be open-source and prohibited 
+for commercial use. 
+You must retain, in the source form of any derivative works that you  
+distribute, all copyright, patent, trademark, and attribution notices  
+from the source form of this work. 
+ 
+For commercial uses of this software, please send email to xwzhou@zju.edu.cn
+"""
 from typing import Literal, Sequence, Set, Union
 from pathlib import Path
+
 try:
-    from mocap_wrapper.run.lib import chdir_gitRepo, continuous, Quat
+    from mocap_wrapper.run.lib import chdir_gitRepo, continuous, euler_to_quat
 except ImportError:
-    from lib import chdir_gitRepo, continuous, Quat
+    from lib import chdir_gitRepo, continuous, euler_to_quat
 chdir_gitRepo('gvhmr')
 import gc
 import inspect
@@ -458,7 +478,7 @@ def export(
                 key = ';'.join([prefix, key_who, k, _K])
                 if not IS_EULER:
                     for k in ['global_orient', 'body_pose']:
-                        pred[K][k] = Quat(pred[K][k])
+                        pred[K][k] = euler_to_quat(pred[K][k])
                 data[key] = pred[K][k].cpu().numpy()
         else:
             # 基本不会执行这里

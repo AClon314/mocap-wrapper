@@ -145,7 +145,7 @@ def Lib(arr, mod1: ModuleType | str = np, mod2: ModuleType | str = 'torch', ret_
     return mod
 
 
-def Norm(arr: TN, dim: int = -1, keepdim: bool = False) -> TN:
+def Norm(arr: TN, dim: int = -1, keepdim: bool = True) -> TN:
     """计算范数，支持批量输入"""
     lib = Lib(arr)
     is_torch = lib.__name__ == 'torch'
@@ -173,7 +173,9 @@ def skew_symmetric(v: TN) -> TN:
         return lib.stack([row0, row1, row2], axis=-2)  # (...,3,3)
 
 
-@deprecated('use to_quat')
+def print_shape(v, k): print(k, ':', v.shape)
+
+
 def Rodrigues(rot_vec3: TN) -> TN:
     """
     支持批量处理的罗德里格斯公式
@@ -188,18 +190,20 @@ def Rodrigues(rot_vec3: TN) -> TN:
     np.ndarray
         3x3 rotation matrix
 
-    _R: np.ndarray = np.eye(3) + sin * K + (1 - cos) * K @ K  # 原式  
+    _R: np.ndarray = np.eye(3) + sin * K + (1 - cos) * K @ K  # 原式
     choose (3,1) instead 3:    3 is vec, k.T == k;    (3,1) is matrix, k.T != k
     """
     assert rot_vec3.shape[-1] == 3, f"Last dimension must be 3, but got {rot_vec3.shape}"
     lib = Lib(rot_vec3)
     is_torch = lib.__name__ == 'torch'
 
+    shape_orig = rot_vec3.shape
+    rot_vec3 = rot_vec3.reshape(-1, 3)  # 扁平化处理，支持批量输入
     # 计算旋转角度
     theta = Norm(rot_vec3, dim=-1, keepdim=True)  # (...,1)
 
-    epsilon = 1e-8
-    mask = theta < epsilon
+    EPSILON = 1e-8
+    mask = theta < EPSILON
 
     # 处理小角度情况
     K_small = skew_symmetric(rot_vec3)
@@ -209,15 +213,15 @@ def Rodrigues(rot_vec3: TN) -> TN:
     R_small = eye + K_small  # 广播加法
 
     # 处理一般情况
-    safe_theta = lib.where(mask, epsilon * lib.ones_like(theta), theta)  # 避免除零
+    safe_theta = lib.where(mask, EPSILON * lib.ones_like(theta), theta)  # 避免除零
     k = rot_vec3 / safe_theta  # 单位向量
 
     K = skew_symmetric(k)
     k = k[..., None]  # 添加最后维度 (...,3,1)
     kkt = lib.matmul(k, lib.swapaxes(k, -1, -2))  # (...,3,3)
 
-    cos_t = lib.cos(theta)[..., None, None]  # (...,1,1)
-    sin_t = lib.sin(theta)[..., None, None]
+    cos_t = lib.cos(theta)[..., None]  # (...,1,1)
+    sin_t = lib.sin(theta)[..., None]
 
     R_full = cos_t * eye + sin_t * K + (1 - cos_t) * kkt
 
@@ -225,12 +229,13 @@ def Rodrigues(rot_vec3: TN) -> TN:
     if is_torch:
         mask = mask.view(*mask.shape, 1, 1)
     else:
-        mask = mask[..., None, None]
+        mask = mask[..., None]
 
-    return lib.where(mask, R_small, R_full)
+    ret = lib.where(mask, R_small, R_full)
+    ret = ret.reshape(*shape_orig[:-1], 3, 3)  # 恢复原始形状
+    return ret
 
 
-@deprecated('use to_quat')
 def RotMat_to_quat(R: TN) -> TN:
     """将3x3旋转矩阵转换为单位四元数 [w, x, y, z]，支持批量和PyTorch/NumPy"""
     lib = Lib(R)  # 自动检测模块
@@ -292,34 +297,37 @@ def RotMat_to_quat(R: TN) -> TN:
         index = i.reshape(1, *i.shape, 1).expand(1, *i.shape, 4)
         q = lib.gather(cases, dim=0, index=index).squeeze(0)
     else:
-        index = i[..., np.newaxis, np.newaxis]
-        q = np.take_along_axis(cases, index, axis=0).squeeze(0)
+        # 构造NumPy兼容的索引
+        index = i.reshape(1, *i.shape, 1)  # 添加新轴以对齐批量维度
+        index = np.broadcast_to(index, (1,) + i.shape + (4,))  # 扩展至四元数维度
+        q = np.take_along_axis(cases, index, axis=0).squeeze(0)  # 选择并压缩维度
 
     # 归一化处理（带数值稳定）
     norm = Norm(q, dim=-1, keepdim=True)
-    return q / (norm + EPSILON)  # 防止零除法
+    ret = q / (norm + EPSILON)  # 防止除零
+    return ret
 
 
-@deprecated('use to_quat')
 def euler_to_quat(arr: TN) -> TN: return RotMat_to_quat(Rodrigues(arr))
 def Axis(is_torch=False): return 'dim' if is_torch else 'axis'
 
 
-def Quat(euler: TN) -> TN:
+@deprecated('use `euler_to_quat`')
+def quat(xyz: TN) -> TN:
     """euler to quat
     Args:
         arr (TN): 输入张量/数组，shape为(...,3)，对应[roll, pitch, yaw]（弧度）
     Returns:
         quat: normalized [w,x,y,z], shape==(...,4)
     """
-    if euler.shape[-1] == 4:
-        return euler
-    assert euler.shape[-1] == 3, f"Last dimension should be 3, but found {euler.shape}"
-    lib = Lib(euler)  # 自动检测库类型
+    if xyz.shape[-1] == 4:
+        return xyz
+    assert xyz.shape[-1] == 3, f"Last dimension should be 3, but found {xyz.shape}"
+    lib = Lib(xyz)  # 自动检测库类型
     is_torch = lib.__name__ == 'torch'
 
     # 计算半角三角函数（支持广播）
-    half_angles = 0.5 * euler
+    half_angles = 0.5 * xyz
     cos_half = lib.cos(half_angles)  # shape (...,3)
     sin_half = lib.sin(half_angles)
 
@@ -338,29 +346,29 @@ def Quat(euler: TN) -> TN:
     z = cr * cp * sy - sr * sp * cy
 
     # 堆叠并归一化
-    quat = lib.stack([w, x, y, z], **{Axis(is_torch): -1})
-    return quat / Norm(quat, dim=-1, keepdim=True)
+    _quat = lib.stack([w, x, y, z], **{Axis(is_torch): -1})
+    return _quat / Norm(_quat, dim=-1, keepdim=True)
 
 
-def Euler(quat: TN) -> TN:
+def euler(wxyz: TN) -> TN:
     """union quat to euler
     Args:
         quat (TN): [w,x,y,z], shape==(...,4)
     Returns:
         euler: [roll_x, pitch_y, yaw_z] in arc system, shape==(...,3)
     """
-    if quat.shape[-1] == 3:
-        return quat
-    assert quat.shape[-1] == 4, f"Last dimension should be 4, but found {quat.shape}"
-    lib = Lib(quat)  # 自动检测库类型
+    if wxyz.shape[-1] == 3:
+        return wxyz
+    assert wxyz.shape[-1] == 4, f"Last dimension should be 4, but found {wxyz.shape}"
+    lib = Lib(wxyz)  # 自动检测库类型
     is_torch = lib.__name__ == 'torch'
     EPSILON = 1e-12  # 数值稳定系数
 
     # 归一化四元数（防止输入未归一化）
-    quat = quat / Norm(quat, dim=-1, keepdim=True)  # type: ignore
+    wxyz = wxyz / Norm(wxyz, dim=-1, keepdim=True)  # type: ignore
 
     # 解包四元数分量（支持广播）
-    w, x, y, z = quat[..., 0], quat[..., 1], quat[..., 2], quat[..., 3]
+    w, x, y, z = wxyz[..., 0], wxyz[..., 1], wxyz[..., 2], wxyz[..., 3]
 
     # 计算roll (x轴旋转)
     sinr_cosp = 2 * (w * x + y * z)
@@ -378,8 +386,8 @@ def Euler(quat: TN) -> TN:
     yaw = lib.arctan2(siny_cosp, cosy_cosp + EPSILON)
 
     # 堆叠结果
-    euler = lib.stack([roll, pitch, yaw], **{Axis(is_torch): -1})
-    return euler
+    _euler = lib.stack([roll, pitch, yaw], **{Axis(is_torch): -1})
+    return _euler
 
 
 class ArgParser(argparse.ArgumentParser):
@@ -389,8 +397,12 @@ class ArgParser(argparse.ArgumentParser):
 
 
 if __name__ == '__main__':
-    arr = np.array([0, 0, 1])
-    _arr = Quat(arr)
-    print(_arr)
-    _arr = Euler(_arr)
-    print(_arr)
+    arr = np.array([[1, 1, 1], [1, 0, 0]])
+    _arr = quat(arr)
+    print(_arr.shape, _arr)
+    _arr = euler(_arr)
+    print(_arr.shape, _arr)
+    _arr = Rodrigues(arr)
+    print(_arr.shape, _arr)
+    _arr = RotMat_to_quat(_arr)
+    print(_arr.shape, _arr)

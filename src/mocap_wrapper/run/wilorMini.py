@@ -4,7 +4,10 @@
 # @Author  : wenshao(original), AClon314(modified)
 # @Project : WiLoR-mini
 # @FileName: test_wilor_pipeline.py
-# https://github.com/warmshao/WiLoR-mini/blob/main/tests/test_pipelines.py
+"""
+https://github.com/warmshao/WiLoR-mini/blob/main/tests/test_pipelines.py
+"""
+
 """
 you need to install trimesh and pyrender if you want to render mesh
 pip install trimesh
@@ -17,9 +20,9 @@ import argparse
 import numpy as np
 from typing import Any, Literal, Optional, get_args
 try:
-    from .lib import squeeze, Quat  # >= python 3.11
+    from .lib import squeeze, euler_to_quat  # for IDE
 except ImportError:
-    from lib import squeeze, Quat   # python 3.10
+    from lib import squeeze, euler_to_quat  # for python 3.10
 from rich.progress import (
     Progress, TextColumn, BarColumn, TaskProgressColumn, MofNCompleteColumn, TimeElapsedColumn, TimeRemainingColumn)
 from sys import platform
@@ -362,7 +365,7 @@ def data_remap(From, to, frame=0):
         wilor_preds = {K: np.expand_dims(squeeze(v, key=K), axis=0) for K, v in wilor_preds.items()}
         if not IS_EULER:
             for K in ['global_orient', 'hand_pose']:
-                wilor_preds[K] = Quat(wilor_preds[K])
+                wilor_preds[K] = euler_to_quat(wilor_preds[K])
         if len(pred) == 0:
             _hand = {
                 'start': frame,
