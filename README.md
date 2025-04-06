@@ -59,13 +59,6 @@ hand: no constant tracking for video(just no yolo, ready for photo but not video
 - [Look Ma, no markers: holistic performance capture without the hassle](https://www.youtube.com/watch?v=4RkLDW3GmdY)
 
 ### hardware:RealTime
-<style>
-.icon {
-  width: 1em;
-  height: 1em;
-  vertical-align: -0.125em;
-}
-</style>
 <table>
   <tr>
     <th></th>

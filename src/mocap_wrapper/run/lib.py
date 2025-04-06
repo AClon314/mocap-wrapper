@@ -173,9 +173,6 @@ def skew_symmetric(v: TN) -> TN:
         return lib.stack([row0, row1, row2], axis=-2)  # (...,3,3)
 
 
-def print_shape(v, k): print(k, ':', v.shape)
-
-
 def Rodrigues(rot_vec3: TN) -> TN:
     """
     支持批量处理的罗德里格斯公式
@@ -193,12 +190,12 @@ def Rodrigues(rot_vec3: TN) -> TN:
     _R: np.ndarray = np.eye(3) + sin * K + (1 - cos) * K @ K  # 原式
     choose (3,1) instead 3:    3 is vec, k.T == k;    (3,1) is matrix, k.T != k
     """
+    if rot_vec3.shape[-1] == 4:
+        return rot_vec3
     assert rot_vec3.shape[-1] == 3, f"Last dimension must be 3, but got {rot_vec3.shape}"
     lib = Lib(rot_vec3)
     is_torch = lib.__name__ == 'torch'
 
-    shape_orig = rot_vec3.shape
-    rot_vec3 = rot_vec3.reshape(-1, 3)  # 扁平化处理，支持批量输入
     # 计算旋转角度
     theta = Norm(rot_vec3, dim=-1, keepdim=True)  # (...,1)
 
@@ -227,22 +224,22 @@ def Rodrigues(rot_vec3: TN) -> TN:
 
     # 合并结果
     if is_torch:
-        mask = mask.view(*mask.shape, 1, 1)
+        mask = mask.view(*mask.shape[:-1], 1, 1)
     else:
         mask = mask[..., None]
 
     ret = lib.where(mask, R_small, R_full)
-    ret = ret.reshape(*shape_orig[:-1], 3, 3)  # 恢复原始形状
     return ret
 
 
 def RotMat_to_quat(R: TN) -> TN:
     """将3x3旋转矩阵转换为单位四元数 [w, x, y, z]，支持批量和PyTorch/NumPy"""
+    if R.shape[-1] == 4:
+        return R
+    assert R.shape[-2:] == (3, 3), f"输入R的末两维必须为3x3，当前为{R.shape}"
     lib = Lib(R)  # 自动检测模块
     is_torch = lib.__name__ == 'torch'
     EPSILON = 1e-12  # 数值稳定系数
-
-    assert R.shape[-2:] == (3, 3), f"输入R的末两维必须为3x3，当前为{R.shape}"
 
     # 计算迹，形状为(...)
     trace = lib.einsum('...ii->...', R)
@@ -255,7 +252,10 @@ def RotMat_to_quat(R: TN) -> TN:
         (1 + 2 * R[..., 2, 2] - trace) / 4,
     ], axis=-1)
 
-    q_sq = lib.maximum(q_sq, 0.0)  # 确保平方值非负
+    other = 0.0
+    if is_torch:
+        other = lib.zeros_like(q_sq)
+    q_sq = lib.maximum(q_sq, other)  # 确保平方值非负
 
     # 找到最大分量的索引，形状(...)
     i = lib.argmax(q_sq, axis=-1)
@@ -308,11 +308,11 @@ def RotMat_to_quat(R: TN) -> TN:
     return ret
 
 
-def euler_to_quat(arr: TN) -> TN: return RotMat_to_quat(Rodrigues(arr))
+def quat_rotAxis(arr: TN) -> TN: return RotMat_to_quat(Rodrigues(arr))
 def Axis(is_torch=False): return 'dim' if is_torch else 'axis'
 
 
-@deprecated('use `euler_to_quat`')
+@deprecated('use `quat_rotAxis`')
 def quat(xyz: TN) -> TN:
     """euler to quat
     Args:

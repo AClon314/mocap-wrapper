@@ -23,9 +23,9 @@ from typing import Literal, Sequence, Set, Union
 from pathlib import Path
 
 try:
-    from mocap_wrapper.run.lib import chdir_gitRepo, continuous, euler_to_quat
+    from mocap_wrapper.run.lib import chdir_gitRepo, continuous, quat_rotAxis, euler
 except ImportError:
-    from lib import chdir_gitRepo, continuous, euler_to_quat
+    from lib import chdir_gitRepo, continuous, quat_rotAxis, euler
 chdir_gitRepo('gvhmr')
 import gc
 import inspect
@@ -476,9 +476,10 @@ def export(
         if hasattr(pred[K], 'keys'):
             for k in pred[K].keys():
                 key = ';'.join([prefix, key_who, k, _K])
-                if not IS_EULER:
-                    for k in ['global_orient', 'body_pose']:
-                        pred[K][k] = euler_to_quat(pred[K][k])
+                if k in ['global_orient', 'body_pose']:
+                    pred[K][k] = quat_rotAxis(pred[K][k])
+                    if IS_EULER:
+                        pred[K][k] = euler(pred[K][k])
                 data[key] = pred[K][k].cpu().numpy()
         else:
             # 基本不会执行这里
