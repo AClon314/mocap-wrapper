@@ -76,8 +76,12 @@ hand: no constant tracking for video(just no yolo, ready for photo but not video
   <tr>
     <td rowspan="2">face</td>
     <td>
-      <a href="https://www.ifacialmocap.com/" title="iPhone X + PC(win/Mac)"><svg class="icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 384 512"><!--!Font Awesome Free 6.7.2 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free Copyright 2025 Fonticons, Inc.--><path d="M318.7 268.7c-.2-36.7 16.4-64.4 50-84.8-18.8-26.9-47.2-41.7-84.7-44.6-35.5-2.8-74.3 20.7-88.5 20.7-15 0-49.4-19.7-76.4-19.7C63.3 141.2 4 184.8 4 273.5q0 39.3 14.4 81.2c12.8 36.7 59 126.7 107.2 125.2 25.2-.6 43-17.9 75.8-17.9 31.8 0 48.3 17.9 76.4 17.9 48.6-.7 90.4-82.5 102.6-119.3-65.2-30.7-61.7-90-61.7-91.9zm-56.6-164.2c27.3-32.4 24.8-61.9 24-72.5-24.1 1.4-52 16.4-67.9 34.9-17.5 19.8-27.8 44.3-25.6 71.9 26.1 2 49.9-11.4 69.5-34.3z"/></svg>iFacialMocap</a> |
-      <a href="https://suvidriel.itch.io/meowface" title="free, android, can work with iFacialMocap PC client"><svg class="icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 576 512"><!--!Font Awesome Free 6.7.2 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free Copyright 2025 Fonticons, Inc.--><path d="M420.6 301.9a24 24 0 1 1 24-24 24 24 0 0 1 -24 24m-265.1 0a24 24 0 1 1 24-24 24 24 0 0 1 -24 24m273.7-144.5 47.9-83a10 10 0 1 0 -17.3-10h0l-48.5 84.1a301.3 301.3 0 0 0 -246.6 0L116.2 64.5a10 10 0 1 0 -17.3 10h0l47.9 83C64.5 202.2 8.2 285.6 0 384H576c-8.2-98.5-64.5-181.8-146.9-226.6"/></svg> Meowface</a>
+      <a href="https://www.ifacialmocap.com/" title="iPhone X + PC(win/Mac)">
+      <img class="icon" src="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAzODQgNTEyIj48IS0tIUZvbnQgQXdlc29tZSBGcmVlIDYuNy4yIGJ5IEBmb250YXdlc29tZSAtIGh0dHBzOi8vZm9udGF3ZXNvbWUuY29tIExpY2Vuc2UgLSBodHRwczovL2ZvbnRhd2Vzb21lLmNvbS9saWNlbnNlL2ZyZWUgQ29weXJpZ2h0IDIwMjUgRm9udGljb25zLCBJbmMuLS0+PHBhdGggZD0iTTMxOC43IDI2OC43Yy0uMi0zNi43IDE2LjQtNjQuNCA1MC04NC44LTE4LjgtMjYuOS00Ny4yLTQxLjctODQuNy00NC42LTM1LjUtMi44LTc0LjMgMjAuNy04OC41IDIwLjctMTUgMC00OS40LTE5LjctNzYuNC0xOS43QzYzLjMgMTQxLjIgNCAxODQuOCA0IDI3My41cTAgMzkuMyAxNC40IDgxLjJjMTIuOCAzNi43IDU5IDEyNi43IDEwNy4yIDEyNS4yIDI1LjItLjYgNDMtMTcuOSA3NS44LTE3LjkgMzEuOCAwIDQ4LjMgMTcuOSA3Ni40IDE3LjkgNDguNi0uNyA5MC40LTgyLjUgMTAyLjYtMTE5LjMtNjUuMi0zMC43LTYxLjctOTAtNjEuNy05MS45em0tNTYuNi0xNjQuMmMyNy4zLTMyLjQgMjQuOC02MS45IDI0LTcyLjUtMjQuMSAxLjQtNTIgMTYuNC02Ny45IDM0LjktMTcuNSAxOS44LTI3LjggNDQuMy0yNS42IDcxLjkgMjYuMSAyIDQ5LjktMTEuNCA2OS41LTM0LjN6Ii8+PC9zdmc+"></img>
+      iFacialMocap</a>|
+      <a href="https://suvidriel.itch.io/meowface" title="free, android, can work with iFacialMocap PC client">
+      <img class="icon" src="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA1NzYgNTEyIj48IS0tIUZvbnQgQXdlc29tZSBGcmVlIDYuNy4yIGJ5IEBmb250YXdlc29tZSAtIGh0dHBzOi8vZm9udGF3ZXNvbWUuY29tIExpY2Vuc2UgLSBodHRwczovL2ZvbnRhd2Vzb21lLmNvbS9saWNlbnNlL2ZyZWUgQ29weXJpZ2h0IDIwMjUgRm9udGljb25zLCBJbmMuLS0+PHBhdGggZD0iTTQyMC42IDMwMS45YTI0IDI0IDAgMSAxIDI0LTI0IDI0IDI0IDAgMCAxIC0yNCAyNG0tMjY1LjEgMGEyNCAyNCAwIDEgMSAyNC0yNCAyNCAyNCAwIDAgMSAtMjQgMjRtMjczLjctMTQ0LjUgNDcuOS04M2ExMCAxMCAwIDEgMCAtMTcuMy0xMGgwbC00OC41IDg0LjFhMzAxLjMgMzAxLjMgMCAwIDAgLTI0Ni42IDBMMTE2LjIgNjQuNWExMCAxMCAwIDEgMCAtMTcuMyAxMGgwbDQ3LjkgODNDNjQuNSAyMDIuMiA4LjIgMjg1LjYgMCAzODRINTc2Yy04LjItOTguNS02NC41LTE4MS44LTE0Ni45LTIyNi42Ii8+PC9zdmc+"></img>
+      Meowface</a>
     </td>
     <td>shape key</td>
   </tr>
@@ -145,10 +149,10 @@ the blender addon use `Armature mapping **to**`
 - bbox: yolo_bbox_xyXY
 
 ## Licenses
-Please refer to their respective licenses for more details:
+By using this repository, you must also comply with the terms of these external licenses:
 
-| Dependency| License
+| Repo | License |
 |-|-|
-|GVHMR|≈[![CC BY-NC-SA](https://licensebuttons.net/l/by-nc-sa/3.0/88x31.png)](https://github.com/zju3dv/GVHMR/blob/main/LICENSE "CC BY-NC-SA")
+|GVHMR|[Copyright 2022-2023 3D Vision Group at the State Key Lab of CAD&CG, Zhejiang University. All Rights Reserved. ![CC BY-NC-SA](https://licensebuttons.net/l/by-nc-sa/3.0/88x31.png)](https://github.com/zju3dv/GVHMR/blob/main/LICENSE "CC BY-NC-SA")
 |WiLoR| [![CC BY-NC-ND 4.0](https://licensebuttons.net/l/by-nc-nd/3.0/88x31.png)](https://github.com/rolpotamias/WiLoR/blob/main/license.txt "CC BY-NC-ND 4.0")
 |mocap-wrapper| [AGPL v3](./LICENSE)
