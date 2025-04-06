@@ -76,18 +76,14 @@ hand: no constant tracking for video(just no yolo, ready for photo but not video
   <tr>
     <td rowspan="2">face</td>
     <td>
-      <a href="https://www.ifacialmocap.com/" title="iPhone X + PC(win/Mac)">
-      <img class="icon" src="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAzODQgNTEyIj48IS0tIUZvbnQgQXdlc29tZSBGcmVlIDYuNy4yIGJ5IEBmb250YXdlc29tZSAtIGh0dHBzOi8vZm9udGF3ZXNvbWUuY29tIExpY2Vuc2UgLSBodHRwczovL2ZvbnRhd2Vzb21lLmNvbS9saWNlbnNlL2ZyZWUgQ29weXJpZ2h0IDIwMjUgRm9udGljb25zLCBJbmMuLS0+PHBhdGggZD0iTTMxOC43IDI2OC43Yy0uMi0zNi43IDE2LjQtNjQuNCA1MC04NC44LTE4LjgtMjYuOS00Ny4yLTQxLjctODQuNy00NC42LTM1LjUtMi44LTc0LjMgMjAuNy04OC41IDIwLjctMTUgMC00OS40LTE5LjctNzYuNC0xOS43QzYzLjMgMTQxLjIgNCAxODQuOCA0IDI3My41cTAgMzkuMyAxNC40IDgxLjJjMTIuOCAzNi43IDU5IDEyNi43IDEwNy4yIDEyNS4yIDI1LjItLjYgNDMtMTcuOSA3NS44LTE3LjkgMzEuOCAwIDQ4LjMgMTcuOSA3Ni40IDE3LjkgNDguNi0uNyA5MC40LTgyLjUgMTAyLjYtMTE5LjMtNjUuMi0zMC43LTYxLjctOTAtNjEuNy05MS45em0tNTYuNi0xNjQuMmMyNy4zLTMyLjQgMjQuOC02MS45IDI0LTcyLjUtMjQuMSAxLjQtNTIgMTYuNC02Ny45IDM0LjktMTcuNSAxOS44LTI3LjggNDQuMy0yNS42IDcxLjkgMjYuMSAyIDQ5LjktMTEuNCA2OS41LTM0LjN6Ii8+PC9zdmc+"></img>
-      iFacialMocap</a>|
-      <a href="https://suvidriel.itch.io/meowface" title="free, android, can work with iFacialMocap PC client">
-      <img class="icon" src="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA1NzYgNTEyIj48IS0tIUZvbnQgQXdlc29tZSBGcmVlIDYuNy4yIGJ5IEBmb250YXdlc29tZSAtIGh0dHBzOi8vZm9udGF3ZXNvbWUuY29tIExpY2Vuc2UgLSBodHRwczovL2ZvbnRhd2Vzb21lLmNvbS9saWNlbnNlL2ZyZWUgQ29weXJpZ2h0IDIwMjUgRm9udGljb25zLCBJbmMuLS0+PHBhdGggZD0iTTQyMC42IDMwMS45YTI0IDI0IDAgMSAxIDI0LTI0IDI0IDI0IDAgMCAxIC0yNCAyNG0tMjY1LjEgMGEyNCAyNCAwIDEgMSAyNC0yNCAyNCAyNCAwIDAgMSAtMjQgMjRtMjczLjctMTQ0LjUgNDcuOS04M2ExMCAxMCAwIDEgMCAtMTcuMy0xMGgwbC00OC41IDg0LjFhMzAxLjMgMzAxLjMgMCAwIDAgLTI0Ni42IDBMMTE2LjIgNjQuNWExMCAxMCAwIDEgMCAtMTcuMyAxMGgwbDQ3LjkgODNDNjQuNSAyMDIuMiA4LjIgMjg1LjYgMCAzODRINTc2Yy04LjItOTguNS02NC41LTE4MS44LTE0Ni45LTIyNi42Ii8+PC9zdmc+"></img>
-      Meowface</a>
+      <a href="https://www.ifacialmocap.com/" title="iPhone X + PC(win/Mac)">🍎iFacialMocap</a> | 
+      <a href="https://suvidriel.itch.io/meowface" title="free, android, can work with iFacialMocap PC client">🤖 Meowface</a>
     </td>
     <td>shape key</td>
   </tr>
   <tr>
     <td>
-      <a href="https://dev.epicgames.com/documentation/en-us/unreal-engine/live-link-in-unreal-engine"><i class="fab fa-apple"></i>unreal live link</a>
+      <a href="https://dev.epicgames.com/documentation/en-us/unreal-engine/live-link-in-unreal-engine">🍎+💻unreal live link</a>
     </td>
     <td>bone</td>
   </tr>
