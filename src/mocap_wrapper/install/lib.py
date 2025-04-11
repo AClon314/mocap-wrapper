@@ -304,7 +304,6 @@ SHELL = get_shell()
 PKG_MGR = get_pkg_mgr()
 PY_MGR = get_py_mgr()
 try:
-    from mocap_wrapper.install.Gdown import google_drive
     if __name__ == '__main__':
         aio.run(install(runs=['gvhmr', ]))
 except ImportError:

@@ -107,6 +107,7 @@ async def i_gvhmr(Dir=DIR_GVHMR, env=ENV, **kwargs):
     ]
     tasks = await aio.gather(*tasks)
     Log.info("✔ Installed GVHMR")
+    CONFIG['gvhmr'] = True
 
 if __name__ == '__main__':
     i_gvhmr_config('../GVHMR')

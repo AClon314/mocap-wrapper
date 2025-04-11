@@ -96,8 +96,10 @@ mocap -I
 ```
 
 ## usage
+See `mocap -h` for more options.
 ```sh
-mocap -i input.mp4 output.mp4
+mocap -i input.mp4
+mocap -i input.mp4 -b gvhmr,wilor -o outdir
 ```
 
 ## dev
@@ -107,13 +109,22 @@ You have to read these if you want to modify code.
 LOGLVL=debug mocap -I
 ```
 
+### TODO
+PR welcome! (ゝ∀･)
+||important| not|
+|--|--|--|
+|urgent|- bones remapping to UE Mannequin | - make wilor predict hands ID continuously
+|not|- [MANO to smplx](https://github.com/VincentHu19/Mano2Smpl-X/blob/main/mano2smplx.py) <br> - [track camera from gvhmr](https://github.com/zju3dv/GVHMR/issues/30) <br> |- bbox_viewer.blender <br> - only import selected bones <br> - remember which .npz for each armature
+
 ### [docker](docker/Dockerfile)
 ```sh
 # docker build -t mocap -f docker/Dockerfile .
 podman build -t mocap -f docker/Dockerfile . --security-opt label=disable
 ```
 
-### [requirements](src/mocap_wrapper/requirements/gvhmr.txt)
+### requirements
+Will do the following steps for each requirements.txt in [`src/mocap_wrapper/requirements`](src/mocap_wrapper/requirements/gvhmr.txt):
+
 1. use `mamba`/`conda` to install, so the commented lines are not installed.
 2. use `pip` to install the **rest** packages that startwith `# `. So if you want to do comments, you can use `## `or`#...`without space char.
 

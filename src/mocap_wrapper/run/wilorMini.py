@@ -191,10 +191,10 @@ class Renderer:
         #     baseColorFactor=(*mesh_base_color, 1.0))
         vertex_colors = np.array([(*mesh_base_color, 1.0)] * vertices.shape[0])
         if is_right:
-            mesh = trimesh.Trimesh(vertices.copy() + camera_translation, self.faces.copy(), vertex_colors=vertex_colors)
+            faces = self.faces.copy()
         else:
-            mesh = trimesh.Trimesh(vertices.copy() + camera_translation, self.faces_left.copy(),
-                                   vertex_colors=vertex_colors)
+            faces = self.faces_left.copy()
+        mesh = trimesh.Trimesh(vertices.copy() + camera_translation, faces, vertex_colors=vertex_colors)
         # mesh = trimesh.Trimesh(vertices.copy(), self.faces.copy())
 
         rot = trimesh.transformations.rotation_matrix(
@@ -362,7 +362,7 @@ def data_remap(From, to, frame=0):
         pred = to[i]
         wilor_preds: dict[str, np.ndarray] = hand["wilor_preds"]
         wilor_preds['bbox'] = hand['hand_bbox']
-        wilor_preds = {K: np.expand_dims(squeeze(v, key=K), axis=0) for K, v in wilor_preds.items()}
+        wilor_preds = {K: np.expand_dims(squeeze(v, key=K), axis=0) for K, v in wilor_preds.items() if K not in ['pred_vertices', 'scaled_focal_length']}
         if not IS_EULER:
             for K in ['global_orient', 'hand_pose']:
                 wilor_preds[K] = quat_rotAxis(wilor_preds[K])
@@ -370,12 +370,13 @@ def data_remap(From, to, frame=0):
             _hand = {
                 'start': frame,
                 'is_right': hand['is_right'],
+                'scaled_focal_length': hand['scaled_focal_length'],
                 **wilor_preds
             }
             to[i] = _hand
         else:
             if hand['is_right'] != pred['is_right']:
-                print(f"hand{i} is_right changed @ {frame}")
+                print(f"hand{i} is_right changed @ {frame}")    # TODO
             for K in _WILOR_KEYS:
                 if K in pred.keys() and K in wilor_preds.keys():
                     pred[K] = np.concatenate((pred[K], wilor_preds[K]), axis=0)
@@ -474,7 +475,7 @@ def video_wilor(input='video.mp4', out_dir=OUTDIR, progress: Optional[Progress] 
     filename = no_ext_filename(input)
     file = filename + '.mp4'
     task = progress.add_task(
-        f"📹︎ →✋ {file}", total=total) if progress else None
+        f"👋←📹 {file}", total=total) if progress else None
 
     # Create VideoWriter object
     output_path = os.path.join(out_dir, _PREFIX + file)  # tmp

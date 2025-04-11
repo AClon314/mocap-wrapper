@@ -1,4 +1,4 @@
-"""shared functions: 
+"""shared functions:
 - download/aria, calc_md5, is_resumable_file, try_aria_port
 - popen/echo, unzip/version
 - run_1by1, async_queue
@@ -59,7 +59,7 @@ QRCODE = """
 █ ███ █ ▄▀██▄▄█▄█ █ ███ █
 █ ▀▀▀ █ ▀▄█ ▀█▄ █ █ ▀▀▀ █
 ▀▀▀▀▀▀▀ ▀▄▀▄▀ █▄▀ ▀▀▀▀▀▀▀
-▀█ ▄▄▀▀█▄▀█▄▄▀ █   ▄█▀▄  
+▀█ ▄▄▀▀█▄▀█▄▄▀ █   ▄█▀▄
 ▀█▄██▀▀█▄▀▄ ▀ ▀█▄▄▄▄▄▄ ▀█
 ▄▀▄█▀▄▀█▄▀██▄ █▄▀ ▀█ ▀ █▀
 █ ▀▀ ▀▀▄ ▀ ▄ ▀▀▀█ ▀▀ ▄██▀
@@ -254,8 +254,8 @@ def copy_kwargs(
 def filter_kwargs(funcs: List[Union[Callable, object]], kwargs, check=_CHECK_KWARGS):
     """Filter out invalid kwargs to prevent Exception
 
-    Don't use this if the funcs 
-    actually parse args by `**kwargs` 
+    Don't use this if the funcs
+    actually parse args by `**kwargs`
     while using `.pyi` to hint args,
     which will filter out your needed kwargs.
 
@@ -339,6 +339,7 @@ async def popen(
         mode (str):
             - realtime: **foreground**, print in real-time
             - wait: await until finished
+            - wait-print: after finished, print the output
             - no-wait: **background**, immediately return, suitable for **forever-looping**, use:
             p = await popen('cmd', mode='bg')
             await p.expect(pexpect.EOF, async_=True)
@@ -346,23 +347,17 @@ async def popen(
         kwargs: `pexpect.spawn()` args
 
     Returns:
-        process (pexpect.spawn): 
+        process (pexpect.spawn):
     """
     Log.info(f"{mode}: '{cmd}'")
     p = pexpect.spawn(cmd, timeout=timeout, **kwargs)
     FD = sys.stdout.fileno()
+    def os_write(): return os.write(FD, p.read_nonblocking(4096))
     if mode == 'realtime':
         while p.isalive():
-            try:
-                os.write(FD, p.read_nonblocking(4096))  # type: ignore
-                await aio.sleep(0.01)
-            except pexpect.EOF:
-                if not p.isalive():
-                    break
-            except pexpect.TIMEOUT:
-                Log.warning(f"Timeout: {cmd}")
-            except Exception:
-                raise
+            os_write()
+            await aio.sleep(0.03)
+        os_write()
     elif mode == 'wait':
         while p.isalive():
             try:
@@ -371,7 +366,6 @@ async def popen(
                 Log.warning(f"Timeout: {cmd}")
             except Exception:
                 raise
-            # os.write(FD, p.before)  # type: ignore
     elif mode == 'no-wait':
         ...
     else:

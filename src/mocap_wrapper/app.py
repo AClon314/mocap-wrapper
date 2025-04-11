@@ -20,7 +20,8 @@ async def Python(run: TYPE_RUNS, *args: str):
     if run == 'wilor':
         run = 'wilorMini'   # type: ignore
     py = res_path(module='run', file=f'{run}.py')
-    return await mamba(f'python {py} {_arg}', env=ENV)
+    cmd = f'python {py} {_arg}'
+    return await mamba(cmd, env=ENV)
 
 
 async def run(runs: Sequence[TYPE_RUNS], input: str, outdir: str, Range='', args: Sequence[str] = []):

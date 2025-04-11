@@ -69,8 +69,8 @@ async def test_resume(urls):
 
 
 async def test_popen():
-    p, out, err = await popen('echo "Hello World!"')
-    assert p.returncode == 0, p
+    p = await popen('echo "Hello World!"', mode='wait')
+    assert p.exitstatus == 0, p
 
 
 @pytest.mark.parametrize(

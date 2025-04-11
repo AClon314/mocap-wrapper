@@ -116,7 +116,7 @@ def squeeze(v: np.ndarray, axis=0, key=''):
     return v
 
 
-def get_mod(mod1: ModuleType | str):
+def _get_mod(mod1: ModuleType | str):
     if isinstance(mod1, str):
         _mod1 = sys.modules.get(mod1, None)
     else:
@@ -131,8 +131,8 @@ def Lib(arr, mod1: ModuleType | str = np, mod2: ModuleType | str = 'torch', ret_
     is_torch = lib.__name__ == 'torch'
     ```
     """
-    _mod1 = get_mod(mod1)
-    _mod2 = get_mod(mod2)
+    _mod1 = _get_mod(mod1)
+    _mod2 = _get_mod(mod2)
     if _mod1 and _mod2:
         mod = _mod1 if isinstance(arr, ret_1_if) else _mod2
     elif _mod1:
@@ -308,6 +308,110 @@ def RotMat_to_quat(R: TN) -> TN:
     return ret
 
 
+def RotMat_to_new(R: TN, out=4) -> TN:
+    """将3x3旋转矩阵转换为单位四元数 [w, x, y, z] 或欧拉角(xyz顺序)，支持批量和PyTorch/NumPy"""
+    if R.shape[-1] == out:
+        return R
+    assert R.shape[-2:] == (3, 3), f"输入R的末两维必须为3x3，当前为{R.shape}"
+    lib = Lib(R)  # 自动检测模块
+    is_torch = lib.__name__ == 'torch'
+    EPSILON = 1e-12  # 数值稳定系数
+
+    if out == 4:
+        # 计算迹，形状为(...)
+        trace = lib.einsum('...ii->...', R)
+
+        # 计算四个分量的平方（带数值稳定处理）
+        q_sq = lib.stack([
+            (trace + 1) / 4,
+            (1 + 2 * R[..., 0, 0] - trace) / 4,
+            (1 + 2 * R[..., 1, 1] - trace) / 4,
+            (1 + 2 * R[..., 2, 2] - trace) / 4,
+        ], axis=-1)
+
+        other = 0.0
+        if is_torch:
+            other = lib.zeros_like(q_sq)
+        q_sq = lib.maximum(q_sq, other)  # 确保平方值非负
+
+        # 找到最大分量的索引，形状(...)
+        i = lib.argmax(q_sq, axis=-1)
+
+        # 计算分母（带数值稳定处理）
+        denoms = 4 * lib.sqrt(q_sq + EPSILON)  # 添加极小值防止sqrt(0)
+
+        # 构造每个case的四元数分量
+        cases = []
+        for i_case in range(4):
+            denom = denoms[..., i_case]  # 当前case的分母
+            if i_case == 0:
+                w = lib.sqrt(q_sq[..., 0] + EPSILON)  # 数值稳定
+                x = (R[..., 2, 1] - R[..., 1, 2]) / denom
+                y = (R[..., 0, 2] - R[..., 2, 0]) / denom
+                z = (R[..., 1, 0] - R[..., 0, 1]) / denom
+            elif i_case == 1:
+                x = lib.sqrt(q_sq[..., 1] + EPSILON)
+                w = (R[..., 2, 1] - R[..., 1, 2]) / denom
+                y = (R[..., 0, 1] + R[..., 1, 0]) / denom
+                z = (R[..., 0, 2] + R[..., 2, 0]) / denom
+            elif i_case == 2:
+                y = lib.sqrt(q_sq[..., 2] + EPSILON)
+                w = (R[..., 0, 2] - R[..., 2, 0]) / denom
+                x = (R[..., 0, 1] + R[..., 1, 0]) / denom
+                z = (R[..., 1, 2] + R[..., 2, 1]) / denom
+            else:  # i_case == 3
+                z = lib.sqrt(q_sq[..., 3] + EPSILON)
+                w = (R[..., 1, 0] - R[..., 0, 1]) / denom
+                x = (R[..., 0, 2] + R[..., 2, 0]) / denom
+                y = (R[..., 1, 2] + R[..., 2, 1]) / denom
+
+            case = lib.stack([w, x, y, z], axis=-1)
+            cases.append(case)
+
+        # 合并所有情况并进行索引选择
+        cases = lib.stack(cases, axis=0)
+        if is_torch:
+            index = i.reshape(1, *i.shape, 1).expand(1, *i.shape, 4)
+            q = lib.gather(cases, dim=0, index=index).squeeze(0)
+        else:
+            # 构造NumPy兼容的索引
+            index = i.reshape(1, *i.shape, 1)  # 添加新轴以对齐批量维度
+            index = np.broadcast_to(index, (1,) + i.shape + (4,))  # 扩展至四元数维度
+            q = np.take_along_axis(cases, index, axis=0).squeeze(0)  # 选择并压缩维度
+
+        # 归一化处理（带数值稳定）
+        norm = Norm(q, dim=-1, keepdim=True)
+        ret = q / (norm + EPSILON)  # 防止除零
+        return ret
+    elif out == 3:
+        if is_torch:
+            sy = torch.sqrt(R[..., 0, 0] * R[..., 0, 0] + R[..., 1, 0] * R[..., 1, 0])
+            singular = sy < 1e-6
+            if singular.any():
+                x = torch.atan2(-R[..., 1, 2], R[..., 1, 1])
+                y = torch.atan2(-R[..., 2, 0], sy)
+                z = torch.zeros_like(x)
+            else:
+                x = torch.atan2(R[..., 2, 1], R[..., 2, 2])
+                y = torch.atan2(-R[..., 2, 0], sy)
+                z = torch.atan2(R[..., 1, 0], R[..., 0, 0])
+            return torch.stack([x, y, z], dim=-1)
+        else:
+            sy = np.sqrt(R[..., 0, 0] * R[..., 0, 0] + R[..., 1, 0] * R[..., 1, 0])
+            singular = sy < 1e-6
+            if np.any(singular):
+                x = np.arctan2(-R[..., 1, 2], R[..., 1, 1])
+                y = np.arctan2(-R[..., 2, 0], sy)
+                z = np.zeros_like(x)
+            else:
+                x = np.arctan2(R[..., 2, 1], R[..., 2, 2])
+                y = np.arctan2(-R[..., 2, 0], sy)
+                z = np.arctan2(R[..., 1, 0], R[..., 0, 0])
+            return np.stack([x, y, z], axis=-1)
+    else:
+        raise ValueError("out参数只能为3或4")
+
+
 def quat_rotAxis(arr: TN) -> TN: return RotMat_to_quat(Rodrigues(arr))
 def Axis(is_torch=False): return 'dim' if is_torch else 'axis'
 
@@ -388,6 +492,60 @@ def euler(wxyz: TN) -> TN:
     # 堆叠结果
     _euler = lib.stack([roll, pitch, yaw], **{Axis(is_torch): -1})
     return _euler
+
+
+def compute_global_rotation(pose_axis_anges, joint_idx):
+    """
+    calculating joints' global rotation
+    Args:
+        pose_axis_anges (np.array): SMPLX's local pose (22,3)
+    Returns:
+        np.array: (3, 3)
+    """
+    global_rotation = np.eye(3)
+    parents = [-1, 0, 0, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 9, 9, 12, 13, 14, 16, 17, 18, 19]
+    while joint_idx != -1:
+        joint_rotation = Rodrigues(pose_axis_anges[joint_idx])
+        global_rotation = joint_rotation @ global_rotation
+        joint_idx = parents[joint_idx]
+    return global_rotation
+
+
+def mano_to_smplx(smplx_body_gvhmr, mano_hand_hamer):
+    """https://github.com/VincentHu19/Mano2Smpl-X/blob/main/mano2smplx.py"""
+    M = np.diag([-1, 1, 1])  # Preparing for the left hand switch
+
+    lib = Lib(smplx_body_gvhmr["global_orient"])
+    # Assuming that your data are stored in gvhmr_smplx_params and hamer_mano_params
+    full_body_pose = lib.concatenate((smplx_body_gvhmr["global_orient"], smplx_body_gvhmr["body_pose"].reshape(21, 3)), dim=0)     # gvhmr_smplx_params["global_orient"]: (3, 3)
+    left_elbow_global_rot = compute_global_rotation(full_body_pose, 18)  # left elbow IDX: 18
+    right_elbow_global_rot = compute_global_rotation(full_body_pose, 19)  # left elbow IDX: 19
+
+    left_wrist_global_rot = mano_hand_hamer["global_orient"][0].cpu().numpy()  # hamer_mano_params["global_orient"]: (2, 3, 3)
+    left_wrist_global_rot = M @ left_wrist_global_rot @ M  # mirror switch
+    left_wrist_pose = np.linalg.inv(left_elbow_global_rot) @ left_wrist_global_rot
+
+    right_wrist_global_rot = mano_hand_hamer["global_orient"][1].cpu().numpy()
+    right_wrist_pose = np.linalg.inv(right_elbow_global_rot) @ right_wrist_global_rot
+
+    left_wrist_pose_vec = euler(RotMat_to_quat(left_wrist_pose))
+    right_wrist_pose_vec = euler(RotMat_to_quat(right_wrist_pose))
+
+    left_hand_pose = np.ones(45)
+    right_hand_pose = np.ones(45)
+    for i in range(15):
+        left_finger_pose = M @ mano_hand_hamer["hand_pose"][0][i].cpu().numpy() @ M  # hamer_mano_params["hand_pose"]: (2, 15, 3, 3)
+        left_finger_pose_vec = euler(RotMat_to_quat(left_finger_pose))
+        left_hand_pose[i * 3: i * 3 + 3] = left_finger_pose_vec
+
+        right_finger_pose = mano_hand_hamer["hand_pose"][1][i].cpu().numpy()
+        right_finger_pose_vec = euler(RotMat_to_quat(right_finger_pose))
+        right_hand_pose[i * 3: i * 3 + 3] = right_finger_pose_vec
+
+    smplx_body_gvhmr["body_pose"][57: 60] = left_wrist_pose_vec
+    smplx_body_gvhmr["body_pose"][60: 63] = right_wrist_pose_vec
+    smplx_body_gvhmr["left_hand_pose"] = left_hand_pose
+    smplx_body_gvhmr["right_hand_pose"] = right_hand_pose
 
 
 class ArgParser(argparse.ArgumentParser):

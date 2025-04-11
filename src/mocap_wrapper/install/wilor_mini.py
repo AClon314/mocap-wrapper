@@ -10,4 +10,5 @@ async def i_wilor_mini(env=ENV, **kwargs):
     p = await txt_pip_retry(txt, env=env)
     p = await mamba(py_mgr='pip', pkgs=['git+https://github.com/warmshao/WiLoR-mini'], env=env, **kwargs)
     Log.info("✔ Installed WiLoR-mini")
+    CONFIG['wilor'] = True
     return p

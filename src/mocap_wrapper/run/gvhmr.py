@@ -492,6 +492,7 @@ def export(
 def find_camera_extrinsics(verts_world, verts_camera):
     """
     Find camera extrinsics (R, T) given vertices in world and camera coordinate systems.
+    https://github.com/zju3dv/GVHMR/issues/30
 
     Args:
         verts_world: (N, 3) Vertices in world coordinates.
