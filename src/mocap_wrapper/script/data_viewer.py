@@ -98,7 +98,7 @@ def expand_dict(data, prefix='', depth=0) -> dict[str, Any]:
             if is_dict(v):
                 expand_dict(v, f'{prefix}{k}{_SEP}', depth)
             else:
-                if isinstance(v, torch.Tensor) or isinstance(v, np.ndarray):
+                if isinstance(v, (torch.Tensor, np.ndarray)):
                     while v.shape[0] == 1:
                         v = v.squeeze(0)
                 if len(_FLAT.keys()) >= _MAX_KEYS:
