@@ -455,7 +455,7 @@ def image_wilor(input='img.png', out_dir=OUTDIR):
         cv2.imwrite(os.path.join(out_dir, _PREFIX + filename + '.webp'), render_image)
 
 
-def video_wilor(input='video.mp4', out_dir=OUTDIR, progress: Optional[Progress] = None):
+def video_wilor(input='video.mp4', out_dir=OUTDIR, progress: Progress | None = None):
     WiLorHandPose3dEstimationPipeline = Import()
     LIGHT_PURPLE = (0.25098039, 0.274117647, 0.65882353)
     device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")

@@ -61,7 +61,7 @@ PKG_MGRS['brew'] = PKG_MGRS['apt']  # macos
 PKG_MGRS['yum'] = PKG_MGRS['dnf']   # rhel
 
 
-def remove_if_p(path: Union[str, Path]):
+def remove_if_p(path: str | Path):
     """remove file if progress is successful"""
     os.remove(path) if os.path.exists(path) else None
 
@@ -159,7 +159,7 @@ async def mamba(
     py_mgr: TYPE_PY_MGRS = 'mamba',
     env=ENV,
     python: str = '',
-    txt: Union[Literal['requirements.txt'], Path, str] = '',
+    txt: Literal['requirements.txt'] | Path | str = '',
     pkgs=[],
     **kwargs
 ):
@@ -228,7 +228,7 @@ async def mamba(
     return True  # TODO: return failed list
 
 
-def txt_pip_retry(txt: Union[str, Path], tmp_dir=DIR, env=ENV):
+def txt_pip_retry(txt: str | Path, tmp_dir=DIR, env=ENV):
     """
     1. remove installed lines
     2. install package that start with `# ` (not like `##...`or`# #...`)

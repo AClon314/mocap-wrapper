@@ -70,7 +70,7 @@ QRCODE = """
 ▀▀▀▀▀▀▀ ▀ ▀▀  ▀ ▀ ▀▀▀▀  ▀"""[1:]
 
 
-def path_expand(path: Union[str, Path], absolute=True):
+def path_expand(path: str | Path, absolute=True):
     path = os.path.expandvars(os.path.expanduser(path))
     if absolute:
         path = os.path.abspath(path)
@@ -102,7 +102,7 @@ class Config(dict):
         'wilor': False,
     }
 
-    def __init__(self, /, *args: TYPE_CONFIG, file: Union[Path, str] = "config.toml", **kwargs: Unpack[TYPE_CONFIG]) -> None:
+    def __init__(self, /, *args: TYPE_CONFIG, file: Path | str = "config.toml", **kwargs: Unpack[TYPE_CONFIG]) -> None:
         """
 
         This will sync to config file:
@@ -121,7 +121,7 @@ class Config(dict):
             #     Log.warning(f"Load failed {self.path}: {e}")
         self.dump()
 
-    def dump(self, file: Union[Path, str] = '') -> None:
+    def dump(self, file: Path | str = '') -> None:
         """将self dict保存到TOML文件"""
         if not file:
             file = self.path
@@ -196,8 +196,8 @@ async def async_queue(duration=5.0):
 
 
 async def run_1by1(
-    coros: Sequence[Union[Coroutine, aio.Task]],
-    callback: Union[Callable, aio.Task, None] = None,
+    coros: Sequence[Coroutine | aio.Task],
+    callback: Callable | aio.Task | None = None,
     duration=_RELAX
 ):
     """
@@ -251,7 +251,7 @@ def copy_kwargs(
     return return_func
 
 
-def filter_kwargs(funcs: List[Union[Callable, object]], kwargs, check=_CHECK_KWARGS):
+def filter_kwargs(funcs: List[Callable | object], kwargs, check=_CHECK_KWARGS):
     """Filter out invalid kwargs to prevent Exception
 
     Don't use this if the funcs
@@ -291,7 +291,7 @@ async def gather(*args, **kwargs): return await aio.gather(*args, **kwargs)
 
 
 async def unzip(
-    zip_path: Union[str, Path], From='', to=DIR, pwd='',
+    zip_path: str | Path, From='', to=DIR, pwd='',
     overwrite_rule: Literal['always', 'skip', 'rename_new', 'rename_old'] = 'skip',
     **kwargs
 ):
@@ -712,7 +712,7 @@ class Single():
     instance = None
 
     @classmethod
-    def get(cls, value: Union[Callable, Any] = None):
+    def get(cls, value: Callable | Any = None):
         if Single.instance is None:
             if callable(value):
                 Single.instance = value()
@@ -725,10 +725,10 @@ class Single():
 async def ffmpeg_(
     input: str,
     out: str,
-    fps: Optional[int] = None,
-    crf: Optional[int] = 20,    # 17 lossless,23,28
+    fps: int | None = None,
+    crf: int | None = 20,    # 17 lossless,23,28
     start: str = '00:00:00',
-    duration: Optional[str] = None,
+    duration: str | None = None,
     encode: Literal['copy', 'h264', 'av1'] = 'copy',
     overwrite=True,
     **kwargs
@@ -760,7 +760,7 @@ async def ffmpeg_(
 
 class Kw_ff_streams(TypedDict):
     index: int
-    codec_name: Union[Literal['h264', 'h265', 'aac'], str]
+    codec_name: Literal['h264', 'h265', 'aac'] | str
     codec_type: Literal['video', 'audio', 'subtitle']
     width: int
     height: int

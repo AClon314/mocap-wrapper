@@ -435,7 +435,7 @@ def savez(npz, new_data, mode: Literal['w', 'a'] = 'a'):
 
 def export(
     pred: dict,
-    file: Union[Path, str] = 'mocap_gvhmr.npz',
+    file: Path | str = 'mocap_gvhmr.npz',
     who=0,
 ):
     """
@@ -560,7 +560,7 @@ def data_remap(pred):
         pred[K]['body_pose'] = pred[K]['body_pose'].reshape(-1, 21, 3)
 
 
-def gvhmr(cfg, Persons: Union[Sequence[int], Set[int], None] = None):
+def gvhmr(cfg, Persons: Sequence[int] | Set[int] | None = None):
     # Log.info(f"[GPU]: {torch.cuda.get_device_name()}")
     Log.info(f'[GPU]: {torch.cuda.get_device_properties("cuda")}')
 
