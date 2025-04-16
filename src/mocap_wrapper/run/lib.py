@@ -1,7 +1,9 @@
 import os
+import gc
 import sys
 import toml
 import argparse
+import inspect
 import numpy as np
 from typing_extensions import deprecated
 from platformdirs import user_config_path
@@ -20,6 +22,27 @@ TYPE_RANGE = tuple[int, int]
 T = TypeVar('T')
 TN = TypeVar('NT', 'np.ndarray', 'torch.Tensor')    # type: ignore
 Log = getLogger(__name__)
+def vram_gb(torch): return torch.cuda.memory_allocated() / 1024 ** 3
+
+
+def free_ram(torch):
+    """def free_ram(): _free_ram(torch)"""
+    vram_before = vram_gb(torch)
+
+    stack = inspect.stack()
+    caller = stack[1]
+    gc.collect()
+    torch.cuda.empty_cache()
+
+    vram_release = vram_gb(torch) - vram_before
+    msg = f"[Free VRAM] {vram_release:.2f} GB at\t{caller.filename}:{caller.lineno}"
+    if vram_release < -0.01:
+        Log.info(msg)
+    elif vram_release > 0.01:
+        Log.warning(msg)
+    else:
+        ...
+        # Log.warning(f'(DEBUG: Need removed) {msg}')
 
 
 def chdir_gitRepo(mod: Literal['gvhmr']):

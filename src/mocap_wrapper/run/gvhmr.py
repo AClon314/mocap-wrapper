@@ -23,12 +23,10 @@ from typing import Literal, Sequence, Set, Union
 from pathlib import Path
 
 try:
-    from mocap_wrapper.run.lib import chdir_gitRepo, continuous, quat_rotAxis, euler
+    from mocap_wrapper.run.lib import chdir_gitRepo, continuous, quat_rotAxis, euler, free_ram as _free_ram
 except ImportError:
-    from lib import chdir_gitRepo, continuous, quat_rotAxis, euler
+    from lib import chdir_gitRepo, continuous, quat_rotAxis, euler, free_ram as _free_ram
 chdir_gitRepo('gvhmr')
-import gc
-import inspect
 import argparse
 from os import symlink
 CRF = 23  # 17 is lossless, every +6 halves the mp4 size
@@ -104,7 +102,7 @@ from hmr4d.utils.net_utils import detach_to_cpu, to_cuda, moving_average_smooth 
 from hmr4d.utils.smplx_utils import make_smplx
 from hmr4d.utils.vis.renderer import Renderer, get_global_cameras_static, get_ground_params_from_points
 from hmr4d.utils.geo_transform import apply_T_on_points, compute_T_ayfz2ay
-def vram_gb(): return torch.cuda.memory_allocated() / 1024 ** 3
+def free_ram(): _free_ram(torch)
 
 
 def parse_args_to_cfg(args=argParser()):
@@ -155,25 +153,6 @@ def parse_args_to_cfg(args=argParser()):
     return cfg
 
 
-def free_ram():
-    vram_before = vram_gb()
-
-    stack = inspect.stack()
-    caller = stack[1]
-    gc.collect()
-    torch.cuda.empty_cache()
-
-    vram_release = vram_gb() - vram_before
-    msg = f"[Free VRAM] {vram_release:.2f} GB at\t{caller.filename}:{caller.lineno}"
-    if vram_release < -0.01:
-        Log.info(msg)
-    elif vram_release > 0.01:
-        Log.warning(msg)
-    else:
-        ...
-        # Log.warning(f'(DEBUG: Need removed) {msg}')
-
-
 def save_bbox(cfg, id_frames, id_bbox_xyxy, ids):
     """TODO: replace yolo_track.npz"""
     for p, i in enumerate(ids):
@@ -198,7 +177,6 @@ def load_yolo_track(cfg):
     person_count = len(ids)
     if not person_count:
         Log.info(f'How many people in the video? {person_count}')
-
     return id_frames, id_bbox_xyxy, ids
 
 
@@ -218,6 +196,7 @@ def get_one_track_patch(self, video_path, cfg):
     frames = torch.tensor(id_frames[id_track])  # (N,)
     bbox_xyxy = torch.tensor(id_bbox_xyxy[id_track])  # (N, 4)
 
+    # TODO: remove interpolate to save size, seperate begins on same person
     # interpolate missing frames
     mask = frame_id_to_mask(frames, get_video_lwh(video_path)[0])
     bbx_xyxy_one_track = rearrange_by_mask(bbox_xyxy, mask)  # (F, 4), missing filled with 0
@@ -475,7 +454,8 @@ def export(
     for K, _K in filter.items():
         if hasattr(pred[K], 'keys'):
             for k in pred[K].keys():
-                key = ';'.join([prefix, key_who, k, _K])
+                # TODO: remove interpolate, detect actually begin frame
+                key = ';'.join([prefix, key_who, '0', k, _K])
                 if k in ['global_orient', 'body_pose']:
                     pred[K][k] = quat_rotAxis(pred[K][k])
                     if IS_EULER:

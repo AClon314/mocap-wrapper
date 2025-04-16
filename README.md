@@ -99,12 +99,12 @@ Will do the following steps for each requirements.txt in [`src/mocap_wrapper/req
 2. use `pip` to install the **rest** packages that startwith `# `. So if you want to do comments, you can use `## `or`#...`without space char.
 
 ### .npz struct
-key: `Armature mapping from`;`Algorithm run`;`who`;`prop[0]`;`prop[1]`...
+key: `Armature mapping from`;`Algorithm run`;`who`;`begin`;`prop[0]`;`prop[1]`...
 
 example: 
-- smplx;gvhmr;person0;body_pose;global = array([...], dtype=...)
-- smplx;wilor;person1;hand_pose;incam = ...
-- smplx;wilor;person1;bbox_xyXY;1 = ... , start from frame 1
+- smplx;gvhmr;person0;0;body_pose;global = array([...], dtype=...)
+- smplx;wilor;person1;9;hand_pose;incam = ...
+- smplx;wilor;person1;1;bbox_xyXY; = ... , start from frame 1
 - smplx;gvhmr;;K = ... , can leave blank
 
 ps:

@@ -355,9 +355,19 @@ async def popen(
     def os_write(): return os.write(FD, p.read_nonblocking(4096))
     if mode == 'realtime':
         while p.isalive():
-            os_write()
+            try:
+                os_write()
+            except pexpect.EOF:
+                break
+            except pexpect.TIMEOUT:
+                Log.warning(f"Timeout: {cmd}")
+            except Exception:
+                raise
             await aio.sleep(0.03)
-        os_write()
+        try:
+            os_write()
+        except pexpect.EOF:
+            pass
     elif mode == 'wait':
         while p.isalive():
             try:

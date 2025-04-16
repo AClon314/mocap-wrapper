@@ -328,9 +328,9 @@ def export(
 
     for i, hand in enumerate(preds):
         LR = 'R' if hand.pop('is_right') > 0.5 else 'L'
-        start = hand.pop('start')
+        begin = hand.pop('begin')
         for k, v in hand.items():
-            key = ';'.join([prefix, f'hand{i}{LR}', k, f'{start}'])
+            key = ';'.join([prefix, f'hand{i}{LR}', f'{begin}', k])
             if not isinstance(v, np.ndarray):
                 print(f"key cast as np.ndarray: {key}")
                 v = np.array(v)
@@ -358,19 +358,20 @@ def data_remap(From, to, frame=0):
     _lack = max(_len - lens, 0)
     if _lack > 0:
         to.extend([{}] * _lack)
+    BLACKLIST = ['pred_vertices', 'scaled_focal_length']
     for i, hand in enumerate(From):
         pred = to[i]
         wilor_preds: dict[str, np.ndarray] = hand["wilor_preds"]
         wilor_preds['bbox'] = hand['hand_bbox']
-        wilor_preds = {K: np.expand_dims(squeeze(v, key=K), axis=0) for K, v in wilor_preds.items() if K not in ['pred_vertices', 'scaled_focal_length']}
+        wilor_preds = {K: np.expand_dims(squeeze(v, key=K), axis=0) for K, v in wilor_preds.items() if K not in BLACKLIST}
         if not IS_EULER:
             for K in ['global_orient', 'hand_pose']:
                 wilor_preds[K] = quat_rotAxis(wilor_preds[K])
         if len(pred) == 0:
             _hand = {
-                'start': frame,
+                'begin': frame,
                 'is_right': hand['is_right'],
-                'scaled_focal_length': hand['scaled_focal_length'],
+                'scaled_focal_length': hand["wilor_preds"]['scaled_focal_length'],
                 **wilor_preds
             }
             to[i] = _hand
@@ -380,7 +381,7 @@ def data_remap(From, to, frame=0):
             for K in _WILOR_KEYS:
                 if K in pred.keys() and K in wilor_preds.keys():
                     pred[K] = np.concatenate((pred[K], wilor_preds[K]), axis=0)
-                else:
+                elif K not in BLACKLIST:
                     print(f"hand{i} {K} not in pred @ {frame}, {pred.keys()}")
 
 
