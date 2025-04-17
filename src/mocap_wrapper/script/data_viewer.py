@@ -99,7 +99,7 @@ def expand_dict(data, prefix='', depth=0) -> dict[str, Any]:
                 expand_dict(v, f'{prefix}{k}{_SEP}', depth)
             else:
                 if isinstance(v, (torch.Tensor, np.ndarray)):
-                    while v.shape[0] == 1:
+                    while v.shape and v.shape[0] == 1:
                         v = v.squeeze(0)
                 if len(_FLAT.keys()) >= _MAX_KEYS:
                     print(f'too many keys, keys.len: {len(_FLAT.keys())}')
@@ -125,17 +125,14 @@ def json_dumps(data, **kwargs):
 def flatten_data(files):
     global _FLAT
     for f in files:
-        try:
-            is_len = len(files) > 1
-            _prefix = prefix(f) if is_len else ''
-            if is_len:
-                if _PY_VAR:
-                    _prefix = _SEP + sub(_prefix)
-                _prefix += _SEP
-            expand_dict(load(f), prefix=_prefix)
-            # globals().update(_FLAT)
-        except Exception as e:
-            print(e)
+        is_len = len(files) > 1
+        _prefix = prefix(f) if is_len else ''
+        if is_len:
+            if _PY_VAR:
+                _prefix = _SEP + sub(_prefix)
+            _prefix += _SEP
+        expand_dict(load(f), prefix=_prefix)
+        # globals().update(_FLAT)
     return _FLAT
 
 

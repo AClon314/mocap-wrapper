@@ -20,9 +20,9 @@ import argparse
 import numpy as np
 from typing import Any, Literal, Optional, get_args
 try:
-    from .lib import squeeze, quat_rotAxis  # for IDE
+    from .lib import squeeze, quat_rotAxis, VIDEO_EXT  # for IDE
 except ImportError:
-    from lib import squeeze, quat_rotAxis  # for python 3.10
+    from lib import squeeze, quat_rotAxis, VIDEO_EXT  # for python 3.10
 from rich.progress import (
     Progress, TextColumn, BarColumn, TaskProgressColumn, MofNCompleteColumn, TimeElapsedColumn, TimeRemainingColumn)
 from sys import platform
@@ -30,7 +30,6 @@ is_win = platform == "win32"
 is_linux = platform == "linux"
 if not is_win:
     os.environ['PYOPENGL_PLATFORM'] = 'egl'  # linux fix
-_IMG = ['jpg', 'jpeg', 'png', 'bmp', 'webp']
 _PREFIX = '_out_'
 _TYPE_WILOR = Literal['bbox', 'betas', 'global_orient', 'hand_pose', 'pred_cam', 'pred_cam_t_full', 'pred_keypoints_2d', 'pred_keypoints_3d', 'pred_vertices', 'scaled_focal_length', ]
 _WILOR_KEYS: tuple[str] = get_args(_TYPE_WILOR)
@@ -568,7 +567,7 @@ def wilor(args: argparse.Namespace, arg: argparse.ArgumentParser):
             TimeElapsedColumn(),
             TimeRemainingColumn(),
         ) as p:
-            if args.input.split('.')[-1].lower() in _IMG:
+            if args.input.split('.')[-1].lower() not in VIDEO_EXT:
                 image_wilor(input=args.input, out_dir=outdir)
             else:
                 video_wilor(input=args.input, out_dir=outdir, progress=p)
