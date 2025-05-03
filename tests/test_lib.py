@@ -1,10 +1,10 @@
+import shutil
 import pytest
 from os import getcwd
 from sys import path as PATH
 CWD = getcwd()
 PATH.append(CWD)
 from mocap_wrapper.install.lib import *
-from mocap_wrapper.install.Gdown import google_drive
 DRY_RUN = False
 ENV = 'test'
 
@@ -29,16 +29,17 @@ async def test_download(urls, kwargs):
         # os.remove(d.path)
 
 
-@pytest.mark.skip(reason="need to pre-install in CI")
+# @pytest.mark.skip(reason="need to pre-install in CI")
 @pytest.mark.parametrize(
-    "From, to",
-    [('output/SMPL_python_v.1.1.0.zip',
-      'output'),]
+    "Zip, From, To",
+    [
+        ('example.zip', None, '.example'),
+    ]
 )
-async def test_unzip(From, to):
-    p = await unzip(From, to, dry_run=DRY_RUN)
+async def test_unzip(Zip, From, To):
+    p = await unzip(Zip, From, To)
+    shutil.rmtree(To)
     assert p.exitstatus == 0, p
-    # os.rmdir(to)
 
 
 @pytest.mark.parametrize(
