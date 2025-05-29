@@ -106,7 +106,6 @@ def getLogger(name=__name__):
 Log = getLogger(__name__)
 
 if __name__ == '__main__':
-    Log = getLogger(__name__)
     Log.debug('Hello, world!')
     # task = PROGRESS_DL.add_task('test', total=10)
     from time import sleep

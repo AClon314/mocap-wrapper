@@ -13,17 +13,14 @@ you need to install trimesh and pyrender if you want to render mesh
 pip install trimesh
 pip install pyrender
 """
-IS_RENDER = False
-IS_EULER = False
+IS_RENDER = IS_RAW = IS_EXPORT_OBJ = False
 OUTDIR = 'output'
+LIGHT_PURPLE = (0.25098039, 0.274117647, 0.65882353)
 import os
 import argparse
 import numpy as np
-from typing import Any, Literal, Optional, get_args
-try:
-    from .lib import squeeze, quat_rotAxis, VIDEO_EXT  # for IDE
-except ImportError:
-    from lib import squeeze, quat_rotAxis, VIDEO_EXT  # for python 3.10 # type: ignore
+from typing import Literal, get_args
+from lib import quat_rotAxis, savez, squeeze, VIDEO_EXT
 from rich.progress import (
     Progress, TextColumn, BarColumn, TaskProgressColumn, MofNCompleteColumn, TimeElapsedColumn, TimeRemainingColumn)
 from sys import platform
@@ -308,12 +305,6 @@ class Renderer:
             scene.add_node(node)
 
 
-def savez(npz, new_data, mode: Literal['w', 'a'] = 'a'):
-    if mode == 'a' and os.path.exists(npz):
-        new_data = {**np.load(npz, allow_pickle=True), **new_data}
-    np.savez_compressed(npz, **new_data)
-
-
 def export(
     preds: list[dict[str, np.ndarray | float | int]],
     file='mocap_wilor.npz',
@@ -331,10 +322,15 @@ def export(
         begin = hand.pop('begin')
         for k, v in hand.items():
             key = ';'.join([prefix, f'hand{i}{LR}', f'{begin}', k])
+
+            if not IS_RAW and k in ['global_orient', 'hand_pose']:
+                v = quat_rotAxis(v)
+
             if not isinstance(v, np.ndarray):
                 print(f"key cast as np.ndarray: {key}")
                 v = np.array(v)
             data[key] = v
+
     savez(file, data)
 
 
@@ -364,9 +360,6 @@ def data_remap(From, to, frame=0):
         wilor_preds: dict[str, np.ndarray] = hand["wilor_preds"]
         wilor_preds['bbox'] = hand['hand_bbox']
         wilor_preds = {K: np.expand_dims(squeeze(v, key=K), axis=0) for K, v in wilor_preds.items() if K not in BLACKLIST}
-        if not IS_EULER:
-            for K in ['global_orient', 'hand_pose']:
-                wilor_preds[K] = quat_rotAxis(wilor_preds[K])
         if len(pred) == 0:
             _hand = {
                 'begin': frame,
@@ -401,7 +394,6 @@ def Import():
 
 def image_wilor(input='img.png', out_dir=OUTDIR):
     WiLorHandPose3dEstimationPipeline = Import()
-    LIGHT_PURPLE = (0.25098039, 0.274117647, 0.65882353)
     device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
     dtype = torch.float16
 
@@ -433,9 +425,8 @@ def image_wilor(input='img.png', out_dir=OUTDIR):
                 scene_bg_color=(1, 1, 1),
                 focal_length=scaled_focal_length,
             )
-            tmesh = renderer.vertices_to_trimesh(
-                verts, cam_t.copy(), LIGHT_PURPLE, is_right=is_right)
-            tmesh.export(os.path.join(out_dir, f'{filename}_hand{i:02d}.obj'))
+            export_obj(renderer, verts, cam_t, is_right,
+                       os.path.join(out_dir, f'{filename}_hand{i:02d}.obj'))
             cam_view = renderer.render_rgba(
                 verts, cam_t=cam_t,
                 render_res=[image.shape[1], image.shape[0]],
@@ -455,9 +446,14 @@ def image_wilor(input='img.png', out_dir=OUTDIR):
         cv2.imwrite(os.path.join(out_dir, _PREFIX + filename + '.webp'), render_image)
 
 
+def export_obj(renderer, verts, cam_t, is_right, out='{filename}_hand{idx:02d}.obj'):
+    tmesh = renderer.vertices_to_trimesh(
+        verts, cam_t.copy(), LIGHT_PURPLE, is_right=is_right)
+    tmesh.export(out)
+
+
 def video_wilor(input='video.mp4', out_dir=OUTDIR, progress: Progress | None = None):
     WiLorHandPose3dEstimationPipeline = Import()
-    LIGHT_PURPLE = (0.25098039, 0.274117647, 0.65882353)
     device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
     dtype = torch.float16
 
@@ -480,8 +476,14 @@ def video_wilor(input='video.mp4', out_dir=OUTDIR, progress: Progress | None = N
 
     # Create VideoWriter object
     output_path = os.path.join(out_dir, _PREFIX + file)  # tmp
-    fourcc = cv2.VideoWriter_fourcc(*'mp4v')
+    fourcc = cv2.VideoWriter_fourcc(*'mp4v')  # type:ignore
     vout = cv2.VideoWriter(output_path, fourcc, fps, (width, height)) if IS_RENDER else None
+
+    if IS_EXPORT_OBJ:
+        output_path_obj = os.path.join(out_dir, 'obj')
+        os.makedirs(output_path_obj, exist_ok=True)
+    else:
+        output_path_obj = None
 
     preds: list[dict] = []  # hands, frames
     frame_count = 0
@@ -494,6 +496,15 @@ def video_wilor(input='video.mp4', out_dir=OUTDIR, progress: Progress | None = N
 
         _pred = pipe.predict(image)  # hands per frame
         data_remap(_pred, preds, frame_count)
+
+        if output_path_obj:
+            for i, out in enumerate(_pred):
+                wilor_preds = out["wilor_preds"]
+                is_right = out['is_right']
+                verts = wilor_preds['pred_vertices'][0]
+                cam_t = wilor_preds['pred_cam_t_full'][0]
+                export_obj(renderer, verts, cam_t, is_right,
+                           os.path.join(output_path_obj, f'{filename}_hand{i:02d}_{frame_count}.obj'))
 
         if IS_RENDER:
             render_image = image.copy()
@@ -511,7 +522,6 @@ def video_wilor(input='video.mp4', out_dir=OUTDIR, progress: Progress | None = N
                     scene_bg_color=(1, 1, 1),
                     focal_length=scaled_focal_length,
                 )
-                # tmesh = renderer.vertices_to_trimesh(verts, cam_t.copy(), LIGHT_PURPLE, is_right=is_right)
                 cam_view = renderer.render_rgba(
                     verts, cam_t=cam_t,
                     render_res=[image.shape[1], image.shape[0]],
@@ -541,15 +551,19 @@ def argParser():
     arg = argparse.ArgumentParser()
     arg.add_argument('-i', '--input', metavar='in.mp4')
     arg.add_argument('-o', '--outdir', metavar=OUTDIR, default=OUTDIR)
-    arg.add_argument('--euler', action='store_true', help='use euler angles on bones rotation. Default is quaternion.')
+    arg.add_argument('--raw', action='store_true', help='raw data, NO axis angle to quaternion')
     arg.add_argument('--render', action='store_true', help='render hands mesh to video')
+    arg.add_argument('--obj', action='store_true', help='export hands mesh to .obj')
     args, _args = arg.parse_known_args()
     if args.render:
         global IS_RENDER
         IS_RENDER = True
-    global IS_EULER
-    if args.euler:
-        IS_EULER = True
+    if args.obj:
+        global IS_EXPORT_OBJ
+        IS_EXPORT_OBJ = True
+    if args.raw:
+        global IS_RAW
+        IS_RAW = True
     if not args.input:
         arg.print_help()
         exit(1)

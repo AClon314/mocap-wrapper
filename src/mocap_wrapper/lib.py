@@ -899,10 +899,10 @@ def need_ffmpeg(from_file, Range='', fps_times=5):
         is_ffmpeg = True
         r = [r.total_seconds() for r in range_time(Range)]
         kw.update({'ss': r[0], 't': r[1]})
-    elif from_fps != to_fps:
+    if is_diff_fps := from_fps != to_fps:
         is_ffmpeg = True
         kw.update({'r': to_fps})
-    else:
+    if not Range and not is_diff_fps:
         is_ffmpeg = is_vbr(metadata)
     return kw, is_ffmpeg
 

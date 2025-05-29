@@ -136,7 +136,7 @@ def flatten_data(files):
     return _FLAT
 
 
-def convert_npt(files: list, outname=_OUTNAME, save=True, Print=False):
+def convert_npt(files: list, outname=_OUTNAME, save=False, Print=False):
     """```python
     _GLOBAL = convert_npt(files=[])
     globals().update(_GLOBAL)

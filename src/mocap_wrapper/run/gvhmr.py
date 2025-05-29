@@ -21,11 +21,7 @@ For commercial uses of this software, please send email to xwzhou@zju.edu.cn
 """
 from typing import Literal, Sequence, Set, Union
 from pathlib import Path
-
-try:
-    from mocap_wrapper.run.lib import chdir_gitRepo, continuous, quat_rotAxis, euler, free_ram as _free_ram
-except ImportError:
-    from lib import chdir_gitRepo, continuous, quat_rotAxis, euler, free_ram as _free_ram
+from lib import savez, chdir_gitRepo, continuous, quat_rotAxis, euler, free_ram as _free_ram
 chdir_gitRepo('gvhmr')
 import argparse
 from os import symlink
@@ -425,12 +421,6 @@ def render_global(cfg):
         img = renderer.render_with_ground(verts_glob[[i]], color[None], cameras, global_lights)
         writer.write_frame(img)
     writer.close()
-
-
-def savez(npz, new_data, mode: Literal['w', 'a'] = 'a'):
-    if mode == 'a' and Path(npz).exists():
-        new_data = {**np.load(npz, allow_pickle=True), **new_data}
-    np.savez_compressed(npz, **new_data)
 
 
 def export(

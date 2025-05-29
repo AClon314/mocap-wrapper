@@ -8,12 +8,12 @@ import numpy as np
 from typing_extensions import deprecated
 from platformdirs import user_config_path
 from types import ModuleType
-from typing import Literal, Sequence, TypeVar
+from typing import Any, Literal, Sequence, TypeVar
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))  # relative import
 try:
-    from ..logger import getLogger, cleanup
+    from ..logger import Log, cleanup
 except ImportError:
-    from logger import getLogger, cleanup   # type: ignore
+    from logger import Log, cleanup   # type: ignore
 cleanup()
 VIDEO_EXT = "webm,mkv,flv,flv,vob,vob,ogv,ogg,drc,gifv,webm,gifv,mng,avi,mov,qt,wmv,yuv,rm,rmvb,viv,asf,amv,mp4,m4p,m4v,mpg,mp2,mpeg,mpe,mpv,mpg,mpeg,m2v,m4v,svi,3gp,3g2,mxf,roq,nsv,flv,f4v,f4p,f4a,f4b".split(',')
 MAPPING = {
@@ -22,8 +22,13 @@ MAPPING = {
 TYPE_RANGE = tuple[int, int]
 T = TypeVar('T')
 TN = TypeVar('NT', 'np.ndarray', 'torch.Tensor')    # type: ignore
-Log = getLogger(__name__)
 def vram_gb(torch): return torch.cuda.memory_allocated() / 1024 ** 3
+
+
+def savez(npz: str, new_data: dict[str, Any], mode: Literal['w', 'a'] = 'a'):
+    if mode == 'a' and os.path.exists(npz):
+        new_data = {**np.load(npz, allow_pickle=True), **new_data}
+    np.savez_compressed(npz, **new_data)
 
 
 def free_ram(torch):
