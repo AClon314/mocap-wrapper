@@ -1,4 +1,5 @@
 rich
+toml
 numpy
 gdown   # optinal?
 aiohttp

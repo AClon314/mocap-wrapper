@@ -5,8 +5,8 @@ import atexit
 import logging
 from os import environ, path
 IS_DEBUG = False
-_LOGLEVEL = environ.get('LOGLVL')
-if _LOGLEVEL and _LOGLEVEL.upper() == 'DEBUG':
+_LOGLEVEL = environ.get('LOG')
+if _LOGLEVEL and _LOGLEVEL.upper().startswith('D'):
     IS_DEBUG = True
 _LOGLEVEL = (_LOGLEVEL or 'INFO').upper()[0]
 _DATEFMT = '%H:%M:%S'
@@ -102,6 +102,8 @@ def getLogger(name=__name__):
     Log.propagate = False
     return Log
 
+
+Log = getLogger(__name__)
 
 if __name__ == '__main__':
     Log = getLogger(__name__)

@@ -1,20 +1,22 @@
-import shutil
 import pytest
+import shutil
+import logging
+import numpy as np
 from os import getcwd
 from sys import path as PATH
+from mocap_wrapper.run.lib import euler, quat_rotAxis
 CWD = getcwd()
 PATH.append(CWD)
 from mocap_wrapper.install.lib import *
 DRY_RUN = False
 ENV = 'test'
-
-
 URLS = [
     # 'https://dldir1.qq.com/qqfile/qq/PCQQ9.7.17/QQ9.7.17.29225.exe',  # CN: 200MB
     # 'http://speedtest.zju.edu.cn/100M',
     # 'https://speed.cloudflare.com/__down?during=download&bytes=104857600',   # GLOBAL: 100MB
     'https://gitlab.com/libeigen/eigen/-/archive/3.4.0/eigen-3.4.0.zip',  # 3MB
 ]
+Log = logging.getLogger(__name__)
 
 
 @pytest.mark.parametrize(
@@ -102,7 +104,21 @@ async def test_ffmpeg(video, dry_run=False):
 )
 def test_range_time(text):
     Range = range_time(text)
-    Log.info(Range)
+
+
+@pytest.mark.parametrize(
+    "rot",
+    [
+        [1, 1, 1],
+    ]
+)
+def test_rod(rot):
+    if not hasattr(rot, 'shape'):
+        rot = np.array(rot)
+    Quat = quat_rotAxis(rot)
+    Euler = euler(Quat)
+    Log.info(Quat)
+    Log.info(Euler)
 
 
 @pytest.fixture(scope="function", autouse=True)

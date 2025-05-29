@@ -79,10 +79,11 @@ async def i_gvhmr_models(Dir=DIR_GVHMR, **kwargs):
 
 
 async def i_gvhmr(Dir=DIR_GVHMR, env=ENV, **kwargs):
-    Log.info("📦 Install GVHMR")
+    Log.info(f"📦 Install GVHMR at {DIR_GVHMR}")
     if not os.path.exists(Dir):
         os.makedirs(Dir)
         p = await popen('git clone https://github.com/zju3dv/GVHMR .', Raise=False, **kwargs)
+    os.chdir(DIR_GVHMR)
     i_gvhmr_config(Dir)
     p = mamba(env=env, python='3.10', **kwargs)
     dir_checkpoints = path_expand(os.path.join(Dir, 'inputs', 'checkpoints'))
@@ -92,15 +93,11 @@ async def i_gvhmr(Dir=DIR_GVHMR, env=ENV, **kwargs):
         txt = res_path(file='gvhmr.txt')
         p = await mamba(env=env, txt=txt, **kwargs)
         p = await txt_pip_retry(txt, env=env)
-        return p
-
-    async def git_mamba():
-        p = await git_pull()
         p = await mamba(f'pip install -e {Dir}', env=env, **kwargs)
         return p
 
     tasks = [
-        git_mamba(),
+        git_pull(),
         i_gvhmr_post(),
         # i_dpvo(Dir=os.path.join(Dir, 'third-party/DPVO'), env=env, **kwargs),
         i_gvhmr_models(Dir=dir_checkpoints, **kwargs)

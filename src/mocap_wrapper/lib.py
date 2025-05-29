@@ -20,8 +20,7 @@ from platformdirs import user_config_path
 from importlib.resources import path as _res_path
 from importlib.metadata import version as _version
 from worker import worker    # type: ignore
-from logging import getLogger
-from mocap_wrapper.logger import IS_DEBUG, PROGRESS_DL
+from mocap_wrapper.logger import IS_DEBUG, PROGRESS_DL, Log
 from types import SimpleNamespace
 from typing import Any, Callable, Coroutine, Dict, List, Literal, Optional, ParamSpec, Sequence, Tuple, TypeVar, TypedDict, Union, Unpack, cast, get_args, overload
 from typing_extensions import deprecated
@@ -50,7 +49,6 @@ RUNS = get_args(TYPE_RUNS)
 DIR_SELF = os.path.dirname(os.path.abspath(__file__))
 PACKAGE = __package__ if __package__ else os.path.basename(DIR_SELF)
 __version__ = _version(PACKAGE)
-Log = getLogger(__name__)
 is_linux = platform == 'linux'
 is_win = platform == 'win32'
 is_mac = platform == 'darwin'
@@ -349,7 +347,7 @@ async def popen(
     Returns:
         process (pexpect.spawn):
     """
-    Log.info(f"{mode}: '{cmd}'")
+    Log.info(f"{mode}: {cmd=}")
     p = pexpect.spawn(cmd, timeout=timeout, **kwargs)
     FD = sys.stdout.fileno()
     def os_write(): return os.write(FD, p.read_nonblocking(4096))

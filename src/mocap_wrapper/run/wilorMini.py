@@ -14,6 +14,7 @@ pip install trimesh
 pip install pyrender
 """
 IS_RENDER = False
+IS_EULER = False
 OUTDIR = 'output'
 import os
 import argparse
@@ -22,7 +23,7 @@ from typing import Any, Literal, Optional, get_args
 try:
     from .lib import squeeze, quat_rotAxis, VIDEO_EXT  # for IDE
 except ImportError:
-    from lib import squeeze, quat_rotAxis, VIDEO_EXT  # for python 3.10
+    from lib import squeeze, quat_rotAxis, VIDEO_EXT  # for python 3.10 # type: ignore
 from rich.progress import (
     Progress, TextColumn, BarColumn, TaskProgressColumn, MofNCompleteColumn, TimeElapsedColumn, TimeRemainingColumn)
 from sys import platform
@@ -547,7 +548,6 @@ def argParser():
         global IS_RENDER
         IS_RENDER = True
     global IS_EULER
-    IS_EULER = False
     if args.euler:
         IS_EULER = True
     if not args.input:

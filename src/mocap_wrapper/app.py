@@ -4,12 +4,11 @@ import atexit
 import argparse
 import asyncio as aio
 from typing import Any, Coroutine, Sequence
-from mocap_wrapper.logger import IS_DEBUG, cleanup
-from mocap_wrapper.lib import DIR, RUNS, CONFIG, PACKAGE, TYPE_RUNS, QRCODE, ffmpeg_or_link, gather, getLogger, mkdir, path_expand, res_path, __version__
+from mocap_wrapper.logger import IS_DEBUG, cleanup, Log
+from mocap_wrapper.lib import DIR, RUNS, CONFIG, PACKAGE, TYPE_RUNS, QRCODE, ffmpeg_or_link, gather, mkdir, path_expand, res_path, __version__
 from mocap_wrapper.install.lib import ENV, install, async_queue, mamba
 DEFAULT: Sequence[TYPE_RUNS] = ('wilor', 'gvhmr')
 OUTPUT_DIR = os.path.join(DIR, 'output')
-Log = getLogger(__name__)
 def version(): return f'{PACKAGE} {__version__} 👻\tconfig: {CONFIG.path}\tcode: https://github.com/AClon314/mocap-wrapper'
 # TODO： 兼容notebook环境pip，避免循环导入，解耦模块
 

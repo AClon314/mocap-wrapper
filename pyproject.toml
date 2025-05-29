@@ -35,7 +35,7 @@ requires-python = ">=3.11" # 💡 you can remove the codes about `typing Unpack`
 dependencies = {file = ["requirements.txt"]}
 
 [project.optional-dependencies]
-dev = ["pytest", "pytest-asyncio", "fake-bpy-module-4.3"]
+dev = ["pytest", "pytest-asyncio", "fake-bpy-module-4.3", "plotly"]
 
 [project.urls]
 Download = "http://github.com/AClon314/mocap-wrapper/releases"

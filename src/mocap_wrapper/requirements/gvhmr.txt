@@ -39,7 +39,7 @@ joblib
 trimesh # 3D-Vision
 pycolmap
 ## git+https://github.com/facebookresearch/pytorch3d.git # for windows?
-# pytorch3d @ https://dl.fbaipublicfiles.com/pytorch3d/packaging/wheels/py310_cu121_pyt230/pytorch3d-0.7.6-cp310-cp310-linux_x86_64.whl
+# pytorch3d@https://dl.fbaipublicfiles.com/pytorch3d/packaging/wheels/py310_cu121_pyt230/pytorch3d-0.7.6-cp310-cp310-linux_x86_64.whl
 ## open3d>=0.17.0
 
 ultralytics>=8.2.42  # 2D-Pose, YOLO

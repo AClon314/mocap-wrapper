@@ -48,6 +48,7 @@ Rank: [body🕺](https://paperswithcode.com/task/3d-human-pose-estimation "3D人
 - hand: no constant tracking for video(just no yolo, ready for photo but not video)
 
 ### software:non-OpenSource
+- [🕺👋👤-文🎵 Genmo （Nvidia Lab）](https://research.nvidia.com/labs/dair/genmo/)
 - [🕺👋👤Look Ma, no markers: holistic performance capture without the hassle](https://www.youtube.com/watch?v=4RkLDW3GmdY)
 - [👤D-ViT](https://arxiv.org/abs/2411.07167v1 "Cascaded Dual Vision Transformer for Accurate Facial Landmark Detection")
 
