@@ -5,7 +5,7 @@ import toml
 import argparse
 import inspect
 import numpy as np
-from typing_extensions import deprecated
+from pathlib import Path
 from platformdirs import user_config_path
 from types import ModuleType
 from typing import Any, Literal, Sequence, TypeVar
@@ -25,7 +25,7 @@ TN = TypeVar('NT', 'np.ndarray', 'torch.Tensor')    # type: ignore
 def vram_gb(torch): return torch.cuda.memory_allocated() / 1024 ** 3
 
 
-def savez(npz: str, new_data: dict[str, Any], mode: Literal['w', 'a'] = 'a'):
+def savez(npz: 'str|Path', new_data: dict[str, Any], mode: Literal['w', 'a'] = 'a'):
     if mode == 'a' and os.path.exists(npz):
         new_data = {**np.load(npz, allow_pickle=True), **new_data}
     np.savez_compressed(npz, **new_data)
@@ -445,7 +445,6 @@ def quat_rotAxis(arr: TN) -> TN: return RotMat_to_quat(Rodrigues(arr))
 def Axis(is_torch=False): return 'dim' if is_torch else 'axis'
 
 
-@deprecated('use `quat_rotAxis`')
 def quat(xyz: TN) -> TN:
     """euler to quat
     Args:

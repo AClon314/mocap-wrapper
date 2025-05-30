@@ -19,7 +19,7 @@ LIGHT_PURPLE = (0.25098039, 0.274117647, 0.65882353)
 import os
 import argparse
 import numpy as np
-from typing import Literal, get_args
+from typing import Literal, Sequence, get_args
 from lib import quat_rotAxis, savez, squeeze, VIDEO_EXT
 from rich.progress import (
     Progress, TextColumn, BarColumn, TaskProgressColumn, MofNCompleteColumn, TimeElapsedColumn, TimeRemainingColumn)
@@ -336,49 +336,100 @@ def export(
 
 def data_remap(From: list[dict], to: list[dict], frame=0):
     """
-    remap preds data for `export()`
+    remap preds data for `export()` per frame
 
     Args:
         From: list of dicts, each dict contains hand predictions for a frame
         to: list of dicts, each dict will be updated with the remapped data
 
     ```python
-    preds: list[dict] = []
+    to_preds: list[dict] = []
     frame_count = 0
     while cap.isOpened():
         ...
-        _pred = pipe.predict(image)
-        data_remap(_pred, preds, frame_count)
-    export(preds, os.path.join(out_dir, f'mocap_{filename}.npz'))
+        From_pred = pipe.predict(image)
+        data_remap(From_pred, to_preds, frame_count)
+    export(to_preds, ...)
     ```"""
     _len = len(From)
     lens = len(to)
-    print(f"Changed: {_len} hands @ frame {frame}") if _len != lens else None
-    _lack = max(_len - lens, 0)
-    if _lack > 0:
-        to.extend([{}] * _lack)
+    print(f"⚠️ Changed: {_len} hands @ {frame=}") if _len != lens else None
     BLACKLIST = ['pred_vertices', 'scaled_focal_length']    # won't save these
-    for i, hand in enumerate(From):
-        pred = to[i]
-        wilor_preds: dict[str, np.ndarray] = hand["wilor_preds"]
-        wilor_preds['bbox'] = hand['hand_bbox']
+    TO_I = set()
+    # print(f'{frame=}{_FROM_I=}')
+    for _i, _hand in enumerate(From):
+        # ensure to only match with not done hands
+        i_to = match_nearest_hand(_hand, to, frame=frame, done_idx=TO_I)
+        if i_to is None:
+            i_to = len(to)
+            to.append({})
+        hand = to[i_to]
+        TO_I.add(i_to)
+        wilor_preds: dict[str, np.ndarray] = _hand["wilor_preds"]
+        wilor_preds['bbox'] = _hand['hand_bbox']
         wilor_preds = {K: np.expand_dims(squeeze(v, key=K), axis=0) for K, v in wilor_preds.items() if K not in BLACKLIST}
-        if len(pred) == 0:
-            _hand = {
+
+        print(f'{i_to is None=}\t{len(hand)==0=}') if (i_to is None) != (len(hand) == 0) else None
+
+        if len(hand) == 0:
+            print(f"➕ hand{i_to} created @ {frame=}")
+            __hand = {
                 'begin': frame,
-                'is_right': hand['is_right'],
-                'scaled_focal_length': hand['wilor_preds']['scaled_focal_length'],
+                'is_right': _hand['is_right'],
+                'scaled_focal_length': _hand['wilor_preds']['scaled_focal_length'],
                 **wilor_preds
             }
-            to[i] = _hand
+            to[i_to] = __hand
         else:
-            if hand['is_right'] != pred['is_right']:
-                print(f"hand{i} is_right changed @ {frame}")    # TODO: 每一帧手的 ID/左右标识 不一样, 用上一帧bbox来就近匹配
+            if _hand['is_right'] != hand['is_right']:
+                print(f"❌ hand{_i} is_right changed @ {frame=}")   # this shouldn't happen
             for K in _WILOR_KEYS:
-                if K in pred.keys() and K in wilor_preds.keys():
-                    pred[K] = np.concatenate((pred[K], wilor_preds[K]), axis=0)
+                if K in hand.keys() and K in wilor_preds.keys():
+                    hand[K] = np.concatenate((hand[K], wilor_preds[K]), axis=0)
                 elif K not in BLACKLIST:
-                    print(f"hand{i} {K} not in pred @ {frame}, {pred.keys()}")
+                    print(f"hand{_i} {K} not in pred @ {frame=}, {hand.keys()}")  # this shouldn't happen
+
+
+def match_nearest_hand(_hand: dict, to: list[dict], frame: int, done_idx: set[int] = set(), max_error=50.0) -> int | None:
+    """
+    根据bbox和is_right找到最佳匹配的手部索引
+
+    Args:
+        _hand: From的当前手
+        to: _hand 在 `to[frame-1]` 内查找
+        frame: current frame
+        done_idx: exclude these idx from `to`
+
+    Returns:
+        最佳匹配的索引，如果没有找到则返回None
+    """
+    _bbox = np.array(_hand['hand_bbox'])
+    _is_right = _hand['is_right']
+    min_distance = float('inf')
+    index = None
+
+    for i, hand in enumerate(to):
+        # 跳过空预测 或 已匹配
+        if len(hand) == 0 or i in done_idx:
+            continue
+
+        # 优先匹配相同的左右手标识
+        if hand.get('is_right') == _is_right and 'bbox' in hand:
+            bbox = hand['bbox'][max(0, min(frame, len(hand['bbox'])) - 1)]
+            if bbox.shape == _bbox.shape:
+                # 计算bbox中心点距离
+                from_center = np.array([
+                    (_bbox[0] + _bbox[2]) / 2,
+                    (_bbox[1] + _bbox[3]) / 2])
+                to_center = np.array([
+                    (bbox[0] + bbox[2]) / 2,
+                    (bbox[1] + bbox[3]) / 2])
+                distance = np.linalg.norm(from_center - to_center)
+                if distance < min_distance:
+                    min_distance = distance
+                    index = i
+    print(f'{min_distance=} @ {frame=}') if min_distance > max_error else None
+    return index
 
 
 def Import():

@@ -15,11 +15,7 @@ try:
     from typing import Any
 except ImportError as e:
     ...
-_FILE = [
-    # '/home/n/document/code/mocap/output/0_input_video/0_input_video.mp4_hand00.pt',
-    # '/home/n/document/code/mocap/output/hands_easy✋/hands_easy✋.pt',
-    # '/home/n/document/code/mocap/output/背越式跳高（慢动作）/mocap_背越式跳高（慢动作）.npz',
-]
+_FILE = []
 _MAX_DEPTH = 4
 _MAX_KEYS = 100
 _PY_VAR = True
@@ -31,7 +27,7 @@ def Type(v): return str(type(v))[8:-2]
 def sub(str): return re.sub(r'[^a-zA-Z0-9_]', '_', str)
 def prefix(file) -> str: return os.path.splitext(os.path.basename(file))[0]
 def is_dict(v): return hasattr(v, 'keys')
-def is_list(v): return hasattr(v, '__getitem__') and not is_dict(v) and not isinstance(v, str)
+def is_list(v): return hasattr(v, '__getitem__') and hasattr(v, '__len__') and getattr(v, 'ndim', 0) != 0 and not is_dict(v) and not isinstance(v, str)
 def load_np(file): return np.load(file, allow_pickle=True)
 def load_pt(file): return torch.load(file)
 
@@ -87,8 +83,11 @@ def expand_dict(data, prefix='', depth=0) -> dict[str, Any]:
 
     if is_list(data):
         print(f'list: {prefix} len: {len(data)}')
-        for i, x in enumerate(data):
-            expand_dict(x, f'{prefix}列{i}{_SEP}', depth)
+        if len(data) > 0 and is_dict(data[0]):
+            for i, x in enumerate(data):
+                expand_dict(x, f'{prefix}列{i}{_SEP}', depth)
+        else:
+            _FLAT[prefix] = data
     elif is_dict(data):
         for k, v in data.items():
             if _PY_VAR:

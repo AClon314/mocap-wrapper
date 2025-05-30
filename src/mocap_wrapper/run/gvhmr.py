@@ -19,9 +19,9 @@ from the source form of this work.
  
 For commercial uses of this software, please send email to xwzhou@zju.edu.cn
 """
-from typing import Literal, Sequence, Set, Union
+from typing import Sequence, Set
 from pathlib import Path
-from lib import savez, chdir_gitRepo, continuous, quat_rotAxis, euler, free_ram as _free_ram
+from lib import Rodrigues, RotMat_to_quat, savez, chdir_gitRepo, continuous, euler, free_ram as _free_ram
 chdir_gitRepo('gvhmr')
 import argparse
 from os import symlink
@@ -436,67 +436,71 @@ def export(
     data = {}
     prefix = 'smplx;gvhmr'
     key_who = f'person{who}'
-    filter = {
-        'smpl_params_global': 'global',
-        'smpl_params_incam': 'incam',
-    }
+    R = {'incam': Rodrigues(pred['smpl_params_incam']['global_orient'])}
+    K = 'smpl_params_global'
+    if hasattr(pred[K], 'keys'):
+        for k in pred[K].keys():
+            # TODO: remove interpolate, detect actually begin frame
+            if k == 'betas':
+                pred[K][k] = pred[K][k][0]
+            key = ';'.join([prefix, key_who, '0', k])
+            if k in ('global_orient', 'body_pose'):
+                _R = Rodrigues(pred[K][k])
+                if k == 'global_orient':
+                    R['global'] = _R
+                pred[K][k] = RotMat_to_quat(_R)
+                if IS_EULER:
+                    pred[K][k] = euler(pred[K][k])
+            data[key] = pred[K][k].cpu().numpy()
+    else:
+        # 基本不会执行这里
+        key = ';'.join([prefix, '', K])
+        data[key] = pred[K].cpu().numpy()
 
-    for K, _K in filter.items():
-        if hasattr(pred[K], 'keys'):
-            for k in pred[K].keys():
-                # TODO: remove interpolate, detect actually begin frame
-                key = ';'.join([prefix, key_who, '0', k, _K])
-                if k in ['global_orient', 'body_pose']:
-                    pred[K][k] = quat_rotAxis(pred[K][k])
-                    if IS_EULER:
-                        pred[K][k] = euler(pred[K][k])
-                data[key] = pred[K][k].cpu().numpy()
-        else:
-            # 基本不会执行这里
-            key = ';'.join([prefix, '', K])
-            data[key] = pred[K].cpu().numpy()
+    prefix = f'{prefix};cam@{key_who};0'
+    cam_R, cam_T = camera_extrinsics(
+        R['global'],
+        R['incam'],
+        pred['smpl_params_global']['transl'],
+        pred['smpl_params_incam']['transl'],
+    )
+    cam_R = RotMat_to_quat(cam_R).cpu().numpy()
+    cam_T = cam_T.cpu().numpy()
+    data[f'{prefix};global_orient'] = cam_R
+    data[f'{prefix};transl'] = cam_T
 
     savez(file, data)
 
 
-def find_camera_extrinsics(verts_world, verts_camera):
+def camera_extrinsics(R_global, R_incam, trans_global, trans_incam):
     """
-    Find camera extrinsics (R, T) given vertices in world and camera coordinate systems.
-    https://github.com/zju3dv/GVHMR/issues/30
+    计算每帧的相机外参 (R, T)，将全局坐标系转换为相机坐标系。
 
     Args:
-        verts_world: (N, 3) Vertices in world coordinates.
-        verts_camera: (N, 3) Vertices in camera coordinates.
+        rot_global: (N, 3, 3) 全局坐标系下人体的旋转矩阵。
+        rot_incam: (N, 3, 3) 相机坐标系下人体的旋转矩阵。
+        trans_global: (N, 3) 全局坐标系下人体的平移向量。
+        trans_incam: (N, 3) 相机坐标系下人体的平移向量。
 
     Returns:
-        R: (3, 3) Rotation matrix.
-        T: (3,) Translation vector.
+        R_list: (N, 3, 3) 每帧的旋转矩阵。
+        T_list: (N, 3) 每帧的平移向量。
     """
-    # Compute centroids
-    centroid_world = verts_world.mean(dim=0)
-    centroid_camera = verts_camera.mean(dim=0)
+    N = R_global.shape[0]
+    R_list = []
+    T_list = []
 
-    # Center the points
-    centered_verts_world = verts_world - centroid_world
-    centered_verts_camera = verts_camera - centroid_camera
+    for i in range(N):
+        # 计算当前帧的相机旋转矩阵 R[i]
+        R_i = R_incam[i] @ R_global[i].T  # 矩阵乘法
 
-    # Compute the cross-covariance matrix
-    H = centered_verts_camera.T @ centered_verts_world
+        # 计算当前帧的相机平移向量 T[i]
+        T_i = trans_incam[i] - R_i @ trans_global[i]
 
-    # Perform SVD
-    U, _, Vt = torch.linalg.svd(H)
+        R_list.append(R_i)
+        T_list.append(T_i)
 
-    # Compute rotation matrix
-    R = U @ Vt
-    # Ensure R is a proper rotation matrix
-    if torch.det(R) < 0:
-        U[:, -1] *= -1  # Adjust U if determinant is negative
-        R = U @ Vt
-
-    # Compute translation vector
-    T = centroid_camera - R @ centroid_world
-
-    return R, T
+    return torch.stack(R_list), torch.stack(T_list)
 
 
 def per_person(cfg):
@@ -546,8 +550,9 @@ def per_person(cfg):
 
 
 def data_remap(pred):
-    for K in ('smpl_params_global', 'smpl_params_incam'):
-        pred[K]['body_pose'] = pred[K]['body_pose'].reshape(-1, 21, 3)
+    del pred['smpl_params_incam']['betas']
+    del pred['smpl_params_incam']['body_pose']
+    pred['smpl_params_global']['body_pose'] = pred['smpl_params_global']['body_pose'].reshape(-1, 21, 3)
 
 
 def gvhmr(cfg, Persons: Sequence[int] | Set[int] | None = None):
