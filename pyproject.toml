@@ -13,7 +13,7 @@ keywords = ["mocap", "pose estimate", "blender", "unreal"]
 license = {file = "LICENSE"}
 name = "mocap-wrapper"
 readme = "README.md"
-version = "0.2.0"
+version = "0.2.1"
 
 classifiers = [
   "License :: OSI Approved :: MIT License",

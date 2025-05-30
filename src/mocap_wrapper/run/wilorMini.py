@@ -334,10 +334,13 @@ def export(
     savez(file, data)
 
 
-def data_remap(From, to, frame=0):
+def data_remap(From: list[dict], to: list[dict], frame=0):
     """
     remap preds data for `export()`
-    TODO: 每一帧手的 ID/左右标识 不一样, 用上一帧bbox来就近匹配
+
+    Args:
+        From: list of dicts, each dict contains hand predictions for a frame
+        to: list of dicts, each dict will be updated with the remapped data
 
     ```python
     preds: list[dict] = []
@@ -354,7 +357,7 @@ def data_remap(From, to, frame=0):
     _lack = max(_len - lens, 0)
     if _lack > 0:
         to.extend([{}] * _lack)
-    BLACKLIST = ['pred_vertices', 'scaled_focal_length']
+    BLACKLIST = ['pred_vertices', 'scaled_focal_length']    # won't save these
     for i, hand in enumerate(From):
         pred = to[i]
         wilor_preds: dict[str, np.ndarray] = hand["wilor_preds"]
@@ -364,13 +367,13 @@ def data_remap(From, to, frame=0):
             _hand = {
                 'begin': frame,
                 'is_right': hand['is_right'],
-                'scaled_focal_length': hand["wilor_preds"]['scaled_focal_length'],
+                'scaled_focal_length': hand['wilor_preds']['scaled_focal_length'],
                 **wilor_preds
             }
             to[i] = _hand
         else:
             if hand['is_right'] != pred['is_right']:
-                print(f"hand{i} is_right changed @ {frame}")    # TODO
+                print(f"hand{i} is_right changed @ {frame}")    # TODO: 每一帧手的 ID/左右标识 不一样, 用上一帧bbox来就近匹配
             for K in _WILOR_KEYS:
                 if K in pred.keys() and K in wilor_preds.keys():
                     pred[K] = np.concatenate((pred[K], wilor_preds[K]), axis=0)
