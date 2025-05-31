@@ -156,7 +156,7 @@ def save_bbox(cfg, id_frames, id_bbox_xyxy, ids):
         if len(ranges) > 1:
             Log.warning(f"Person {p} has multiple ranges: {ranges}")
         start = str(ranges[0][0])
-        key = ';'.join(['smplx;gvhmr', f'person{p}', 'bbox', start])
+        key = ';'.join(['smplx;gvhmr', f'person{p}', start, 'bbox'])
         savez(cfg.npz_path, {key: id_bbox_xyxy[i]}, mode='a')
 
 
