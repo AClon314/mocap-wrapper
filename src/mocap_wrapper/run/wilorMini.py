@@ -369,7 +369,7 @@ def data_remap(From: list[dict], to: list[dict], frame=0):
         wilor_preds['bbox'] = _hand['hand_bbox']
         wilor_preds = {K: np.expand_dims(squeeze(v, key=K), axis=0) for K, v in wilor_preds.items() if K not in BLACKLIST}
 
-        print(f'{i_to is None=}\t{len(hand)==0=}') if (i_to is None) != (len(hand) == 0) else None
+        print(f'{i_to is None=}\t{len(hand) == 0=}') if (i_to is None) != (len(hand) == 0) else None
 
         if len(hand) == 0:
             print(f"➕ hand{i_to} created @ {frame=}")
@@ -459,7 +459,7 @@ def image_wilor(input='img.png', out_dir=OUTDIR):
     os.makedirs(out_dir, exist_ok=True)
     preds = []
     data_remap(pred, preds)
-    export(preds, os.path.join(out_dir, f'mocap_{filename}.npz'))
+    export(preds, os.path.join(out_dir, f'{filename}.mocap.npz'))
     if IS_RENDER:
         renderer = Renderer(pipe.wilor_model.mano.faces)
 
@@ -598,7 +598,7 @@ def video_wilor(input='video.mp4', out_dir=OUTDIR, progress: Progress | None = N
     vout.release() if vout else None
     cv2.destroyAllWindows()
 
-    export(preds, os.path.join(out_dir, f'mocap_{filename}.npz'))
+    export(preds, os.path.join(out_dir, f'{filename}.mocap.npz'))
 
 
 def argParser():

@@ -425,7 +425,7 @@ def render_global(cfg):
 
 def export(
     pred: dict,
-    file: Path | str = 'mocap_gvhmr.npz',
+    file: Path | str = 'gvhmr.mocap.npz',
     who=0,
 ):
     """

@@ -24,7 +24,7 @@ output_root: output/demo
 output_dir: "${output_root}/${video_name}"
 preprocess_dir: ${output_dir}/preprocess
 video_path: "${output_dir}/0_input_video.mp4"
-npz_path: "${output_dir}/mocap_${video_name}.npz"
+npz_path: "${output_dir}/${video_name}.mocap.npz"
 
 # Options
 static_cam: False
