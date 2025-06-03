@@ -360,6 +360,8 @@ def symlink(src: str, dst: str, is_src_dir=False, overwrite=True,
     if not os.path.exists(src):
         Log.error(f"{src=} does NOT exist.")
         return None
+    dst_dir = dst if os.path.isdir(dst) else os.path.dirname(dst)
+    os.makedirs(dst_dir, exist_ok=True)
     try:
         if overwrite and os.path.exists(dst):
             os.remove(dst)
@@ -429,6 +431,7 @@ def get_shell():
 
 
 if __name__ == "__main__":
+    Log.debug(f'{os.environ=}')
     if not any([is_win, is_mac, is_linux]):
         Log.warning(f"❓ Unsupported OS={sys.platform}")
     socket.setdefaulttimeout(TIMEOUT)
