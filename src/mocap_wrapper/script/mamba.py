@@ -12,17 +12,23 @@ import logging
 import subprocess
 from time import time
 from random import shuffle
+from typing import Literal
 from urllib.request import urlretrieve, urlopen
-IS_DEBUG = os.getenv('GITHUB_ACTIONS', None)
+from site import getuserbase
+IS_DEBUG = os.getenv('GITHUB_ACTIONS', None) or os.getenv('LOG', None)
 __package__ = 'mocap_wrapper'
 _LEVEL = logging.DEBUG if IS_DEBUG else logging.INFO
-_SLASH_R = '\r\033[K' if IS_DEBUG else ''
+_SLASH_R = r'\r\033[K' if IS_DEBUG else ''
 _SLASH_N = '\n' if IS_DEBUG else ''
-logging.basicConfig(level=_LEVEL)
+logging.basicConfig(level=_LEVEL, format='[%(asctime)s %(levelname)s] %(filename)s:%(lineno)s\t%(message)s', datefmt='%d-%H:%M:%S')
 Log = logging.getLogger(__name__)
 is_win = sys.platform.startswith('win')
 is_mac = sys.platform.startswith('darwin')
 is_linux = sys.platform.startswith('linux')
+if is_win:
+    BIN = r'C:\\Windows\\System32'  # TODO: dirty but working
+else:
+    BIN = os.path.join(getuserbase(), 'bin') if os.getuid() != 0 else '/usr/local/bin'
 ENV = 'base' if IS_DEBUG else 'gil'  # TODO: nogil when compatible
 FOLDER = 'mocap'
 MAMBA = '/root/miniforge3/bin/mamba'
@@ -242,21 +248,32 @@ def download(from_url: str, to_path: str | None = None, log=True):
     return filename, http_headers
 
 
-def get_envs(manager='mamba'):
+def get_envs(manager: Literal['mamba', 'conda'] = 'mamba'):
     """
     Args:
-        manager (str): 'mamba', 'conda', 'pip'
+        manager (str): 'mamba', 'conda'
         kwargs (dict): `subprocess.Popen()` args
 
     Returns:
         env (dict): eg: {'base': '~/miniforge3'}
         now (str): currently env name like 'base'
     """
-    p = run(f'{manager} env list', log=not IS_DEBUG)
-    _env = p.stdout.splitlines()[2:]
-    _env = [l.split() for l in _env if l]   # type: ignore
-    env = {l[0]: l[1 if len(l) == 2 else 2] for l in _env}
-    now = str(os.getenv('CONDA_DEFAULT_ENV'))
+    p = run(f'{manager} env list --json', log=bool(IS_DEBUG))
+    _envs: list = json.loads(p.stdout)['envs']
+    env = {os.path.split(v)[-1]: v for v in _envs}
+    p = run(f'{manager} info --json', log=bool(IS_DEBUG))
+    _info = json.loads(p.stdout)
+    _prefix = ''
+    if manager.endswith('mamba'):
+        _prefix = 'miniforge3'
+        now = _info['environment']
+    elif manager.endswith('conda'):
+        _prefix = 'miniconda3'
+        now = _info['active_prefix_name']
+    else:
+        raise ValueError(f"Unsupported manager: {manager}. Use 'mamba' or 'conda'.")
+    env['base'] = env[_prefix]
+    env.pop(_prefix)
     return env, now
 
 
@@ -267,7 +284,9 @@ def get_latest_release_tag(owner='conda-forge', repo='miniforge') -> str:
             data = json.loads(response.read().decode('utf-8'))
             return data['tag_name']
     except Exception as e:
-        return '25.3.0-3'   # 2025-6-2
+        tag = '25.3.0-3'   # 2025-6-2
+        Log.warning(f"Failed to fetch latest release tag, fallback to {tag}: {e}")
+        return tag
 
 
 def i_mamba():
@@ -298,7 +317,7 @@ def i_mamba():
         except Exception as e:
             Log.warning(f"Skip: {e}")
     if not os.path.exists(setup):
-        raise FileNotFoundError(f"Download failed: {setup}")
+        raise FileNotFoundError(f"Download: {setup}")
     mamba_exe(setup)
 
 
@@ -307,30 +326,37 @@ def mamba_exe(setup, cleanup=not IS_DEBUG):
         p = run(f'start /wait "" {setup} /InstallationType=JustMe /RegisterPython=0 /S /D=%UserProfile%\\Miniforge3')
     else:
         p = run(f'bash "{setup}" -b')
-    _prefix = RE['mamba_prefix'].search(p.stdout)
+    global_mamba_path(p.stdout)
+    if cleanup:
+        os.remove(setup)
+    symlink(MAMBA, os.path.join(BIN, 'mamba')) if not is_win else None  # TODO: mac?
+    return p
+
+
+def global_mamba_path(output: str):
+    _prefix = RE['mamba_prefix'].search(output)
     if _prefix:
         prefix: str = _prefix.group(1).strip()
         global MAMBA, CONDA
         MAMBA = os.path.join(prefix, 'bin', 'mamba')
         CONDA = os.path.join(prefix, 'bin', 'conda')
-    if cleanup:
-        os.remove(setup)
-    symlink(MAMBA, '/bin/mamba') if not is_win else None
-    return p
+    else:
+        raise ValueError(f"Failed to parse mamba prefix from output: {output}")
 
 
 def i_micromamba():
     Log.info("📦 Install Micro-mamba")
     if is_win:
-        run('Invoke-Expression ((Invoke-WebRequest -Uri https://micro.mamba.pm/install.ps1 -UseBasicParsing).Content)')
+        p = run('Invoke-Expression ((Invoke-WebRequest -Uri https://micro.mamba.pm/install.ps1 -UseBasicParsing).Content)')
     else:
-        run(r'"${SHELL}" <(curl -L micro.mamba.pm/install.sh)')
-    symlink(MAMBA, '/bin/mamba') if not is_win else None  # TODO: mac?
+        p = run(r'"${SHELL}" <(curl -L micro.mamba.pm/install.sh)')
+    global_mamba_path(p.stdout)
+    symlink(MAMBA, os.path.join(BIN, 'mamba')) if not is_win else None
 
 
 def symlink(src: str, dst: str, is_src_dir=False, overwrite=True,
             *args, dir_fd: int | None = None):
-    Log.debug(f'🔗 {src} → {dst}')
+    Log.debug(f'🔗 symlink {src} → {dst}')
     if not os.path.exists(src):
         Log.error(f"{src=} does NOT exist.")
         return None
@@ -339,7 +365,8 @@ def symlink(src: str, dst: str, is_src_dir=False, overwrite=True,
             os.remove(dst)
         os.symlink(src=src, dst=dst, target_is_directory=is_src_dir, *args, dir_fd=dir_fd)
         return dst
-    except:
+    except Exception as e:
+        Log.error(f"symlink: {e}")
         return None
 
 
@@ -386,8 +413,8 @@ def i_mocap():
         else:
             raise Exception(f"Failed to install python package.")
     mocap = os.path.join(os.path.dirname(PY['pip']), 'mocap')
-    symlink(mocap, '/bin/mocap') if not is_win else None
-    Log.debug(f'{p.__dict__=}')
+    symlink(mocap, os.path.join(BIN, 'mocap')) if not is_win else None
+    # Log.debug(f'{p.__dict__=}')
     # os.makedirs('mocap', exist_ok=True)
     # os.chdir('mocap')
     mocap = shutil.which('mocap')
@@ -409,4 +436,4 @@ if __name__ == "__main__":
         mirror()
     i_mamba()
     i_mocap()
-    os.execvp('mocap', ['mocap', '--install'])  # -I
+    os.execvp('mocap', ['mocap', '--install'])
