@@ -958,10 +958,7 @@ try:
     aria2p.Download = Download_patch
 
     if __name__ == '__main__':
-        Log.debug('⛄')
         PROGRESS_DL.stop()
         aio.run(popen('python -c "from tqdm import tqdm; import time; import sys; [time.sleep(0.02) for _ in tqdm(range(100),file=sys.stdout)]"', mode='realtime'))
-        # aio.run(ffprobe('/home/n/download/背越式跳高（慢动作）.mp4'))
-
-except ImportError as e:
-    Log.error(f"⚠️ detect missing packages, please check your current conda environment. {e}")
+except Exception as e:
+    Log.error(e)

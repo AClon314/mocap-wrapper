@@ -8,4 +8,4 @@
 *.log
 output/
 out/
-test*.py
+./test*.py

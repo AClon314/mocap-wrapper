@@ -9,6 +9,7 @@ import json
 import socket
 import shutil
 import logging
+import argparse
 import subprocess
 from time import time
 from random import shuffle
@@ -33,10 +34,8 @@ ENV = 'base' if IS_DEBUG else 'gil'  # TODO: nogil when compatible
 FOLDER = 'mocap'
 MAMBA = '/root/miniforge3/bin/mamba'
 CONDA = '/root/miniforge3/bin/conda'
-LAST_SPEED = 0.0
-LAST_TIME = BEGIN_TIME = START_SLOW_TIME = time()
-LAST_TIME = LAST_TIME - 1
-TIMEOUT = 15
+TIMEOUT = 12
+SLOW_SPEED = 0.5  # MB/s
 _RE = {
     'mamba_prefix': 'PREFIX=(.*)\n',
     'python': r'Python (\d+).(\d+)',
@@ -55,7 +54,7 @@ MIRROR_DL = [
     ['https://github.boki.moe/https://github.com', '美国', '[美国 Cloudflare CDN] - 该公益加速源由 [blog.boki.moe] 提供'],
     ['https://github.moeyy.xyz/https://github.com', '美国', '[美国 Cloudflare CDN] - 该公益加速源由 [moeyy.cn] 提供'],
     ['https://gh-proxy.net/https://github.com', '美国', '[美国 Cloudflare CDN] - 该公益加速源由 [gh-proxy.net] 提供'],
-    ['https://github.yongyong.online/https://github.com', '美国', '[美国 Cloudflare CDN] - 该公益加速源由 [github.yongyong.online] 提供'],
+    # ['https://github.yongyong.online/https://github.com', '美国', '[美国 Cloudflare CDN] - 该公益加速源由 [github.yongyong.online] 提供'],
     ['https://ghdd.862510.xyz/https://github.com', '美国', '[美国 Cloudflare CDN] - 该公益加速源由 [ghdd.862510.xyz] 提供'],
     ['https://gh.jasonzeng.dev/https://github.com', '美国', '[美国 Cloudflare CDN] - 该公益加速源由 [gh.jasonzeng.dev] 提供'],
     ['https://gh.monlor.com/https://github.com', '美国', '[美国 Cloudflare CDN] - 该公益加速源由 [gh.monlor.com] 提供'],
@@ -68,7 +67,7 @@ MIRROR_DL = [
     ['https://ghfile.geekertao.top/https://github.com', '美国', '[美国 Cloudflare CDN] - 该公益加速源由 [ghfile.geekertao.top] 提供'],
     ['https://ghp.keleyaa.com/https://github.com', '美国', '[美国 Cloudflare CDN] - 该公益加速源由 [ghp.keleyaa.com] 提供'],
     ['https://github.wuzhij.com/https://github.com', '美国', '[美国 Cloudflare CDN] - 该公益加速源由 [github.wuzhij.com] 提供'],
-    ['https://gh.cache.cloudns.org/https://github.com', '美国', '[美国 Cloudflare CDN] - 该公益加速源由 [gh.cache.cloudns.org] 提供'],
+    # ['https://gh.cache.cloudns.org/https://github.com', '美国', '[美国 Cloudflare CDN] - 该公益加速源由 [gh.cache.cloudns.org] 提供'],
     ['https://gh.chjina.com/https://github.com', '美国', '[美国 Cloudflare CDN] - 该公益加速源由 [gh.chjina.com] 提供'],
     ['https://ghpxy.hwinzniej.top/https://github.com', '美国', '[美国 Cloudflare CDN] - 该公益加速源由 [ghpxy.hwinzniej.top] 提供'],
     ['https://cdn.crashmc.com/https://github.com', '美国', '[美国 Cloudflare CDN] - 该公益加速源由 [cdn.crashmc.com] 提供'],
@@ -82,7 +81,7 @@ MIRROR_DL = [
     ['https://api-gh.muran.eu.org/https://github.com', '美国', '[美国 Cloudflare CDN] - 该公益加速源由 [api-gh.muran.eu.org] 提供'],
     ['https://gh.idayer.com/https://github.com', '美国', '[美国 Cloudflare CDN] - 该公益加速源由 [gh.idayer.com] 提供'],
     ['https://gh.zwnes.xyz/https://github.com', '美国', '[美国 Cloudflare CDN] - 该公益加速源由 [gh.zwnes.xyz] 提供'],
-    ['https://gh.llkk.cc/https://github.com', '美国', '[美国 Cloudflare CDN] - 该公益加速源由 [gh.llkk.cc] 提供'],
+    # ['https://gh.llkk.cc/https://github.com', '美国', '[美国 Cloudflare CDN] - 该公益加速源由 [gh.llkk.cc] 提供'],
     ['https://down.npee.cn/?https://github.com', '美国', '[美国 Cloudflare CDN] - 该公益加速源由 [npee社区] 提供'],
     ['https://raw.ihtw.moe/github.com', '美国', '[美国 Cloudflare CDN] - 该公益加速源由 [raw.ihtw.moe] 提供'],
     ['https://dgithub.xyz', '美国', '[美国 西雅图] - 该公益加速源由 [dgithub.xyz] 提供'],
@@ -95,10 +94,9 @@ MIRROR_DL = [
     # 为了缓解非美国公益节点压力（考虑到很多人无视前面随机的美国节点），干脆也将其加入随机
     ['https://ghproxy.net/https://github.com', '英国', '[英国伦敦] - 该公益加速源由 [ghproxy.net] 提供提示：希望大家尽量多使用美国节点（每次随机 负载均衡），避免流量都集中到亚洲公益节点，减少成本压力，公益才能更持久~'],
     ['https://ghfast.top/https://github.com', '其他', '[日本、韩国、新加坡、美国、德国等]（CDN 不固定） - 该公益加速源由 [ghproxy.link] 提供提示：希望大家尽量多使用美国节点（每次随机 负载均衡），避免流量都集中到亚洲公益节点，减少成本压力，公益才能更持久~'],
-    ['https://wget.la/https://github.com', '其他', '[中国香港、中国台湾、日本、美国等]（CDN 不固定） - 该公益加速源由 [ucdn.me] 提供提示：希望大家尽量多使用美国节点（每次随机 负载均衡），避免流量都集中到亚洲公益节点，减少成本压力，公益才能更持久~'],
+    # ['https://wget.la/https://github.com', '其他', '[中国香港、中国台湾、日本、美国等]（CDN 不固定） - 该公益加速源由 [ucdn.me] 提供提示：希望大家尽量多使用美国节点（每次随机 负载均衡），避免流量都集中到亚洲公益节点，减少成本压力，公益才能更持久~'],
     ['https://kkgithub.com', '其他', '[中国香港、日本、韩国、新加坡等] - 该公益加速源由 [help.kkgithub.com] 提供提示：希望大家尽量多使用美国节点（每次随机 负载均衡），避免流量都集中到亚洲公益节点，减少成本压力，公益才能更持久~'],
 ]
-shuffle(MIRROR_DL)
 MIRROR_CLONE = [
     ['https://gitclone.com', '国内', '[中国 国内] - 该公益加速源由 [GitClone] 提供 - 缓存：有 - 首次比较慢，缓存后较快'],
     ['https://kkgithub.com', '香港', '[中国香港、日本、新加坡等] - 该公益加速源由 [help.kkgithub.com] 提供'],
@@ -106,7 +104,6 @@ MIRROR_CLONE = [
     ['https://githubfast.com', '韩国', '[韩国] - 该公益加速源由 [Github Fast] 提供'],
     ['https://ghproxy.net/https://github.com', '日本', '[日本 大阪] - 该公益加速源由 [ghproxy.net] 提供'],
 ]
-shuffle(MIRROR_CLONE)
 MIRROR_PYPI = [
     'https://pypi.tuna.tsinghua.edu.cn/simple',  # 清华
     'https://mirrors.aliyun.com/pypi/simple',  # 阿里云
@@ -189,62 +186,73 @@ def mirror():
         # mirror_conda()
 
 
-def dl_progress(count, block_size, total_bytes):
-    global LAST_SPEED, LAST_TIME, BEGIN_TIME, START_SLOW_TIME
-    N = 1024**2  # 1 MB
-    block_size_mb = block_size / N
-    total_mb = total_bytes / N if total_bytes > 0 else -1
-    done = count * block_size_mb
+def dl_progress(begin_time: float, filename: str = '', log: bool = True):
+    """创建一个带有局部状态的下载进度回调函数"""
+    last_speed = 0.0
+    last_time = begin_time - 1
+    start_slow_time = None
 
-    cur_time = time()
-    elapsed = cur_time - BEGIN_TIME
-    current_speed = done / elapsed if elapsed > 0 else -1
+    def progress(count, block_size, total_bytes):
+        nonlocal last_speed, last_time, start_slow_time
 
-    # 指数加权平均平滑速度
-    alpha = 0.8
-    if current_speed > 0:
-        LAST_SPEED = alpha * LAST_SPEED + (1 - alpha) * current_speed
-    else:
-        LAST_SPEED *= alpha  # 无数据时衰减历史速度
+        N = 1024**2  # 1 MB
+        block_size_mb = block_size / N
+        total_mb = total_bytes / N if total_bytes > 0 else -1
+        done = count * block_size_mb
 
-    # 计算剩余时间（基于平滑速度）
-    remain_mb = total_mb - done
-    remain_sec = remain_mb / LAST_SPEED if LAST_SPEED > 1e-6 else float('inf')
+        cur_time = time()
+        elapsed = cur_time - begin_time
+        current_speed = done / elapsed if elapsed > 0 else -1
 
-    # 每1秒更新一次日志
-    if cur_time - LAST_TIME > 1:
-        LAST_TIME = cur_time
-        if total_bytes > 0:
-            percent = done * 100 / total_mb if total_mb > 0 else 0
-            if percent >= 100:
-                msg = f"✔ Downloaded {total_mb:.2f} MB"
+        # 指数加权平均平滑速度
+        alpha = 0.8
+        if current_speed > 0:
+            last_speed = alpha * last_speed + (1 - alpha) * current_speed
+        else:
+            last_speed *= alpha  # 无数据时衰减历史速度
+
+        # 计算剩余时间（基于平滑速度）
+        remain_mb = total_mb - done
+        remain_sec = remain_mb / last_speed if last_speed > 1e-6 else float('inf')
+
+        # 每1秒更新一次日志
+        if log and cur_time - last_time > 1:
+            last_time = cur_time
+            if total_bytes > 0:
+                percent = done * 100 / total_mb if total_mb > 0 else 0
+                if percent >= 100:
+                    msg = f"✔ Downloaded {total_mb:.2f} MB"
+                else:
+                    msg = f"⬇ Downloading: {percent:.1f}% @ {last_speed:.2f}MB/s\t🕒 {remain_sec / 60:.2f}min\t({done:.1f}/{total_mb:.1f} MB)"
             else:
-                msg = f"⬇ Downloading: {percent:.1f}% @ {LAST_SPEED:.2f}MB/s\t🕒 {remain_sec / 60:.2f}min\t({done:.1f}/{total_mb:.1f} MB)"
-        else:
-            msg = f"⬇ Downloading: {done:.2f} MB"
-        print(f'{_SLASH_R}{msg}', end=_SLASH_N)
-        sys.stdout.flush()
+                msg = f"⬇ Downloading: {done:.2f} MB"
 
-    # 限速判断
-    SLOW_SPEED = 0.5  # 可调整的低速阈值（MB/s）
-    if elapsed > TIMEOUT:  # 连接稳定后开始判断
-        if LAST_SPEED < SLOW_SPEED:
-            # 记录首次进入低速的时间
-            if START_SLOW_TIME is None:
-                START_SLOW_TIME = cur_time
-            # 持续低速超过阈值时间则触发重试
-            elif cur_time - START_SLOW_TIME > TIMEOUT:
-                START_SLOW_TIME = None
-                raise Exception(f"🐌 Too slow, speed={LAST_SPEED:.2f}MB/s < {SLOW_SPEED}MB/s for {TIMEOUT}s.")
-        else:
-            START_SLOW_TIME = None
+            if filename:
+                msg = f"{msg}\t{filename}"
+            print(f'{_SLASH_R}{msg}', end=_SLASH_N, flush=True)
+
+        # 限速判断
+        if elapsed > TIMEOUT:  # 连接稳定后开始判断
+            if last_speed < SLOW_SPEED:
+                # 记录首次进入低速的时间
+                if start_slow_time is None:
+                    start_slow_time = cur_time
+                # 持续低速超过阈值时间则触发重试
+                elif cur_time - start_slow_time > TIMEOUT:
+                    start_slow_time = None
+                    raise Exception(f"🐌 Too slow, speed={last_speed:.2f}MB/s < {SLOW_SPEED}MB/s for {TIMEOUT}s.")
+            else:
+                start_slow_time = None
+
+    return progress
 
 
 def download(from_url: str, to_path: str | None = None, log=True):
-    global BEGIN_TIME
     Log.info(f"🔍 Download from {from_url}") if log else None
-    BEGIN_TIME = time()
-    filename, http_headers = urlretrieve(from_url, filename=to_path, reporthook=dl_progress)
+    filename = os.path.basename(to_path if to_path else from_url)
+    filename, http_headers = urlretrieve(
+        from_url, filename=to_path,
+        reporthook=dl_progress(begin_time=time(), filename=filename, log=log))
     return filename, http_headers
 
 
@@ -258,10 +266,10 @@ def get_envs(manager: Literal['mamba', 'conda'] = 'mamba'):
         env (dict): eg: {'base': '~/miniforge3'}
         now (str): currently env name like 'base'
     """
-    p = run(f'{manager} env list --json', log=bool(IS_DEBUG))
+    p = run(f'{manager} env list --json', log=False)
     _envs: list = json.loads(p.stdout)['envs']
     env = {os.path.split(v)[-1]: v for v in _envs}
-    p = run(f'{manager} info --json', log=bool(IS_DEBUG))
+    p = run(f'{manager} info --json', log=False)
     _info = json.loads(p.stdout)
     _prefix = ''
     if manager.endswith('mamba'):
@@ -430,13 +438,41 @@ def get_shell():
     return shell
 
 
-if __name__ == "__main__":
+def set_timeout(timeout: int = TIMEOUT):
+    global TIMEOUT
+    TIMEOUT = timeout
+    socket.setdefaulttimeout(TIMEOUT)
+
+
+def get_args():
+    parser = argparse.ArgumentParser(description='Install mamba & mocap-wrapper script. mamba和mocap-wrapper的预安装脚本。')
+    parser.add_argument('-y', '--yes', action='store_true', help='Skip confirmation prompts. 无人值守，跳过确认提示。')
+    args = parser.parse_args()
+    if not args.yes:
+        confirm = input("Install mamba as python env manager, and mocap-wrapper? (y/N): ").strip().lower()
+        if confirm != 'y':
+            Log.info("Installation cancelled.")
+            sys.exit(0)
+
+
+def main():
+    msg = 'Run `mocap --install -b wilor,gvhmr` to continue!'
     Log.debug(f'{os.environ=}')
     if not any([is_win, is_mac, is_linux]):
         Log.warning(f"❓ Unsupported OS={sys.platform}")
+    if all([shutil.which(exe) for exe in ('mamba', 'mocap')]):
+        Log.info(f"✅ Already installed. {msg}")
+        return
+    # get_args()
+    mirror()
+    shuffle(MIRROR_DL)
+    shuffle(MIRROR_CLONE)
     socket.setdefaulttimeout(TIMEOUT)
-    if not all([shutil.which(exe) for exe in ('mamba', 'mocap')]):
-        mirror()
     i_mamba()
     i_mocap()
-    os.execvp('mocap', ['mocap', '--install'])
+    Log.info(f"✅ {msg}`")
+    # os.execvp('mocap', ['mocap', '--install'])
+
+
+if __name__ == "__main__":
+    main()

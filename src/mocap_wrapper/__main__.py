@@ -4,7 +4,7 @@ import atexit
 import argparse
 import asyncio as aio
 from typing import Any, Coroutine, Sequence
-from mocap_wrapper.logger import IS_DEBUG, cleanup, Log
+from mocap_wrapper.logger import IS_DEBUG, cleanup
 from mocap_wrapper.lib import DIR, RUNS, CONFIG, PACKAGE, TYPE_RUNS, QRCODE, ffmpeg_or_link, gather, mkdir, path_expand, res_path, __version__
 from mocap_wrapper.install.lib import ENV, install, async_queue, mamba
 DEFAULT: Sequence[TYPE_RUNS] = ('wilor', 'gvhmr')
@@ -49,8 +49,7 @@ def argParser():
     arg.add_argument('-o', '--outdir', metavar=OUTPUT_DIR, default=OUTPUT_DIR)
     arg.add_argument('-r', '--range', metavar='[a,b]or[a,duration]', default='', help='video time range, eg: `--range=0:0:1,0:2` is 1s~2s, `--range=10` is 0s~10s')
     # arg.add_argument('--euler', action='store_true', help='use euler_XYZ for bones rotations for export data')
-    arg.add_argument('--convert', action='store_true', help='convert all input .npy/.npz/.pt/.pkl into .npz for blender addon')
-
+    # arg.add_argument('--convert', action='store_true', help='convert all input .npy/.npz/.pt/.pkl into .npz for blender addon')
     # arg.add_argument('--smpl', help='cookies:PHPSESSID to download smpl files. eg: `--smpl=26-digits_123456789_123456`')
     # arg.add_argument('--smplx', help='cookies:PHPSESSID to download smplx files. eg: `--smplx=26-digits_123456789_123456`')
     # arg.add_argument('--user-agent', help='From your logged in browser. eg: `--user-agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.36 Edge/16.16299"`')

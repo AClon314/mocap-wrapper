@@ -112,7 +112,7 @@ async def get_envs(manager: TYPE_PY_MGRS = 'mamba', **kwargs):
         env (dict): eg: {'base': '~/miniforge3'}
         now (str): currently env name like 'base'
     """
-    p, env = await echo(f'{manager} env list', **kwargs)
+    p, env = await echo(f'{manager} env list --json', **kwargs)
     env = env.strip().splitlines()[2:]
     env = [l.split() for l in env if l]   # type: ignore
     env = {l[0]: l[1 if len(l) == 2 else 2] for l in env}

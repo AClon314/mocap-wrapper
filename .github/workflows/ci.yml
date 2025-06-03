@@ -34,9 +34,12 @@ jobs:
       #   with:
       #     python-version: ${{ matrix.python }}
 
-      - name: Init env from mamba.py
+      - name: (install mocap-wrapper) mamba.py
         run: python src/mocap_wrapper/script/mamba.py #| tee ./.log/init.log
 
+      - name: (install 7z,aria2c,gvhmr,wilor) mocap --install
+        run: mocap --install
+
       #  `-rs` flag is used to debug for the test failure
-      - name: Run test
+      - name: pytest
         run: python -m pytest -rs tests #| tee ./.log/test.log
