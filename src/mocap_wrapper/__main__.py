@@ -49,7 +49,6 @@ def argParser():
     arg.add_argument('-o', '--outdir', metavar=OUTPUT_DIR, default=OUTPUT_DIR)
     arg.add_argument('-r', '--range', metavar='[a,b]or[a,duration]', default='', help='video time range, eg: `--range=0:0:1,0:2` is 1s~2s, `--range=10` is 0s~10s')
     # arg.add_argument('--euler', action='store_true', help='use euler_XYZ for bones rotations for export data')
-    # arg.add_argument('--convert', action='store_true', help='convert all input .npy/.npz/.pt/.pkl into .npz for blender addon')
     # arg.add_argument('--smpl', help='cookies:PHPSESSID to download smpl files. eg: `--smpl=26-digits_123456789_123456`')
     # arg.add_argument('--smplx', help='cookies:PHPSESSID to download smplx files. eg: `--smplx=26-digits_123456789_123456`')
     # arg.add_argument('--user-agent', help='From your logged in browser. eg: `--user-agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.36 Edge/16.16299"`')
@@ -60,7 +59,7 @@ def argParser():
 def mocap(
     inputs: list[str], outdir: str,
     Range: str, at: str, by: Sequence[TYPE_RUNS],
-    is_npt, _args: list[str]
+    _args: list[str]
 ):
     atexit.register(cleanup)
     global DIR
@@ -81,9 +80,6 @@ def mocap(
             aio.run(
                 run(by, i, outdir, Range=Range, args=_args),
                 debug=IS_DEBUG)
-    if is_npt:
-        from mocap_wrapper.script.data_viewer import convert_npt
-        convert_npt(inputs, outdir, save=True, Print=True)
 
 
 def script_entry():
@@ -105,8 +101,7 @@ def script_entry():
         Range=args.range,
         at=args.at,
         by=by,
-        is_npt=args.convert,
-        _args=_args
+        _args=_args,
     )
 
 

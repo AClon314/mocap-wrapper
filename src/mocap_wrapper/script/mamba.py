@@ -170,9 +170,9 @@ def mirror_conda(urls: dict | None = None):
 
 def mirror():
     global IS_MIRROR
-    Log.info("🔍 Checking mirrors...")
+    Log.info("🪞 Checking if need mirror...")
     try:
-        with urlopen('https://www.google.com', timeout=3) as response:
+        with urlopen('https://www.google.com', timeout=5) as response:
             if response.status != 200:
                 raise Exception("Google is not reachable")
             else:
