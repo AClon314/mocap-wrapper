@@ -1,5 +1,7 @@
 #!/bin/env python
-from operator import is_
+'''
+curl https://raw.githubusercontent.com/AClon314/mocap-wrapper/refs/heads/master/src/mocap_wrapper/script/mamba.py | python
+'''
 import os
 import re
 import sys
@@ -23,8 +25,8 @@ is_mac = sys.platform.startswith('darwin')
 is_linux = sys.platform.startswith('linux')
 ENV = 'base' if IS_DEBUG else 'gil'  # TODO: nogil when compatible
 FOLDER = 'mocap'
-MAMBA = 'mamba'
-CONDA = 'conda'
+MAMBA = '/root/miniforge3/bin/mamba'
+CONDA = '/root/miniforge3/bin/conda'
 LAST_SPEED = 0.0
 LAST_TIME = BEGIN_TIME = START_SLOW_TIME = time()
 LAST_TIME = LAST_TIME - 1
@@ -164,15 +166,17 @@ def mirror_conda(urls: dict | None = None):
 
 
 def mirror():
+    global IS_MIRROR
     Log.info("🔍 Checking mirrors...")
     try:
         with urlopen('https://www.google.com', timeout=3) as response:
             if response.status != 200:
                 raise Exception("Google is not reachable")
             else:
+                IS_MIRROR = False
                 MIRROR_DL.insert(0, ['https://github.com', '美国', '[官方Github]'])
+
     except:
-        global IS_MIRROR
         IS_MIRROR = True
         mirror_clone()
         mirror_pypi()
@@ -277,24 +281,25 @@ def i_mamba():
         p = run("echo Miniforge3-$(uname)-$(uname -m).sh")
         setup = p.stdout
     if os.path.exists(setup):
-        mamba_exe(setup)
-        if not os.path.exists(MAMBA):
+        p = mamba_exe(setup)
+        if 'md5sum mismatch' in p.stderr:
             os.remove(setup)  # remove broken setup
-    if not os.path.exists(MAMBA):
-        tag = get_latest_release_tag()
-        url = f"/conda-forge/miniforge/releases/download/{tag}/"
-        url += setup
-        for m in MIRROR_DL:
-            _url = m[0] + url
-            Log.info(f"🔍 From {_url} ({m[-1]})")
-            try:
-                setup, _ = download(_url, setup, log=False)
-                break
-            except Exception as e:
-                Log.warning(f"Skip: {e}")
-        if not os.path.exists(setup):
-            raise FileNotFoundError(f"Download failed: {setup}")
-        mamba_exe(setup)
+        else:
+            return
+    tag = get_latest_release_tag()
+    url = f"/conda-forge/miniforge/releases/download/{tag}/"
+    url += setup
+    for m in MIRROR_DL:
+        _url = m[0] + url
+        Log.info(f"🔍 From {_url} ({m[-1]})")
+        try:
+            setup, _ = download(_url, setup, log=False)
+            break
+        except Exception as e:
+            Log.warning(f"Skip: {e}")
+    if not os.path.exists(setup):
+        raise FileNotFoundError(f"Download failed: {setup}")
+    mamba_exe(setup)
 
 
 def mamba_exe(setup, cleanup=not IS_DEBUG):
@@ -306,11 +311,12 @@ def mamba_exe(setup, cleanup=not IS_DEBUG):
     if _prefix:
         prefix: str = _prefix.group(1).strip()
         global MAMBA, CONDA
-        MAMBA = os.path.join(prefix, 'condabin', 'mamba')
-        CONDA = os.path.join(prefix, 'condabin', 'conda')
+        MAMBA = os.path.join(prefix, 'bin', 'mamba')
+        CONDA = os.path.join(prefix, 'bin', 'conda')
     if cleanup:
         os.remove(setup)
-    return p.returncode
+    symlink(MAMBA, '/bin/mamba') if not is_win else None
+    return p
 
 
 def i_micromamba():
@@ -320,12 +326,14 @@ def i_micromamba():
     else:
         run(r'"${SHELL}" <(curl -L micro.mamba.pm/install.sh)')
     symlink(MAMBA, '/bin/mamba') if not is_win else None  # TODO: mac?
-    os.link('micromamba', 'mamba')
 
 
 def symlink(src: str, dst: str, is_src_dir=False, overwrite=True,
             *args, dir_fd: int | None = None):
     Log.debug(f'🔗 {src} → {dst}')
+    if not os.path.exists(src):
+        Log.error(f"{src=} does NOT exist.")
+        return None
     try:
         if overwrite and os.path.exists(dst):
             os.remove(dst)
@@ -359,16 +367,15 @@ def i_mocap():
     py_bin = os.path.join(envs[ENV], 'bin')
     PY = ['pip', 'python']
     PY = {p: os.path.join(py_bin, p) for p in PY}
-    if IS_MIRROR:
-        github = 'gitee'
-    else:
-        github = 'github'
+    tag = '[dev]' if IS_DEBUG else ''
     if IS_DEBUG:
-        tag = '[dev]'
+        pkg = f'-e ".[dev]"'
     else:
-        tag = ''
+        github = 'gitee' if IS_MIRROR else 'github'
+        url = f'git+https://{github}.com/AClon314/mocap-wrapper.git'
+        pkg = f"{__package__}{tag} @ {url}"
     for i in range(5):
-        p = run(f'{PY["pip"]} install "{__package__}{tag} @ git+https://{github}.com/AClon314/mocap-wrapper.git"')
+        p = run(f'{PY["pip"]} install {pkg}')
         error = p.stderr.lower()
         if p.returncode == 0:
             break
@@ -402,4 +409,4 @@ if __name__ == "__main__":
         mirror()
     i_mamba()
     i_mocap()
-    os.execvp('mocap', ["--version"])  # -I
+    os.execvp('mocap', ['mocap', '--install'])  # -I
