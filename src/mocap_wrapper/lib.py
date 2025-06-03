@@ -490,7 +490,7 @@ def try_aria_port() -> 'aria2p.API':
             )
             aria2.get_stats()
             return aria2
-        except Exception:
+        except Exception as e:
             Log.warning(f"Failed to connect to aria2 on port {port}: {e}")
     raise ConnectionError(f"Failed to connect to aria2 on ports {_ARIA_PORTS}")
 

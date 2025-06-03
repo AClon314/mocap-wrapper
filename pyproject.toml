@@ -34,6 +34,9 @@ requires-python = ">=3.11" # 💡 you can remove the codes about `typing Unpack`
 [tool.setuptools.dynamic]
 dependencies = {file = ["requirements.txt"]}
 
+[tool.setuptools.package-data]
+"*" = ["*.txt", "*.json", "*.yaml", "*.yml", "*.cfg", "*.ini", "*.xml"]
+
 [project.optional-dependencies]
 dev = ["pytest", "pytest-asyncio", "fake-bpy-module-4.3", "plotly"]
 
@@ -42,4 +45,4 @@ Download = "http://github.com/AClon314/mocap-wrapper/releases"
 Homepage = "http://github.com/AClon314/mocap-wrapper"
 
 [project.scripts]
-mocap = "mocap_wrapper:app.script_entry"
+mocap = "mocap_wrapper:__main__.script_entry"

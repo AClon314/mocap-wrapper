@@ -15,7 +15,8 @@ jobs:
     strategy:
       matrix:
         #  Update python version matrix compatible with your project
-        python: ["3.11", "3.12"]
+        python: ["3.13"]
+        # python: ["3.11", "3.12", "3.13"]
 
     env:
       #  Use API Key from GA's environment variables for testing. You can remove this line if you don't need it.
@@ -24,19 +25,18 @@ jobs:
     steps:
       #  This will remove unnecessary files to free up space. This has done because some package needs more space to install. e.g.) torch
       - name: Clean up space for action
-        run: rm -rf /opt/hostedtoolcache
+        run: rm -rf /opt/hostedtoolcache || true
 
       - uses: actions/checkout@v4
-      - name: Setup Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: ${{ matrix.python }}
 
-      #  Install project dependencies with pytest and run tests
-      - name: Install dependencies
-        run: pip install -e ".[dev]"
+      # - name: Setup Python
+      #   uses: actions/setup-python@v5
+      #   with:
+      #     python-version: ${{ matrix.python }}
 
+      - name: Init env from mamba.py
+        run: python src/mocap_wrapper/script/mamba.py #| tee ./.log/init.log
 
       #  `-rs` flag is used to debug for the test failure
       - name: Run test
-        run: python -m pytest -rs tests
+        run: python -m pytest -rs tests #| tee ./.log/test.log

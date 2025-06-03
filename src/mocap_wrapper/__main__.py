@@ -36,6 +36,7 @@ class ArgParser(argparse.ArgumentParser):
         super().print_help(file)
         tasks = [Python(m, '--help')for m in DEFAULT]
         aio.run(gather(*tasks))
+        exit(0)
 
 
 def argParser():

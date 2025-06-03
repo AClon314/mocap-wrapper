@@ -62,7 +62,7 @@ Rank: [body🕺](https://paperswithcode.com/task/3d-human-pose-estimation "3D人
 
 ## install
 ```sh
-pip install git+https://github.com/AClon314/mocap-wrapper
+curl https://raw.githubusercontent.com/AClon314/mocap-wrapper/refs/heads/master/src/mocap_wrapper/script/mamba.py | python
 mocap --install -b gvhmr
 mocap --install -b wilor
 ```
@@ -85,6 +85,8 @@ LOG=debug mocap -I
 ```sh
 # docker build -t mocap -f docker/Dockerfile .
 podman build -t mocap -f docker/Dockerfile . --security-opt label=disable
+# github action local
+act -j test -v --action-offline-mode --bind --reuse # --rm=false
 ```
 
 ### requirements

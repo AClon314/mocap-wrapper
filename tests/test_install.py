@@ -60,13 +60,6 @@ async def test_Gdrive(ID):
     assert url, url
 
 
-@pytest.fixture(scope="function", autouse=True)
-def setup_progress():
-    ...
-    yield
-    # clean()
-
-
 if __name__ == '__main__':
     ...
     # aio.run(test_Gdrive('1DE5GVftRCfZOTMp8YWF0xkGudD'))

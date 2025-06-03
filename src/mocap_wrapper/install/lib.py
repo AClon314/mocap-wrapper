@@ -2,7 +2,7 @@
 - shell package manager(apt/dnf/brew/winget)
 - python package manager(pip/mamba/conda)
 """
-from sys import path as PATH
+# from sys import path as PATH
 from shutil import which, copy as cp
 from mocap_wrapper.lib import *
 from typing import Dict, Literal, Union, get_args
@@ -10,7 +10,7 @@ from mocap_wrapper.logger import getLogger
 
 Log = getLogger(__name__)
 ENV = 'mocap'
-PACKAGES = [('aria2', 'aria2c'), 'git', '7z', 'ffmpeg']
+PACKAGES = [('aria2', 'aria2c'), 'git', '7z', ('p7zip-full p7zip-rar', '7z'), 'ffmpeg']  # TODO 7z: p7zip-full p7zip-rar
 BINS = [p[1] if isinstance(p, tuple) else p for p in PACKAGES]
 PACKAGES = [p[0] if isinstance(p, tuple) else p for p in PACKAGES]
 TYPE_SHELLS = Literal['zsh', 'bash', 'ps']
@@ -102,40 +102,6 @@ async def i_pkgs(**kwargs):
     return True
 
 
-async def i_mamba(require_restart=True, **kwargs):
-    Log.info("📦 Install Mamba")
-    url = "https://github.com/conda-forge/miniforge/releases/latest/download/"
-    setup = ''
-    if is_linux or is_mac:
-        setup = "echo Miniforge3-$(uname)-$(uname -m).sh"
-        p, setup = await echo(setup, **kwargs)
-        setup = setup.strip()
-    elif is_win:
-        setup = "Miniforge3-Windows-x86_64.exe"
-    else:
-        raise Exception("Unsupported platform")
-    url += setup
-    if Aria:
-        d = run_async(download(url, **kwargs))
-    else:
-        raise Exception("Aria2c not found")
-
-    setup = d.dir + '/' + setup
-    p = None
-    if is_win:
-        p = await popen(f'start /wait "" {setup} /InstallationType=JustMe /RegisterPython=0 /S /D=%UserProfile%\\Miniforge3', **kwargs)
-    else:
-        p = await popen(f'bash "{setup}" -b', **kwargs)
-    remove_if_p(setup)
-
-    p = mamba(env='nogil', txt=res_path(), pkgs=['python-freethreading'], **kwargs)
-    p = await popen("conda config --set env_prompt '({default_env})'", **kwargs)  # TODO: need test
-
-    if require_restart:
-        Log.info(f"✔ re-open new terminal and run me again to refresh shell env!")
-        exit(0)  # TODO: find a way not to exit
-
-
 async def get_envs(manager: TYPE_PY_MGRS = 'mamba', **kwargs):
     """
     Args:
@@ -147,8 +113,8 @@ async def get_envs(manager: TYPE_PY_MGRS = 'mamba', **kwargs):
         now (str): currently env name like 'base'
     """
     p, env = await echo(f'{manager} env list', **kwargs)
-    env = env.strip()
-    env = [l.split() for l in env.split('\n') if l and not l.startswith('#')]   # type: ignore
+    env = env.strip().splitlines()[2:]
+    env = [l.split() for l in env if l]   # type: ignore
     env = {l[0]: l[1 if len(l) == 2 else 2] for l in env}
     now = str(os.getenv('CONDA_DEFAULT_ENV'))
     return env, now
@@ -282,7 +248,8 @@ async def install(runs: Sequence[TYPE_RUNS], **kwargs):
     Log.debug(Aria)
 
     if PY_MGR == 'pip':
-        run_async(i_mamba())
+        from mocap_wrapper.script.mamba import i_mamba
+        i_mamba()
 
     if 'gvhmr' in runs:
         from mocap_wrapper.install.gvhmr import i_gvhmr
