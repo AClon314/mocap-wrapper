@@ -30,7 +30,7 @@ if is_win:
     BIN = r'C:\\Windows\\System32'  # TODO: dirty but working
 else:
     BIN = os.path.join(getuserbase(), 'bin') if os.getuid() != 0 else '/usr/local/bin'
-ENV = 'base' if IS_DEBUG else 'gil'  # TODO: nogil when compatible
+ENV = 'base' if IS_DEBUG else 'nogil'
 FOLDER = 'mocap'
 MAMBA = '/root/miniforge3/bin/mamba'
 CONDA = '/root/miniforge3/bin/conda'
@@ -391,14 +391,7 @@ def i_mocap():
                 raise FileNotFoundError(f"Environment '{ENV}' not found.")
     except:
         if ENV != 'base':
-            p = run(f'python --version')
-            version = RE['python'].search(p.stdout)
-            if not version:
-                version = '3.13'    # TODO: 2025-6-2
-            else:
-                version = version.groups()
-                version = '.'.join(version)
-            p = run(f"{MAMBA} create -n {ENV} python={version} -y")    # python-freethreading # don't install in `base`
+            p = run(f"{MAMBA} create -n {ENV} python-freethreading -y")  # don't install in `base`
 
     envs, _ = get_envs(MAMBA)
     py_bin = os.path.join(envs[ENV], 'bin')
@@ -456,7 +449,7 @@ def get_args():
 
 
 def main():
-    msg = 'Run `mocap --install -b wilor,gvhmr` to continue!'
+    msg = f'Run `mamba activate {ENV}` and `mocap --install -b wilor,gvhmr` to continue!'
     Log.debug(f'{os.environ=}')
     if not any([is_win, is_mac, is_linux]):
         Log.warning(f"❓ Unsupported OS={sys.platform}")
@@ -464,10 +457,10 @@ def main():
         Log.info(f"✅ Already installed. {msg}")
         return
     # get_args()
-    mirror()
     shuffle(MIRROR_DL)
     shuffle(MIRROR_CLONE)
     socket.setdefaulttimeout(TIMEOUT)
+    mirror()
     i_mamba()
     i_mocap()
     Log.info(f"✅ {msg}`")

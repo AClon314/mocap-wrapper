@@ -7,7 +7,6 @@ pexpect
 ## mamba failed:
 regex
 aria2p
-pyinfra # conflict with nogil
 typed-ffmpeg
 python-worker
 netscape-cookies

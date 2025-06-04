@@ -67,6 +67,17 @@ mocap --install -b gvhmr
 mocap --install -b wilor
 ```
 
+This will create new conda env `nogil` for mocap-wrapper, and will install mocap/wilor in `mocap` env.
+```sh
+mamba env create -n nogil python-freethreading
+mamba activate nogil
+pip install git+https://github.com/AClon314/mocap-wrapper.git
+
+# If you want to debug run/gvhmr.py
+mamba activate mocap
+./gvhmr.py
+```
+
 ## usage
 See `mocap -h` for more options.
 ```sh
@@ -86,7 +97,7 @@ LOG=debug mocap -I
 # docker build -t mocap -f docker/Dockerfile .
 podman build -t mocap -f docker/Dockerfile . --security-opt label=disable
 # github action local
-act -j test -v --action-offline-mode --bind --reuse # --rm=false
+act -j test -v --action-offline-mode --bind --reuse --env LOG=D # --rm=false
 ```
 
 ### requirements

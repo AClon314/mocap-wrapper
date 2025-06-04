@@ -16,6 +16,7 @@ from pathlib import Path
 from sys import platform
 from fractions import Fraction
 from datetime import timedelta, datetime
+from shutil import get_terminal_size
 from platformdirs import user_config_path
 from importlib.resources import path as _res_path
 from importlib.metadata import version as _version
@@ -25,7 +26,7 @@ from types import SimpleNamespace
 from typing import Any, Callable, Coroutine, Dict, List, Literal, Optional, ParamSpec, Sequence, Tuple, TypeVar, TypedDict, Union, Unpack, cast, get_args, overload
 from typing_extensions import deprecated
 # config
-_TIME_OUT = timedelta(minutes=20).seconds
+_TIMEOUT = timedelta(minutes=20).seconds
 _RELAX = 15      # seconds for next http request, to prevent being 403 blocked
 _ARIA_PORTS = [6800, 16800]
 _OPT = {
@@ -139,7 +140,7 @@ CONFIG = Config()
 DIR = CONFIG['search_dir']
 
 
-def run_async(func: Coroutine, timeout=_TIME_OUT, loop=aio.get_event_loop()):
+def run_async(func: Coroutine, timeout=_TIMEOUT, loop=aio.get_event_loop()):
     return aio.run_coroutine_threadsafe(func, loop).result(timeout)
 
 
@@ -324,11 +325,14 @@ async def unzip(
     return p
 
 
+def is_realtime(): return not (sys.stdout.isatty() or os.getenv('GITHUB_ACTION', None))
+
+
 async def popen(
     cmd: str,
-    mode: Literal['realtime', 'wait', 'no-wait'] = 'realtime',
+    mode: Literal['realtime', 'wait', 'no-wait'] = 'realtime' if is_realtime() else 'wait',
     Raise=False,
-    timeout=_TIME_OUT,
+    timeout: float | int | None = _TIMEOUT,
     **kwargs
 ):
     """Used on long running commands
@@ -347,8 +351,11 @@ async def popen(
     Returns:
         process (pexpect.spawn):
     """
-    Log.info(f"{mode}: {cmd=}")
-    p = pexpect.spawn(cmd, timeout=timeout, **kwargs)
+    Log.info(f"{mode}: {cmd=}") if mode != 'wait' else None
+    dim = get_terminal_size()
+    dim = dim.lines, dim.columns
+    Log.debug(f'{dim=}')
+    p = pexpect.spawn(cmd, timeout=timeout, dimensions=dim, **kwargs)
     FD = sys.stdout.fileno()
     def os_write(): return os.write(FD, p.read_nonblocking(4096))
     if mode == 'realtime':
@@ -358,26 +365,29 @@ async def popen(
             except pexpect.EOF:
                 break
             except pexpect.TIMEOUT:
-                Log.warning(f"Timeout: {cmd}")
+                Log.warning(f"Timeout kill: {cmd}")
+                break
             except Exception:
                 raise
-            await aio.sleep(0.03)
+            await aio.sleep(0.1)
         try:
             os_write()
         except pexpect.EOF:
-            pass
+            ...
     elif mode == 'wait':
         while p.isalive():
             try:
                 await p.expect(pexpect.EOF, async_=True)
             except pexpect.TIMEOUT:
-                Log.warning(f"Timeout: {cmd}")
+                Log.warning(f"Timeout kill: {cmd}")
+                break
             except Exception:
                 raise
     elif mode == 'no-wait':
-        ...
+        return p
     else:
         raise ValueError(f"Invalid mode: {mode}")
+    p.before = p.before.decode().strip() if p.before else ''
     if p.exitstatus != 0:
         if Raise:
             raise ChildProcessError(f"{cmd}")
@@ -389,58 +399,7 @@ async def popen(
 @copy_kwargs(popen)
 async def echo(*args, **kwargs):
     p = await popen(*args, mode='wait', **kwargs)
-    text = ''
-    if p.before and isinstance(p.before, bytes):
-        text = p.before.decode()
-    else:
-        raise Exception(f"{args}, {kwargs}")
-    return p, text
-
-
-@deprecated('Use `popen` instead, this sync would block the main thread')
-def Popen_(
-    cmd: str,
-    timeout=_TIME_OUT, Raise=True, dry_run=False, **kwargs
-):
-    """Used on long running commands  
-    set `timeout` to -1 to run in background (non-blocking)
-
-    - Raise: if False, log warning instead of raising Exception
-    - dry_run: if True, only print the command without executing
-    """
-    Log.info(cmd)
-    if dry_run:
-        return
-    p = sp.Popen(
-        cmd,
-        shell=True, env=os.environ, encoding='utf-8',
-        **filter_kwargs([sp.Popen], kwargs)
-    )
-    if timeout is None or timeout >= 0:
-        p.wait(timeout=timeout)
-        if p.returncode != 0:
-            if Raise:
-                raise ChildProcessError(f"{cmd}")
-            else:
-                Log.warning(f"{cmd}")
-    return p
-
-
-@copy_kwargs(sp.check_output)
-@deprecated('Use `popen` instead, this sync would block the main thread')
-def Exec_(args, Print=True, **kwargs) -> str:
-    """Only used on instantly returning commands
-
-    - Print: print the output
-    - kwargs: default `shell=True`, `timeout=TIMEOUT`
-    """
-    Log.info(args)
-    kwargs.setdefault('shell', True)
-    kwargs.setdefault('timeout', _TIME_OUT)
-    s: str = sp.check_output(args, **kwargs).decode().strip()
-    if Print:
-        print(s)
-    return s
+    return p, str(p.before)
 
 
 async def version(cmd: str):
@@ -917,7 +876,7 @@ try:
     from ffmpeg import probe as ffprobe
     Aria = try_aria_port()
 
-    async def is_resumable_file(url: str, timeout=_TIME_OUT):
+    async def is_resumable_file(url: str, timeout=_TIMEOUT):
         """```python
         return resumable(True/False), filename(str/None)
         ```"""

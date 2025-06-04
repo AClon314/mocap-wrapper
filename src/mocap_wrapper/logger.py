@@ -37,10 +37,9 @@ class CustomFormatter(logging.Formatter):
 
 try:
     from rich.text import Text
-    # from rich.console import Console
     from rich.logging import RichHandler
     from rich.progress import Progress, TextColumn
-    HANDLER = RichHandler(rich_tracebacks=True)
+    HANDLER = RichHandler(rich_tracebacks=True, enable_link_path=False)
     HANDLER.setFormatter(CustomFormatter(datefmt=_DATEFMT))
 
     class SpeedColumn(TextColumn):
@@ -72,7 +71,7 @@ try:
 
     def cleanup():
         """
-        start then **STOP** progress bar
+        start then **STOP** progress bar. See https://github.com/Textualize/rich/issues/3673
 
         ps: I don't like rich.Console, on linux it makes the scroll bar unuseable, could cause flickering progress.
         Every time you `stop()` brings side effect: breaking 2 new blank lines.
