@@ -37,9 +37,13 @@ jobs:
       - name: (install mocap-wrapper) mamba.py
         run: python src/mocap_wrapper/script/mamba.py #| tee ./.log/init.log
 
+      - name: set CN mirror
+        if: ${{ env.ACT == 'true' }}
+        run: bash <(curl -sSL https://gitee.com/SuperManito/LinuxMirrors/raw/main/ChangeMirrors.sh) --source mirrors.aliyun.com --protocol http --use-intranet-source false --backup true --upgrade-software false --clean-cache false --ignore-backup-tips
+
       - name: (install 7z,aria2c,gvhmr,wilor) mocap --install
-        run: mocap --install
+        run: mocap --install -b # 2>&1 | tee ./.log/install.log
 
       #  `-rs` flag is used to debug for the test failure
       - name: pytest
-        run: python -m pytest -rs tests #| tee ./.log/test.log
+        run: /root/miniforge3/bin/python -m pytest -rs tests #| tee ./.log/test.log

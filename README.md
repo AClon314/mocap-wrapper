@@ -1,10 +1,16 @@
 # mocap-wrapper
-Addon: [mocap_importer](https://github.com/AClon314/mocap_importer_blender)
+Use with: [mocap_importer](https://github.com/AClon314/mocap_importer_blender)
+
+Platform support:
+| 🐧Linux | 🪟Windows | 🍎 MacOS | Jupyter Notebook |
+| ------ | -------- | ------- | ---------------- |
+| 🚧      | ❓        | ❓       | ❓                |
 
 A bunch of python scripts that wrap around various mocap libraries to provide a unified interface.  
 Only tested on Linux. Not stable yet.
 
 sincerelly thanks to gvhmr/wilor/wilor-mini developers and others that help each other♥️
+
 ## solutions
 <details><summary>
 stage-by-stage scheme
@@ -60,14 +66,14 @@ Rank: [body🕺](https://paperswithcode.com/task/3d-human-pose-estimation "3D人
 | hand/body | VR headset or VR trackers                                                                                                                                                          | ~~Off topic~~ |
 - *🍎`iphone≥X(12/13 best)`for **better face mocap result** on UE live link, though you can use android🤖 to do live link.*
 
-## install
+## install 安装
 ```sh
+# sudo -i; bash <(curl -sSL https://gitee.com/SuperManito/LinuxMirrors/raw/main/ChangeMirrors.sh) # 一键设置linux镜像(可选)
 curl https://raw.githubusercontent.com/AClon314/mocap-wrapper/refs/heads/master/src/mocap_wrapper/script/mamba.py | python
-mocap --install -b gvhmr
-mocap --install -b wilor
+mocap --install -b gvhmr,wilor
 ```
 
-This will create new conda env `nogil` for mocap-wrapper, and will install mocap/wilor in `mocap` env.
+This will create new conda env `nogil` for mocap-wrapper, and will install mocap/wilor in `mocap` env. Manually like this:
 ```sh
 mamba env create -n nogil python-freethreading
 mamba activate nogil
@@ -78,14 +84,14 @@ mamba activate mocap
 ./gvhmr.py
 ```
 
-## usage
+## usage 用法
 See `mocap -h` for more options.
 ```sh
 mocap -i input.mp4
 mocap -i input.mp4 -b gvhmr,wilor -o outdir
 ```
 
-## dev
+## dev 开发
 You have to read these if you want to modify code.
 
 ```sh
@@ -110,13 +116,11 @@ Will do the following steps for each requirements.txt in [`src/mocap_wrapper/req
 key: `Armature mapping from`;`Algorithm run`;`who`;`begin`;`prop[0]`;`prop[1]`...
 
 example: 
-- smplx;gvhmr;person0;0;body_pose;global = array([...], dtype=...)
-- smplx;wilor;person1;9;hand_pose;incam = ...
-- smplx;wilor;person1;1;bbox_xyXY; = ... , start from frame 1
-- smplx;gvhmr;;K = ... , can leave blank
+- smplx;gvhmr;person0;0;body_pose = array([...], dtype=...)
+- smplx;wilor;person1;9;hand_pose = ...
+- smplx;wilor;person1;1;bbox = ...
 
-ps:
-the blender addon use *Armature mapping **to***
+ps: the blender addon use *Armature mapping **to***
 
 #### prop[0]
 - pose: thetas, θ
@@ -126,7 +130,7 @@ the blender addon use *Armature mapping **to***
 - global_orient: rotate 旋转
 - bbox: yolo_bbox_xyXY
 
-## Licenses
+## Licenses 协议
 By using this repository, you must also comply with the terms of these external licenses:
 
 | Repo          | License                                                                                                                                                                                                                                              |

@@ -1,5 +1,6 @@
 #!/bin/env python
 '''
+# this script will set git/pip mirrors, install mamba, mocap-wrapper.
 curl https://raw.githubusercontent.com/AClon314/mocap-wrapper/refs/heads/master/src/mocap_wrapper/script/mamba.py | python
 '''
 import os
@@ -382,8 +383,7 @@ def symlink(src: str, dst: str, is_src_dir=False, overwrite=True,
 
 def i_mocap():
     if shutil.which('mocap'):
-        Log.info("✅ Mocap is already installed.")
-        return
+        Log.info("⚠️ Reinstall mocap")
     try:
         if (envs_now := get_envs(MAMBA)):
             envs, now = envs_now
@@ -453,9 +453,6 @@ def main():
     Log.debug(f'{os.environ=}')
     if not any([is_win, is_mac, is_linux]):
         Log.warning(f"❓ Unsupported OS={sys.platform}")
-    if all([shutil.which(exe) for exe in ('mamba', 'mocap')]):
-        Log.info(f"✅ Already installed. {msg}")
-        return
     # get_args()
     shuffle(MIRROR_DL)
     shuffle(MIRROR_CLONE)

@@ -1,12 +1,13 @@
 #!/bin/python
 import os
+import copy
 import atexit
 import argparse
 import asyncio as aio
-from typing import Any, Coroutine, Sequence
-from mocap_wrapper.logger import IS_DEBUG, cleanup
+from typing import Sequence
+from mocap_wrapper.logger import cleanup
 from mocap_wrapper.lib import DIR, RUNS, CONFIG, PACKAGE, TYPE_RUNS, QRCODE, ffmpeg_or_link, gather, mkdir, path_expand, res_path, __version__
-from mocap_wrapper.install.lib import ENV, install, async_queue, mamba
+from mocap_wrapper.install.lib import ENV, install, mamba
 DEFAULT: Sequence[TYPE_RUNS] = ('wilor', 'gvhmr')
 OUTPUT_DIR = os.path.join(DIR, 'output')
 def version(): return f'{PACKAGE} {__version__} 👻\tconfig: {CONFIG.path}\tcode: https://github.com/AClon314/mocap-wrapper'
@@ -68,18 +69,16 @@ def mocap(
     mkdir(DIR)
     mkdir(outdir)
 
-    tasks: list[Coroutine[Any, Any, Any]] = [async_queue()]
+    _by = list(copy.deepcopy(by))
     for i in by:
-        if CONFIG[i] != True or not os.path.exists(CONFIG[i]):
-            tasks.append(install(runs=by))
-            aio.run(gather(*tasks), debug=IS_DEBUG)
+        if CONFIG[i] == True:   # TODO os.path.exists(CONFIG[i])
+            _by.remove(i)
+    aio.run(install(runs=_by))
     if inputs:
         cleanup()
         for i in inputs:
             # TODO: auto parallelize if vram > 6gb
-            aio.run(
-                run(by, i, outdir, Range=Range, args=_args),
-                debug=IS_DEBUG)
+            aio.run(run(by, i, outdir, Range=Range, args=_args))
 
 
 def script_entry():

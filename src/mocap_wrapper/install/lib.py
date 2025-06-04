@@ -150,6 +150,7 @@ async def get_envs(manager: Literal['mamba', 'conda'] = 'mamba', **kwargs):
         raise ValueError(f"Unsupported manager: {manager}. Use 'mamba' or 'conda'.")
     env['base'] = env[_prefix]
     env.pop(_prefix)
+    Log.debug(f'{env=}')
     return env, now
 
 
@@ -284,6 +285,7 @@ async def install(runs: Sequence[TYPE_RUNS], **kwargs):
         from mocap_wrapper.script.mamba import i_mamba
         i_mamba()
 
+    # Log.debug(f'{runs=}')
     if 'gvhmr' in runs:
         from mocap_wrapper.install.gvhmr import i_gvhmr
         tasks.append(i_gvhmr(**kwargs))

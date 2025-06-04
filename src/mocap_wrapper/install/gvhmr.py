@@ -82,7 +82,7 @@ async def i_gvhmr(Dir=DIR_GVHMR, env=ENV, **kwargs):
     Log.info(f"📦 Install GVHMR at {DIR_GVHMR}")
     if not os.path.exists(Dir):
         os.makedirs(Dir)
-        p = await popen('git clone https://github.com/zju3dv/GVHMR .', Raise=False, **kwargs)
+    p = await popen(f'git clone https://github.com/zju3dv/GVHMR {Dir}', Raise=False, **kwargs)
     os.chdir(DIR_GVHMR)
     i_gvhmr_config(Dir)
     p = mamba(env=env, python='3.10', **kwargs)

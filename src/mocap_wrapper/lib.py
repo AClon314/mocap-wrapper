@@ -325,12 +325,9 @@ async def unzip(
     return p
 
 
-def is_realtime(): return not (sys.stdout.isatty() or os.getenv('GITHUB_ACTION', None))
-
-
 async def popen(
     cmd: str,
-    mode: Literal['realtime', 'wait', 'no-wait'] = 'realtime' if is_realtime() else 'wait',
+    mode: Literal['realtime', 'wait', 'no-wait'] = 'realtime',
     Raise=False,
     timeout: float | int | None = _TIMEOUT,
     **kwargs
@@ -354,7 +351,6 @@ async def popen(
     Log.info(f"{mode}: {cmd=}") if mode != 'wait' else None
     dim = get_terminal_size()
     dim = dim.lines, dim.columns
-    Log.debug(f'{dim=}')
     p = pexpect.spawn(cmd, timeout=timeout, dimensions=dim, **kwargs)
     FD = sys.stdout.fileno()
     def os_write(): return os.write(FD, p.read_nonblocking(4096))
