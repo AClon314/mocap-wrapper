@@ -276,7 +276,7 @@ async def install(runs: Sequence[TYPE_RUNS], **kwargs):
     p_aria = None
     if Aria is None:
         # try to start aria2c
-        p_aria = await popen('aria2c --enable-rpc --rpc-listen-port=6800', timeout=None, **kwargs)
+        p_aria = await popen('aria2c --enable-rpc --rpc-listen-port=6800', timeout=None, mode='no-wait', **kwargs)
         Aria = try_aria_port()
         if Aria is None:
             raise Exception("Failed to connect rpc to aria2, is aria2c/Motrix running?")
@@ -295,8 +295,7 @@ async def install(runs: Sequence[TYPE_RUNS], **kwargs):
         tasks.append(i_wilor_mini(**kwargs))
 
     ret = await aio.gather(*tasks)
-    if p_aria:
-        p_aria.kill(9)
+    p_aria.kill(9) if p_aria else None
     return ret
 
 
