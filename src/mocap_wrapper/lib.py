@@ -862,7 +862,6 @@ def need_ffmpeg(from_file, Range='', fps_times=5):
 
 
 Aria = None
-IS_MIRROR = False
 try:
     import regex as re
     import aria2p

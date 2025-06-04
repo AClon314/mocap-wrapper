@@ -322,7 +322,6 @@ async def clean():
 
 SHELL = get_shell()
 PKG_MGR = get_pkg_mgr()
-IS_MIRROR = aio.run(mirror())
 try:
     if __name__ == '__main__':
         aio.run(install(runs=['gvhmr', ]))

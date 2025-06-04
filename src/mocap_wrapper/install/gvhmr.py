@@ -15,7 +15,8 @@ def i_gvhmr_config(Dir=DIR_GVHMR, file='gvhmr.yaml'):
 async def i_gvhmr_models(Dir=DIR_GVHMR, **kwargs):
     Log.info("📦 Download GVHMR pretrained models (📝 By downloading, you agree to the GVHMR's corresponding licences)")
     # Dir = path_expand(Dir)
-    DOMAIN = 'hf-mirror.com' if IS_MIRROR else 'huggingface.co'
+    is_mirror = await mirror()
+    DOMAIN = 'hf-mirror.com' if is_mirror else 'huggingface.co'
     URL_HUGGINGFACE = f'https://{DOMAIN}/camenduru/GVHMR/resolve/main/'
     LFS = {
         ('dpvo', 'dpvo.pth'): {
