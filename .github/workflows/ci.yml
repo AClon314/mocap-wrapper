@@ -46,4 +46,4 @@ jobs:
 
       #  `-rs` flag is used to debug for the test failure
       - name: pytest
-        run: /root/miniforge3/bin/python -m pytest -rs tests #| tee ./.log/test.log
+        run: mamba run -n base python -m pytest -rs tests #| tee ./.log/test.log
