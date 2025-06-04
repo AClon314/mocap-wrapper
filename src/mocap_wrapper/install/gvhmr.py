@@ -1,7 +1,7 @@
 from mocap_wrapper.install.Gdown import google_drive
 from mocap_wrapper.install.lib import *
 from mocap_wrapper.install.smpl import i_smpl
-from mocap_wrapper.install.dpvo import i_dpvo
+# from mocap_wrapper.install.dpvo import i_dpvo
 DIR_GVHMR = path_expand(os.path.join(DIR, 'GVHMR'))
 Log = getLogger(__name__)
 
@@ -15,7 +15,8 @@ def i_gvhmr_config(Dir=DIR_GVHMR, file='gvhmr.yaml'):
 async def i_gvhmr_models(Dir=DIR_GVHMR, **kwargs):
     Log.info("📦 Download GVHMR pretrained models (📝 By downloading, you agree to the GVHMR's corresponding licences)")
     # Dir = path_expand(Dir)
-    URL_HUGGINGFACE = 'https://huggingface.co/camenduru/GVHMR/resolve/main/'
+    DOMAIN = 'hf-mirror.com' if IS_MIRROR else 'huggingface.co'
+    URL_HUGGINGFACE = f'https://{DOMAIN}/camenduru/GVHMR/resolve/main/'
     LFS = {
         ('dpvo', 'dpvo.pth'): {
             'GD_ID': '1DE5GVftRCfZOTMp8YWF0xkGudDxK0nr0',   # Google Drive ID

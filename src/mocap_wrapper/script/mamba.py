@@ -171,16 +171,16 @@ def mirror_conda(urls: dict | None = None):
 
 def mirror():
     global IS_MIRROR
-    Log.info("🪞 Checking if need mirror...")
+    Log.info("检查是否需要镜像...")
     try:
-        with urlopen('https://www.google.com', timeout=5) as response:
+        with urlopen('https://www.google.com', timeout=4) as response:
             if response.status != 200:
                 raise Exception("Google is not reachable")
             else:
                 IS_MIRROR = False
                 MIRROR_DL.insert(0, ['https://github.com', '美国', '[官方Github]'])
-
     except:
+        Log.info("🪞 使用镜像")
         IS_MIRROR = True
         mirror_clone()
         mirror_pypi()

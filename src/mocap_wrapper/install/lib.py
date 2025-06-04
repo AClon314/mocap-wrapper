@@ -263,6 +263,21 @@ async def git_pull(**kwargs):
     return p
 
 
+async def mirror():
+    Log.info("检查是否需要镜像...")
+    try:
+        timeout = aiohttp.ClientTimeout(total=4)
+        async with aiohttp.ClientSession(timeout=timeout) as session:
+            async with session.get('https://www.google.com') as response:
+                if response.status != 200:
+                    raise Exception("Google is not reachable")
+                else:
+                    return False
+    except:
+        Log.info("🪞 使用镜像")
+        return True
+
+
 async def install(runs: Sequence[TYPE_RUNS], **kwargs):
     global Aria
     tasks = []
@@ -307,6 +322,7 @@ async def clean():
 
 SHELL = get_shell()
 PKG_MGR = get_pkg_mgr()
+IS_MIRROR = aio.run(mirror())
 try:
     if __name__ == '__main__':
         aio.run(install(runs=['gvhmr', ]))

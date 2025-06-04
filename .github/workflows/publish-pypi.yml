@@ -1,16 +1,9 @@
-#  This workflow is an automated CD to the PyPI.
-#  The auto-trigger is disabled by default, you can edit the trigger in the `on` section if you want.
-
-
 name: Publish to PyPI
 
 on:
   workflow_dispatch:
-
-#  Uncomment the following line to trigger the workflow when you make "release" in the repository
-#  release:
-#    types: [created]
-
+    release:
+      types: [created]
 
 jobs:
   pypi-publish:

@@ -10,7 +10,6 @@ import sys
 import json
 import toml
 import hashlib
-import subprocess as sp
 import asyncio as aio
 from pathlib import Path
 from sys import platform
@@ -863,6 +862,7 @@ def need_ffmpeg(from_file, Range='', fps_times=5):
 
 
 Aria = None
+IS_MIRROR = False
 try:
     import regex as re
     import aria2p
