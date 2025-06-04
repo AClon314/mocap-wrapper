@@ -403,7 +403,7 @@ def i_mocap():
     else:
         github = 'gitee' if IS_MIRROR else 'github'
         url = f'git+https://{github}.com/AClon314/mocap-wrapper.git'
-        pkg = f"{__package__}{tag} @ {url}"
+        pkg = f'"{__package__}{tag} @ {url}"'
     for i in range(5):
         p = run(f'{PY["pip"]} install {pkg}')
         error = p.stderr.lower()
