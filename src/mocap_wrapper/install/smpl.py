@@ -78,7 +78,7 @@ async def tue_mpg(
             eg: {'basicmodel_neutral_lbs_10_207_0_v1.1.0.pkl': 'SMPL_NEUTRAL.pkl'}
     """
     f = await tue_mpg_download(**kwargs)
-    p = await unzip(f.path, From=From, to=to, **kwargs)
+    p = unzip(f.path, From=From, to=to, **kwargs)
     for From, to in map.items():
         os.symlink(From, to)
     return f
@@ -101,28 +101,30 @@ async def i_smpl(
     Dir = path_expand(kwargs.setdefault('Dir', DIR))
     tasks = [
         tue_mpg(
-            **filter_kwargs([i_smpl], kwargs),  # type: ignore
-            url='https://download.is.tue.mpg.de/download.php?domain=smpl&sfile=SMPL_python_v.1.1.0.zip',
-            referer='https://smpl.is.tue.mpg.de/',
-            md5='21f382969eed3ee3f597b049f228f84d',
-            From='SMPL_python_v.1.1.0/smpl/models/*',
-            to='smpl',
-            map={'basicmodel_neutral_lbs_10_207_0_v1.1.0.pkl': 'SMPL_NEUTRAL.pkl'},
-            Dir=Dir,
-            PHPSESSID=PHPSESSIDs['smpl'],
+            **kwargs,   # type: ignore
+            **dict(
+                url='https://download.is.tue.mpg.de/download.php?domain=smpl&sfile=SMPL_python_v.1.1.0.zip',
+                referer='https://smpl.is.tue.mpg.de/',
+                md5='21f382969eed3ee3f597b049f228f84d',
+                From='SMPL_python_v.1.1.0/smpl/models/*',
+                to='smpl',
+                map={'basicmodel_neutral_lbs_10_207_0_v1.1.0.pkl': 'SMPL_NEUTRAL.pkl'},
+                Dir=Dir,
+                PHPSESSID=PHPSESSIDs['smpl']),
         ),
         tue_mpg(
-            **filter_kwargs([i_smpl], kwargs),  # type: ignore
-            url='https://download.is.tue.mpg.de/download.php?domain=smplx&sfile=models_smplx_v1_1.zip',
-            referer='https://smpl-x.is.tue.mpg.de/',
-            md5='763a8d2d6525263ed09aeeac3e67b134',
-            From='models/smplx/*',
-            to='smplx',
-            Dir=Dir,
-            PHPSESSID=PHPSESSIDs['smplx'],
+            **kwargs,   # type: ignore
+            **dict(
+                url='https://download.is.tue.mpg.de/download.php?domain=smplx&sfile=models_smplx_v1_1.zip',
+                referer='https://smpl-x.is.tue.mpg.de/',
+                md5='763a8d2d6525263ed09aeeac3e67b134',
+                From='models/smplx/*',
+                to='smplx',
+                Dir=Dir,
+                PHPSESSID=PHPSESSIDs['smplx'],)
         ),
     ]
-    dls = await aio.gather(*await run_1by1(tasks))
+    dls = await aio.gather(*await run_1by1(tasks))  # TODO: download 1by1 when in same domain!!!
 
     if any([not dl.is_complete for dl in dls]):
         Log.error("❌ please check your cookies:PHPSESSID if it's expired, or change your IP address by VPN")

@@ -1,7 +1,8 @@
-"""shared install logic: 
-- shell package manager(apt/dnf/brew/winget)
-- python package manager(pip/mamba/conda)
 """
+- system package manager(apt/dnf/brew/winget)
+- python package manager(pixi)
+"""
+import json
 # from sys import path as PATH
 from shutil import which, copy as cp
 from mocap_wrapper.lib import *
@@ -26,7 +27,7 @@ BIN_PKG = {
         None: 'git',
         'winget': 'Git.Git',
     },
-    'ffmpeg': {None: 'ffmpeg'},
+    'ffmpeg': {None: 'ffmpeg'},  # TODO delayable
 }
 BINS = [_bin for _bin in BIN_PKG.keys()]
 TYPE_SHELLS = Literal['zsh', 'bash', 'ps']
@@ -154,12 +155,13 @@ async def get_envs(manager: Literal['mamba', 'conda'] = 'mamba', **kwargs):
     return env, now
 
 
+@deprecated('use `pixi` instead')
 async def mamba(
     cmd: str = '',
     py_mgr: TYPE_PY_MGRS = 'mamba',
     env=ENV,
     python: str = '',
-    txt: Literal['requirements.txt'] | Path | str = '',
+    txt: Literal['requirements.txt'] | Path | str | None = '',
     pkgs=[],
     **kwargs
 ):
@@ -228,6 +230,7 @@ async def mamba(
     return True  # TODO: return failed list
 
 
+@deprecated('use `pixi` instead')
 def txt_pip_retry(txt: str | Path, tmp_dir=DIR, env=ENV):
     """
     1. remove installed lines
@@ -257,25 +260,10 @@ async def git_pull(**kwargs):
     git submodule update --init --recursive
     ```"""
     kwargs.setdefault('Raise', False)
-    p = await popen('git fetch --all', **kwargs)
-    p = await popen('git pull', **kwargs)
-    p = await popen('git submodule update --init --recursive', **kwargs)
+    p = cmd('git fetch --all', **kwargs)
+    p = cmd('git pull', **kwargs)
+    p = cmd('gitcmd= submodule update --init --recursive', **kwargs)
     return p
-
-
-async def mirror():
-    Log.info("检查是否需要镜像...")
-    try:
-        timeout = aiohttp.ClientTimeout(total=4)
-        async with aiohttp.ClientSession(timeout=timeout) as session:
-            async with session.get('https://www.google.com') as response:
-                if response.status != 200:
-                    raise Exception("Google is not reachable")
-                else:
-                    return False
-    except:
-        Log.info("🪞 使用镜像")
-        return True
 
 
 async def install(runs: Sequence[TYPE_RUNS], **kwargs):
@@ -298,10 +286,6 @@ async def install(runs: Sequence[TYPE_RUNS], **kwargs):
             raise Exception("Failed to connect rpc to aria2, is aria2c/Motrix running?")
     Log.debug(Aria)
 
-    if not which('mamba'):
-        from mocap_wrapper.script.mamba import i_mamba
-        i_mamba()
-
     # Log.debug(f'{runs=}')
     if 'gvhmr' in runs:
         from mocap_wrapper.install.gvhmr import i_gvhmr
@@ -316,8 +300,7 @@ async def install(runs: Sequence[TYPE_RUNS], **kwargs):
 
 
 async def clean():
-    p = await popen('pip cache purge')
-    p = await popen('conda clean --all')
+    p = await cmd('pixcmd=i cache purge')
 
 
 SHELL = get_shell()

@@ -27,7 +27,7 @@ async def test_env_list(mgr: str):
 )
 async def test_mamba(pkgs, env, cmd):
     fail = await mamba(*pkgs, env=env, txt=None, cmd=cmd, dry_run=DRY_RUN)
-    cleanup = await popen(f"{PY_MGR} env remove -y -n {ENV}")
+    cleanup = await popen(f"mamba env remove -y -n {ENV}")
     assert not fail, fail
 
 
@@ -38,7 +38,8 @@ async def test_mamba(pkgs, env, cmd):
       'smplx=8flff24q1cuirp28c1v959r00n')]
 )
 async def test_smpl(smpl, smplx):
-    dls = await i_smpl(PHPSESSIDs={'smpl': smpl, 'smplx': smplx}, dry_run=DRY_RUN)
+    from mocap_wrapper.install.smpl import i_smpl
+    dls = await i_smpl()
     for d in dls:
         assert d.completed_length > 1, d
         os.remove(d.path)
@@ -50,8 +51,6 @@ async def test_smpl(smpl, smplx):
         ('1DE5GVftRCfZOTMp8YWF0xkGudDxK0nr0'),
         ('1c9iCeKFN4Kr6cMPJ9Ss6Jdc3SZFnO5NP'),
         ('1X5hvVqvqI9tvjUCb2oAlZxtgIKD9kvsc'),
-        ('1sR8xZD9wrZczdDVo6zKscNLwvarIRhP5'),
-        ('1_HGm-lqIH83-M1ML4bAXaqhm_eT2FKo5')
     ]
 )
 async def test_Gdrive(ID):

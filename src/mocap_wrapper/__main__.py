@@ -6,11 +6,12 @@ import argparse
 import asyncio as aio
 from typing import Sequence
 from mocap_wrapper.logger import cleanup
-from mocap_wrapper.lib import DIR, RUNS, CONFIG, PACKAGE, TYPE_RUNS, QRCODE, ffmpeg_or_link, gather, mkdir, path_expand, res_path, __version__
+from mocap_wrapper.lib import DIR, RUNS, CONFIG, PACKAGE, TYPE_RUNS, QRCODE, ffmpeg_or_link, mkdir, path_expand, res_path, __version__
 from mocap_wrapper.install.lib import ENV, install, mamba
 DEFAULT: Sequence[TYPE_RUNS] = ('wilor', 'gvhmr')
 OUTPUT_DIR = os.path.join(DIR, 'output')
 def version(): return f'{PACKAGE} {__version__} 👻\tconfig: {CONFIG.path}\tcode: https://github.com/AClon314/mocap-wrapper'
+async def gather(*args, **kwargs): return await aio.gather(*args, **kwargs)
 # TODO： 兼容notebook环境pip，避免循环导入，解耦模块
 
 
@@ -39,7 +40,7 @@ class ArgParser(argparse.ArgumentParser):
         aio.run(gather(*tasks))
 
 
-def argParser():
+def argParse():
     print(version())
     arg = ArgParser(description=f'sincerelly thanks to gvhmr/wilor/wilor-mini devs and others that help each other♥️ , please consider donate♥️ if helps you a lot :)')
     arg.add_argument('-v', '--version', action='store_true')
@@ -82,7 +83,7 @@ def mocap(
 
 
 def script_entry():
-    args, _args = argParser()
+    args, _args = argParse()
     if args.by:
         by = []
         for r in args.by:

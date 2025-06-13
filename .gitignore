@@ -9,3 +9,6 @@
 output/
 out/
 ./test*.py
+# pixi environments
+.pixi
+*.egg-info

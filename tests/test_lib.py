@@ -1,9 +1,12 @@
+#!/bin/env python
+import signal
 import pytest
 import shutil
 import logging
 import numpy as np
 from os import getcwd
 from sys import path as PATH
+from time import sleep
 from mocap_wrapper.run.lib import euler, quat_rotAxis
 CWD = getcwd()
 PATH.append(CWD)
@@ -20,6 +23,32 @@ Log = logging.getLogger(__name__)
 
 
 @pytest.mark.parametrize(
+    'cmds, func',
+    [
+        # (['echo "Hello!"'] * 2, run_fg),
+        # (['mamba env list --json', 'mamba info --json'], run_fg),
+        (['aria2c --enable-rpc --rpc-listen-port=16800'] * 2, run_fg),
+        # (['curl -I https://www.bing.com'] * 2, run_bg),
+    ]
+)
+def test_aexpect(cmds: list[str], func):
+    aexpects: list['aexpect.Expect' | tuple[int, str]] = [func(cmd) for cmd in cmds]
+    failed = []
+    while aexpects:
+        p = aexpects.pop(0)
+        if isinstance(p, (aexpect.Expect, aexpect.Spawn)):
+            p.kill()
+            failed.append(p.command) if p.get_status() != 0 else None
+        elif p[0] != 0:
+            failed.append(p[1])
+    assert not failed, f"status != 0: {failed}"
+
+
+async def test_aria():
+    ...
+
+
+@pytest.mark.parametrize(
     "urls, kwargs",
     [(URLS, {'dir': os.path.join(CWD, 'output')}),]
 )
@@ -31,7 +60,6 @@ async def test_download(urls, kwargs):
         # os.remove(d.path)
 
 
-# @pytest.mark.skip(reason="need to pre-install in CI")
 @pytest.mark.parametrize(
     "Zip, From, To",
     [
@@ -39,22 +67,9 @@ async def test_download(urls, kwargs):
     ]
 )
 async def test_unzip(Zip, From, To):
-    p = await unzip(Zip, From, To)
+    p = unzip(Zip, From, To)
     shutil.rmtree(To)
     assert p.exitstatus == 0, p
-
-
-@pytest.mark.parametrize(
-    "func, kwargs",
-    [
-        (sp.Popen, {'bad': 'arg', 'stdin': sp.PIPE}),
-        (sp.check_output, {'bad': 'arg', 'stdin': sp.PIPE}),
-    ]
-)
-def test_kwargs(func, kwargs):
-    kwargs = filter_kwargs([func], kwargs)
-    p = func(f"echo '{func}' {kwargs}", shell=True, **kwargs)
-    assert p, p
 
 
 @pytest.mark.parametrize(
@@ -69,11 +84,6 @@ async def test_resume(urls):
         except aiohttp.ServerConnectionError as e:
             Log.error(e)
             continue
-
-
-async def test_popen():
-    p = await popen('echo "Hello World!"', mode='wait')
-    assert p.exitstatus == 0, p
 
 
 @pytest.mark.parametrize(

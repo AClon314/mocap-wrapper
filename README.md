@@ -1,17 +1,37 @@
-# mocap-wrapper
+# mocap-wrapper 动捕套壳
 Use with: [mocap_importer](https://github.com/AClon314/mocap_importer_blender)
-
-Platform support:
-| 🐧Linux | 🪟Windows | 🍎 MacOS | Jupyter Notebook |
-| ------ | -------- | ------- | ---------------- |
-| 🚧      | ❓        | ❓       | ❓                |
 
 A bunch of python scripts that wrap around various mocap libraries to provide a unified interface.  
 Only tested on Linux. Not stable yet.
 
 sincerelly thanks to gvhmr/wilor/wilor-mini developers and others that help each other♥️
 
-## solutions
+## WIP 进展
+
+> [!CAUTION]
+> Currently broken! Code refactoring....
+> TODO code refactor in v0.2.1:
+> - MCP standard support: json-rpc
+> - `popen() download() aria()` using `aexpect` lib instead of `pexpect`
+> - use `pixi` and `uv` instead of `mamba`
+>   - pixi global support: https://github.com/prefix-dev/pixi/issues/3725
+>   - simplify by override toml: https://github.com/prefix-dev/pixi/issues/3890
+> - test case and CI, to make the installation process hardly > failed.
+> - wilor continuous predict.
+> pixi workspace platform add $(python -c "import subprocess as p,json;print(json.loads(p.check_output('pixi info --json',shell=True,text=True))['platform'])")
+pixi config set --local run-post-link-scripts insecure
+UV_HTTP_TIMEOUT = 15
+
+Platform support:
+| 🐧Linux | 🪟Windows | 🍎 MacOS | 📔Jupyter Notebook |
+| ------ | -------- | ------- | ----------------- |
+| 🚧      | ❓        | ❓       | ❓                 |
+
+> [!WARNING]Warning 警告
+> There's a huge code refactoring in the up-comming release v0.2.1. The run part in v0.2.0 should be ok, see [issue#2](https://github.com/AClon314/mocap-wrapper/issues/2)
+> 即将发布的 v0.2.1 版本中将进行大规模代码重构，v0.2.0的运行部分应该没有问题，请参阅 [#2](https://github.com/AClon314/mocap-wrapper/issues/2)
+
+## solutions 方案
 <details><summary>
 stage-by-stage scheme
 </summary>
@@ -40,10 +60,11 @@ Rank: [body🕺](https://paperswithcode.com/task/3d-human-pose-estimation "3D人
 | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------- |
 | [✅🕺GVHMR ![⭐](https://img.shields.io/github/stars/zju3dv/GVHMR?style=flat&label=⭐)](https://github.com/zju3dv/GVHMR "World-Grounded Human Motion Recovery via Gravity-View Coordinates")                                    | [![cite🙶](https://api.juleskreuer.eu/citation-badge.php?doi=10.1145/3680528.3687565)](https://doi.org/10.1145/3680528.3687565)           | [![🕒](https://img.shields.io/github/commit-activity/t/zju3dv/GVHMR/main?label=🕒) ![LAST🕒](https://img.shields.io/github/last-commit/zju3dv/GVHMR/main?label=🕒)](https://github.com/zju3dv/GVHMR/commits)                                                          | [![🎯](https://img.shields.io/github/issues/zju3dv/GVHMR?label=⁉️) ![🎯close](https://img.shields.io/github/issues-closed/zju3dv/GVHMR?label=❔)](https://github.com/zju3dv/GVHMR/issues)                                                          | 2024, VRAM > 3GB                                                             |
 | [🚧🕺TRAM ![⭐](https://img.shields.io/github/stars/yufu-wang/tram?style=flat&label=⭐)](https://github.com/yufu-wang/tram "Global Trajectory and Motion of 3D Humans from in-the-wild Videos")                                 | [![cite🙶](https://api.juleskreuer.eu/citation-badge.php?doi=10.1007/978-3-031-73247-8_27)](https://doi.org/10.1007/978-3-031-73247-8_27) | [![🕒](https://img.shields.io/github/commit-activity/t/yufu-wang/tram/main?label=🕒) ![LAST🕒](https://img.shields.io/github/last-commit/yufu-wang/tram/main?label=🕒)](https://github.com/yufu-wang/tram/commits)                                                    | [![🎯](https://img.shields.io/github/issues/yufu-wang/tram?label=⁉️) ![🎯close](https://img.shields.io/github/issues-closed/yufu-wang/tram?label=❔)](https://github.com/yufu-wang/tram/issues)                                                    | 2024, suit for fast-motion, but VRAM > 6GB                                   |
-| [🚧🕺CoMotion ![⭐](https://img.shields.io/github/stars/apple/ml-comotion?style=flat&label=⭐)](https://github.com/apple/ml-comotion "Concurrent Multi-person 3D Motion")                                                       | [![cite🙶](https://api.juleskreuer.eu/citation-badge.php?doi=10.48550/arXiv.2504.12186)](https://doi.org/10.48550/arXiv.2504.12186)       | [![🕒](https://img.shields.io/github/commit-activity/t/apple/ml-comotion/main?label=🕒) ![LAST🕒](https://img.shields.io/github/last-commit/apple/ml-comotion/main?label=🕒)](https://github.com/apple/ml-comotion/commits)                                           | [![🎯](https://img.shields.io/github/issues/apple/ml-comotion?label=⁉️) ![🎯close](https://img.shields.io/github/issues-closed/apple/ml-comotion?label=❔)](https://github.com/apple/ml-comotion/issues)                                           | 2025, belongs to Apple                                                       |
+| [🕒🕺CoMotion ![⭐](https://img.shields.io/github/stars/apple/ml-comotion?style=flat&label=⭐)](https://github.com/apple/ml-comotion "Concurrent Multi-person 3D Motion")                                                       | [![cite🙶](https://api.juleskreuer.eu/citation-badge.php?doi=10.48550/arXiv.2504.12186)](https://doi.org/10.48550/arXiv.2504.12186)       | [![🕒](https://img.shields.io/github/commit-activity/t/apple/ml-comotion/main?label=🕒) ![LAST🕒](https://img.shields.io/github/last-commit/apple/ml-comotion/main?label=🕒)](https://github.com/apple/ml-comotion/commits)                                           | [![🎯](https://img.shields.io/github/issues/apple/ml-comotion?label=⁉️) ![🎯close](https://img.shields.io/github/issues-closed/apple/ml-comotion?label=❔)](https://github.com/apple/ml-comotion/issues)                                           | 2025, belongs to Apple                                                       |
 | [🕒🕺SAT-HMR ![⭐](https://img.shields.io/github/stars/ChiSu001/SAT-HMR?style=flat&label=⭐)](https://github.com/ChiSu001/SAT-HMR "Real-Time Multi-Person 3D Mesh Estimation via Scale-Adaptive Tokens")                        | [![cite🙶](https://api.juleskreuer.eu/citation-badge.php?doi=10.48550/arXiv.2411.19824)](https://doi.org/10.48550/arXiv.2411.19824)       | [![🕒](https://img.shields.io/github/commit-activity/t/ChiSu001/SAT-HMR/main?label=🕒) ![LAST🕒](https://img.shields.io/github/last-commit/ChiSu001/SAT-HMR/main?label=🕒)](https://github.com/ChiSu001/SAT-HMR/commits)                                              | [![🎯](https://img.shields.io/github/issues/ChiSu001/SAT-HMR?label=⁉️) ![🎯close](https://img.shields.io/github/issues-closed/ChiSu001/SAT-HMR?label=❔)](https://github.com/ChiSu001/SAT-HMR/issues)                                              | 2025                                                                         |
 | [✅👋WiLoR ![⭐](https://img.shields.io/github/stars/rolpotamias/WiLoR?style=flat&label=⭐)](https://github.com/rolpotamias/WiLoR "End-to-end 3D hand localization and reconstruction in-the-wild")                             | [![cite🙶](https://api.juleskreuer.eu/citation-badge.php?doi=10.48550/arXiv.2409.12259)](https://doi.org/10.48550/arXiv.2409.12259)       | [![🕒](https://img.shields.io/github/commit-activity/t/rolpotamias/WiLoR/main?label=🕒) ![LAST🕒](https://img.shields.io/github/last-commit/rolpotamias/WiLoR/main?label=🕒)](https://github.com/rolpotamias/WiLoR/commits)                                           | [![🎯](https://img.shields.io/github/issues/rolpotamias/WiLoR?label=⁉️) ![🎯close](https://img.shields.io/github/issues-closed/rolpotamias/WiLoR?label=❔)](https://github.com/rolpotamias/WiLoR/issues)                                           | 2024, use [mini](https://github.com/warmshao/WiLoR-mini), fast, VRAM > 2.5GB |
-| [🚧👋Hamba ![⭐](https://img.shields.io/github/stars/humansensinglab/Hamba?style=flat&label=⭐)](https://github.com/humansensinglab/Hamba "Single-view 3D Hand Reconstruction withGraph-guided Bi-Scanning Mamba")              | [![cite🙶](https://api.juleskreuer.eu/citation-badge.php?doi=10.48550/arXiv.2407.09646)](https://doi.org/10.48550/arXiv.2407.09646)       | [![🕒](https://img.shields.io/github/commit-activity/t/humansensinglab/Hamba/main?label=🕒) ![LAST🕒](https://img.shields.io/github/last-commit/humansensinglab/Hamba/main?label=🕒)](https://github.com/humansensinglab/Hamba/commits)                               | [![🎯](https://img.shields.io/github/issues/humansensinglab/Hamba?label=⁉️) ![🎯close](https://img.shields.io/github/issues-closed/humansensinglab/Hamba?label=❔)](https://github.com/humansensinglab/Hamba/issues)                               | 2025                                                                         |
+| [🚧👋Dyn-HaMR ![⭐](https://img.shields.io/github/stars/ZhengdiYu/Dyn-HaMR?style=flat&label=⭐)](https://github.com/ZhengdiYu/Dyn-HaMR "Recovering 4D Interacting Hand Motion from a Dynamic Camera")                           | [![cite🙶](https://api.juleskreuer.eu/citation-badge.php?doi=10.48550/arXiv.2412.12861)](https://doi.org/10.48550/arXiv.2412.12861)       | [![🕒](https://img.shields.io/github/commit-activity/t/ZhengdiYu/Dyn-HaMR/main?label=🕒) ![LAST🕒](https://img.shields.io/github/last-commit/ZhengdiYu/Dyn-HaMR/main?label=🕒)](https://github.com/ZhengdiYu/Dyn-HaMR/commits)                                        | [![🎯](https://img.shields.io/github/issues/ZhengdiYu/Dyn-HaMR?label=⁉️) ![🎯close](https://img.shields.io/github/issues-closed/ZhengdiYu/Dyn-HaMR?label=❔)](https://github.com/ZhengdiYu/Dyn-HaMR/issues)                                        | 2025                                                                         |
+| [🕒👋Hamba ![⭐](https://img.shields.io/github/stars/humansensinglab/Hamba?style=flat&label=⭐)](https://github.com/humansensinglab/Hamba "Single-view 3D Hand Reconstruction withGraph-guided Bi-Scanning Mamba")              | [![cite🙶](https://api.juleskreuer.eu/citation-badge.php?doi=10.48550/arXiv.2407.09646)](https://doi.org/10.48550/arXiv.2407.09646)       | [![🕒](https://img.shields.io/github/commit-activity/t/humansensinglab/Hamba/main?label=🕒) ![LAST🕒](https://img.shields.io/github/last-commit/humansensinglab/Hamba/main?label=🕒)](https://github.com/humansensinglab/Hamba/commits)                               | [![🎯](https://img.shields.io/github/issues/humansensinglab/Hamba?label=⁉️) ![🎯close](https://img.shields.io/github/issues-closed/humansensinglab/Hamba?label=❔)](https://github.com/humansensinglab/Hamba/issues)                               | 2025                                                                         |
 | [🕒👋OmniHands ![⭐](https://img.shields.io/github/stars/LinDixuan/OmniHands?style=flat&label=⭐)](https://github.com/LinDixuan/OmniHands)                                                                                      | [![cite🙶](https://api.juleskreuer.eu/citation-badge.php?doi=10.48550/arXiv.2405.20330)](https://doi.org/10.48550/arXiv.2405.20330)       | [![🕒](https://img.shields.io/github/commit-activity/t/LinDixuan/OmniHands/main?label=🕒) ![LAST🕒](https://img.shields.io/github/last-commit/LinDixuan/OmniHands/main?label=🕒)](https://github.com/LinDixuan/OmniHands/commits)                                     | [![🎯](https://img.shields.io/github/issues/LinDixuan/OmniHands?label=⁉️) ![🎯close](https://img.shields.io/github/issues-closed/LinDixuan/OmniHands?label=❔)](https://github.com/LinDixuan/OmniHands/issues)                                     | 2024                                                                         |
 | [🕒👋HaMeR ![⭐](https://img.shields.io/github/stars/geopavlakos/hamer?style=flat&label=⭐)](https://github.com/geopavlakos/hamer "Hand Mesh Recovery")                                                                         | [![cite🙶](https://api.juleskreuer.eu/citation-badge.php?doi=10.48550/arXiv.2312.05251)](https://doi.org/10.48550/arXiv.2312.05251)       | [![🕒](https://img.shields.io/github/commit-activity/t/geopavlakos/hamer/main?label=🕒) ![LAST🕒](https://img.shields.io/github/last-commit/geopavlakos/hamer/main?label=🕒)](https://github.com/geopavlakos/hamer/commits)                                           | [![🎯](https://img.shields.io/github/issues/geopavlakos/hamer?label=⁉️) ![🎯close](https://img.shields.io/github/issues-closed/geopavlakos/hamer?label=❔)](https://github.com/geopavlakos/hamer/issues)                                           | 2023                                                                         |
 | [🕒👋HOISDF ![⭐](https://img.shields.io/github/stars/amathislab/hoisdf?style=flat&label=⭐)](https://github.com/amathislab/hoisdf "Constraining 3D Hand-Object Pose Estimation with Global Signed Distance Fields")            | [![cite🙶](https://api.juleskreuer.eu/citation-badge.php?doi=10.1109/CVPR52733.2024.00989)](https://doi.org/10.1109/CVPR52733.2024.00989) | [![🕒](https://img.shields.io/github/commit-activity/t/amathislab/hoisdf/main?label=🕒) ![LAST🕒](https://img.shields.io/github/last-commit/amathislab/hoisdf/main?label=🕒)](https://github.com/amathislab/hoisdf/commits)                                           | [![🎯](https://img.shields.io/github/issues/amathislab/hoisdf?label=⁉️) ![🎯close](https://img.shields.io/github/issues-closed/amathislab/hoisdf?label=❔)](https://github.com/amathislab/hoisdf/issues)                                           | 2024, better on occulusion                                                   |
@@ -69,7 +90,7 @@ Rank: [body🕺](https://paperswithcode.com/task/3d-human-pose-estimation "3D人
 ## install 安装
 ```sh
 # sudo -i; bash <(curl -sSL https://gitee.com/SuperManito/LinuxMirrors/raw/main/ChangeMirrors.sh) # 一键设置linux镜像(可选)
-curl https://raw.githubusercontent.com/AClon314/mocap-wrapper/refs/heads/master/src/mocap_wrapper/script/mamba.py | python
+curl https://raw.githubusercontent.com/AClon314/mocap-wrapper/refs/heads/master/src/mocap_wrapper/install/pixi.py | python
 mocap --install -b gvhmr,wilor
 ```
 
@@ -91,6 +112,12 @@ mocap -i input.mp4
 mocap -i input.mp4 -b gvhmr,wilor -o outdir
 ```
 
+### [data_viewer.ipynb](tests/data_viewer.ipynb)
+
+A useful data visualize tool to expand .pt/.npy/.npz
+
+![vscode data wrangler](https://code.visualstudio.com/assets/docs/datascience/data-wrangler/full-dw-loop.gif)
+
 ## dev 开发
 You have to read these if you want to modify code.
 
@@ -105,12 +132,6 @@ podman build -t mocap -f docker/Dockerfile . --security-opt label=disable
 # github action local
 act -j test -v --action-offline-mode --bind --reuse --env LOG=D # --rm=false
 ```
-
-### requirements
-Will do the following steps for each requirements.txt in [`src/mocap_wrapper/requirements`](src/mocap_wrapper/requirements/gvhmr.txt):
-
-1. use `mamba`/`conda` to install, so the commented lines are not installed.
-2. use `pip` to install the **rest** packages that startwith `# `. So if you want to do comments, you can use `## `or`#...`without space char.
 
 ### .npz struct
 key: `Armature mapping from`;`Algorithm run`;`who`;`begin`;`prop[0]`;`prop[1]`...
@@ -138,3 +159,4 @@ By using this repository, you must also comply with the terms of these external 
 | GVHMR         | [Copyright 2022-2023 3D Vision Group at the State Key Lab of CAD&CG, Zhejiang University. All Rights Reserved. ![CC BY-NC-SA](https://licensebuttons.net/l/by-nc-sa/3.0/88x31.png)](https://github.com/zju3dv/GVHMR/blob/main/LICENSE "CC BY-NC-SA") |
 | WiLoR         | [![CC BY-NC-ND 4.0](https://licensebuttons.net/l/by-nc-nd/3.0/88x31.png)](https://github.com/rolpotamias/WiLoR/blob/main/license.txt "CC BY-NC-ND 4.0")                                                                                              |
 | mocap-wrapper | [AGPL v3](./LICENSE)                                                                                                                                                                                                                                 |
+| conda         | [use conda source to install pytorch-cuda12.1](https://www.anaconda.com/pricing)                                                                                                                                                                     |

@@ -1,5 +1,5 @@
 """modified from https://github.com/wkentaro/gdown/blob/main/gdown/download.py"""
-from regex import search
+from re import search
 from gdown.download import _get_session, parse_url, get_url_from_gdrive_confirmation, indent, textwrap, FileURLRetrievalError, MozillaCookieJar
 
 

@@ -1,4 +1,4 @@
-#! /bin/env -S conda run --live-stream -n mocap python
+#!/usr/bin/env -S pixi -e mocap -- python
 # -*- coding: utf-8 -*-
 # @Time    : 2024/10/14
 # @Author  : wenshao(original), AClon314(modified)
@@ -21,8 +21,8 @@ import argparse
 import numpy as np
 from typing import Literal, Sequence, get_args
 from lib import quat_rotAxis, savez, squeeze, VIDEO_EXT
-from rich.progress import (
-    Progress, TextColumn, BarColumn, TaskProgressColumn, MofNCompleteColumn, TimeElapsedColumn, TimeRemainingColumn)
+# from rich.progress import (
+#     Progress, TextColumn, BarColumn, TaskProgressColumn, MofNCompleteColumn, TimeElapsedColumn, TimeRemainingColumn)
 from sys import platform
 is_win = platform == "win32"
 is_linux = platform == "linux"
@@ -453,8 +453,8 @@ def image_wilor(input='img.png', out_dir=OUTDIR):
 
     pipe = WiLorHandPose3dEstimationPipeline(device=device, dtype=dtype, verbose=False)
     image = cv2.imread(input)
-    image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
     pred = pipe.predict(image)
+    image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
     filename = no_ext_filename(input)
     os.makedirs(out_dir, exist_ok=True)
     preds = []
@@ -545,10 +545,9 @@ def video_wilor(input='video.mp4', out_dir=OUTDIR, progress: Progress | None = N
         ret, frame = cap.read()
         if not ret:
             break
+        _pred = pipe.predict(image)  # hands per frame
         # Convert frame to RGB
         image = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-
-        _pred = pipe.predict(image)  # hands per frame
         data_remap(_pred, preds, frame_count)
 
         if output_path_obj:
@@ -601,7 +600,7 @@ def video_wilor(input='video.mp4', out_dir=OUTDIR, progress: Progress | None = N
     export(preds, os.path.join(out_dir, f'{filename}.mocap.npz'))
 
 
-def argParser():
+def argParse():
     arg = argparse.ArgumentParser()
     arg.add_argument('-i', '--input', metavar='in.mp4')
     arg.add_argument('-o', '--outdir', metavar=OUTDIR, default=OUTDIR)
@@ -644,7 +643,7 @@ def wilor(args: argparse.Namespace, arg: argparse.ArgumentParser):
 
 
 if __name__ == '__main__':
-    args, _, arg = argParser()
+    args, _, arg = argParse()
 import cv2
 import torch
 import pyrender

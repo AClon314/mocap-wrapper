@@ -1,4 +1,4 @@
-#! /bin/env -S conda run --live-stream -n mocap python
+#!/usr/bin/env -S pixi -e mocap -- python
 """
 ⚠️ This [file](https://github.com/zju3dv/GVHMR/blob/main/tools/demo/demo.py) is protected under the GVHMR license agreement, not the AGPL of this repository. See: https://github.com/zju3dv/GVHMR/blob/main/LICENSE
 
@@ -29,7 +29,7 @@ CRF = 23  # 17 is lossless, every +6 halves the mp4 size
 person_count = None
 
 
-def argParser():
+def argParse():
     # Put all args to cfg
     parser = argparse.ArgumentParser()
     parser.add_argument("-i", "--input", type=str, metavar='in.mp4')
@@ -62,7 +62,7 @@ def argParser():
 
 
 if __name__ == "__main__":
-    cfg = argParser()
+    cfg = argParse()
 
 import cv2
 import torch
@@ -101,7 +101,7 @@ from hmr4d.utils.geo_transform import apply_T_on_points, compute_T_ayfz2ay
 def free_ram(): _free_ram(torch)
 
 
-def parse_args_to_cfg(args=argParser()):
+def parse_args_to_cfg(args=argParse()):
     # Input
     video_path = Path(args.input)
     assert video_path.exists(), f"Video not found at {video_path}"

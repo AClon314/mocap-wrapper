@@ -153,7 +153,7 @@ def convert_npt(files: list, outname=_OUTNAME, save=False, Print=False):
     return _FLAT
 
 
-def argParser():
+def argParse():
     arg = argparse.ArgumentParser()
     arg.add_argument('-i', '--input', nargs='+', type=str, help='input file')
     arg.add_argument('-o', '--output', type=str, metavar=_OUTNAME, default=_OUTNAME, help='.npz filename')
@@ -166,4 +166,4 @@ def argParser():
 
 
 if __name__ == '__main__':
-    argParser()
+    argParse()

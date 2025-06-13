@@ -11,10 +11,9 @@ from types import ModuleType
 from typing import Any, Literal, Sequence, TypeVar
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))  # relative import
 try:
-    from ..logger import Log, cleanup
+    from ..logger import Log
 except ImportError:
-    from logger import Log, cleanup   # type: ignore
-cleanup()
+    from logger import Log   # type: ignore
 VIDEO_EXT = "webm,mkv,flv,flv,vob,vob,ogv,ogg,drc,gifv,webm,gifv,mng,avi,mov,qt,wmv,yuv,rm,rmvb,viv,asf,amv,mp4,m4p,m4v,mpg,mp2,mpeg,mpe,mpv,mpg,mpeg,m2v,m4v,svi,3gp,3g2,mxf,roq,nsv,flv,f4v,f4p,f4a,f4b".split(',')
 MAPPING = {
     'gvhmr': 'GVHMR',

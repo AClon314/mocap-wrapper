@@ -1,6 +1,7 @@
+from mocap_wrapper.lib.pkg_mgr import *
 from mocap_wrapper.install.Gdown import google_drive
-from mocap_wrapper.install.lib import *
 from mocap_wrapper.install.smpl import i_smpl
+from mirror_cn import is_need_mirror
 # from mocap_wrapper.install.dpvo import i_dpvo
 DIR_GVHMR = path_expand(os.path.join(DIR, 'GVHMR'))
 Log = getLogger(__name__)
@@ -15,9 +16,10 @@ def i_gvhmr_config(Dir=DIR_GVHMR, file='gvhmr.yaml'):
 async def i_gvhmr_models(Dir=DIR_GVHMR, **kwargs):
     Log.info("📦 Download GVHMR pretrained models (📝 By downloading, you agree to the GVHMR's corresponding licences)")
     # Dir = path_expand(Dir)
-    is_mirror = await mirror()
+    is_mirror = is_need_mirror()
     DOMAIN = 'hf-mirror.com' if is_mirror else 'huggingface.co'
-    URL_HUGGINGFACE = f'https://{DOMAIN}/camenduru/GVHMR/resolve/main/'
+    HUG_GVHMR = f'https://{DOMAIN}/camenduru/GVHMR/resolve/main/'
+    HUG_SMPLX = f'https://{DOMAIN}/camenduru/SMPLer-X/resolve/main/'
     LFS = {
         ('dpvo', 'dpvo.pth'): {
             'GD_ID': '1DE5GVftRCfZOTMp8YWF0xkGudDxK0nr0',   # Google Drive ID
@@ -51,12 +53,12 @@ async def i_gvhmr_models(Dir=DIR_GVHMR, **kwargs):
     coros = []
     try:
         for out, dic in LFS.items():
-            url = URL_HUGGINGFACE + '/'.join(out)
+            url = HUG_GVHMR + '/'.join(out)
             Log.info(f'md5={dic["md5"]}, url={url}, out={os.path.join(Dir, *out)}')
             t = download(url, md5=dic['md5'], out=os.path.join(Dir, *out))
             coros.append(t)
         for out, dic in LFS_SMPL.items():
-            url = URL_HUGGINGFACE + out[-1]
+            url = HUG_SMPLX + out[-1]
             t = download(url, md5=dic['md5'], out=os.path.join(Dir, *out))
             coros.append(t)
         results = await aio.gather(*coros)
