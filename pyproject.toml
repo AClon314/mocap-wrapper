@@ -53,24 +53,15 @@ Homepage = "http://github.com/AClon314/mocap-wrapper"
 mocap = "mocap_wrapper:__main__.script_entry"
 
 [tool.pixi.workspace]
-channels = ["conda-forge", "nvidia", "pytorch"]
-platforms = ["linux-64", "win-64"] # "osx-arm64", "osx-64"
+channels = ["conda-forge"]
+platforms = ["linux-64"] # "osx-arm64", "osx-64"
 
 [tool.pixi.pypi-dependencies]
 mocap-wrapper = {path = ".", editable = true}
 
-[tool.pixi.pypi-options]
-extra-index-urls = [
-  "https://pypi.tuna.tsinghua.edu.cn/simple",
-  "https://pypi.org/simple",
-]
-index-url = "https://mirrors.aliyun.com/pypi/simple"
-
 [tool.pixi.environments]
-default = {features = ["py313"], solve-group = "default"}
-dev = {features = ["py313", "dev"], solve-group = "default"}
-[tool.pixi.feature.py313.dependencies]
-python = "3.13.*"
+default = {features = [], solve-group = "default"}
+dev = {features = ["dev"], solve-group = "default"}
 
 [tool.pixi.tasks]
 

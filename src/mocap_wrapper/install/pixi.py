@@ -1,7 +1,7 @@
 #!/bin/env python
 '''
 # this script will set git/pip mirrors, install mamba, mocap-wrapper.
-curl https://raw.githubusercontent.com/AClon314/mocap-wrapper/refs/heads/master/src/mocap_wrapper/script/mamba.py | python
+curl https://raw.githubusercontent.com/AClon314/mocap-wrapper/refs/heads/master/src/mocap_wrapper/install/mamba.py | python
 '''
 import os
 import re
@@ -14,14 +14,16 @@ import argparse
 import subprocess
 from time import time
 from typing import Literal
-from urllib.request import urlretrieve, urlopen
 from site import getuserbase
-from mirror_cn.mirror import GITHUB_RELEASE, is_need_mirror, global_git, global_pip, Shuffle
+from warnings import deprecated
+from urllib.request import urlretrieve, urlopen
 IS_DEBUG = os.getenv('GITHUB_ACTIONS', None) or os.getenv('LOG', None)
 __package__ = 'mocap_wrapper'
 _LEVEL = logging.DEBUG if IS_DEBUG else logging.INFO
 _SLASH_R = r'\r\033[K' if IS_DEBUG else ''
 _SLASH_N = '\n' if IS_DEBUG else ''
+_SELF = os.path.abspath(__file__)
+_SELF_DIR = os.path.dirname(_SELF)
 logging.basicConfig(level=_LEVEL, format='[%(asctime)s %(levelname)s] %(filename)s:%(lineno)s\t%(message)s', datefmt='%d-%H:%M:%S')
 Log = logging.getLogger(__name__)
 is_win = sys.platform.startswith('win')
@@ -122,16 +124,99 @@ def dl_progress(begin_time: float, filename: str = '', log: bool = True):
     return progress
 
 
-def download(from_url: str, to_path: str | None = None, log=True):
-    Log.info(f"🔍 Download from {from_url}") if log else None
+def download(
+    from_url: str, to_path: str | None = None,
+    if_exist: Literal['override', 'skip'] = 'skip', log=True
+):
     filename = os.path.basename(to_path if to_path else from_url)
+    if if_exist == 'skip' and to_path and os.path.exists(to_path):
+        Log.info(f"🔍❗ Already exists at {to_path}: {from_url}") if log else None
+        return filename, {}
+    Log.info(f"🔍 Download from {from_url}") if log else None
     filename, http_headers = urlretrieve(
         from_url, filename=to_path,
         reporthook=dl_progress(begin_time=time(), filename=filename, log=log))
     return filename, http_headers
 
 
-def get_envs(manager: Literal['mamba', 'conda'] = 'mamba'):
+def get_latest_release_tag(owner='conda-forge', repo='miniforge') -> str:
+    url = f"https://api.github.com/repos/{owner}/{repo}/releases/latest"
+    try:
+        with urlopen(url, timeout=TIMEOUT) as response:
+            data = json.loads(response.read().decode('utf-8'))
+            return data['tag_name']
+    except Exception as e:
+        tag = '25.3.0-3'   # 2025-6-2
+        Log.warning(f"Failed to fetch latest release tag, fallback to {tag}: {e}")
+        return tag
+
+
+def symlink(src: str, dst: str, is_src_dir=False, overwrite=True,
+            *args, dir_fd: int | None = None):
+    Log.debug(f'🔗 symlink {src} → {dst}')
+    if not os.path.exists(src):
+        Log.error(f"{src=} does NOT exist.")
+        return None
+    dst_dir = dst if os.path.isdir(dst) else os.path.dirname(dst)
+    os.makedirs(dst_dir, exist_ok=True)
+    try:
+        if overwrite and os.path.exists(dst):
+            os.remove(dst)
+        os.symlink(src=src, dst=dst, target_is_directory=is_src_dir, *args, dir_fd=dir_fd)
+        return dst
+    except Exception as e:
+        Log.error(f"symlink: {e}")
+        return None
+
+
+def get_argv():
+    """fallback to sys.argv if fails"""
+    import shlex
+    try:
+        import shlex
+        if is_win:
+            result = subprocess.run(
+                ['wmic', 'process', 'where', f'processid={os.getpid()}', 'get', 'commandline', '/value'],
+                capture_output=True, text=True, timeout=5)
+            for line in result.stdout.split('\n'):
+                if line.startswith('CommandLine='):
+                    cmdline = line[12:].strip()
+                    if cmdline:
+                        return shlex.split(cmdline)
+        else:
+            result = subprocess.run(
+                ['ps', '-p', str(os.getpid()), '-o', 'args='],
+                capture_output=True, text=True, timeout=5)
+            if result.returncode == 0:
+                cmdline = result.stdout.strip()
+                if cmdline:
+                    # 使用shlex正确处理引号和转义
+                    return shlex.split(cmdline)
+    except Exception as e:
+        print(f"{e}")
+    # 回退到标准方式
+    return sys.argv
+
+
+_ARGV = get_argv()
+if 'python' in _ARGV[0]:
+    _PYTHON = _ARGV[0]
+else:
+    _PYTHON = 'python'
+    _ARGV.insert(0, _PYTHON)
+try:
+    from mirror_cn import GITHUB_RELEASE, is_need_mirror, global_git, global_pip, global_pixi, Shuffle
+except ImportError:
+    _py_path = os.path.join(_SELF_DIR, 'mirror_cn.py')
+    if os.path.exists(_py_path):
+        raise
+    Log.debug('❗ mirror_cn module not found, fixing...')
+    download('https://gitee.com/aclon314/mirror-cn/raw/main/src/mirror_cn/mirror_cn.py', _py_path)
+    os.execvp(_PYTHON, _ARGV)
+
+
+@deprecated('use `pixi` instead')
+def get_envs(manager: Literal['mamba', 'conda'] | str = 'mamba'):
     """
     Args:
         manager (str): 'mamba', 'conda'
@@ -160,18 +245,7 @@ def get_envs(manager: Literal['mamba', 'conda'] = 'mamba'):
     return env, now
 
 
-def get_latest_release_tag(owner='conda-forge', repo='miniforge') -> str:
-    url = f"https://api.github.com/repos/{owner}/{repo}/releases/latest"
-    try:
-        with urlopen(url, timeout=TIMEOUT) as response:
-            data = json.loads(response.read().decode('utf-8'))
-            return data['tag_name']
-    except Exception as e:
-        tag = '25.3.0-3'   # 2025-6-2
-        Log.warning(f"Failed to fetch latest release tag, fallback to {tag}: {e}")
-        return tag
-
-
+@deprecated('use `pixi` instead')
 def i_mamba():
     if shutil.which('mamba'):
         Log.info("✅ Mamba is already installed.")
@@ -204,6 +278,7 @@ def i_mamba():
     mamba_exe(setup)
 
 
+@deprecated('use `pixi` instead')
 def mamba_exe(setup, cleanup=not IS_DEBUG):
     if is_win:
         p = run(f'start /wait "" {setup} /InstallationType=JustMe /RegisterPython=0 /S /D=%UserProfile%\\Miniforge3')
@@ -216,6 +291,7 @@ def mamba_exe(setup, cleanup=not IS_DEBUG):
     return p
 
 
+@deprecated('use `pixi` instead')
 def global_mamba_path(output: str):
     _prefix = RE['mamba_prefix'].search(output)
     if _prefix:
@@ -227,6 +303,7 @@ def global_mamba_path(output: str):
         raise ValueError(f"Failed to parse mamba prefix from output: {output}")
 
 
+@deprecated('use `pixi` instead')
 def i_micromamba():
     Log.info("📦 Install Micro-mamba")
     if is_win:
@@ -235,24 +312,6 @@ def i_micromamba():
         p = run(r'"${SHELL}" <(curl -L micro.mamba.pm/install.sh)')
     global_mamba_path(p.stdout)
     symlink(MAMBA, os.path.join(BIN, 'mamba')) if not is_win else None
-
-
-def symlink(src: str, dst: str, is_src_dir=False, overwrite=True,
-            *args, dir_fd: int | None = None):
-    Log.debug(f'🔗 symlink {src} → {dst}')
-    if not os.path.exists(src):
-        Log.error(f"{src=} does NOT exist.")
-        return None
-    dst_dir = dst if os.path.isdir(dst) else os.path.dirname(dst)
-    os.makedirs(dst_dir, exist_ok=True)
-    try:
-        if overwrite and os.path.exists(dst):
-            os.remove(dst)
-        os.symlink(src=src, dst=dst, target_is_directory=is_src_dir, *args, dir_fd=dir_fd)
-        return dst
-    except Exception as e:
-        Log.error(f"symlink: {e}")
-        return None
 
 
 def i_mocap():
@@ -323,6 +382,7 @@ def argParse():
 
 
 def main():
+    global IS_MIRROR
     msg = f'Run `mamba activate {ENV}` and `mocap --install -b wilor,gvhmr` to continue!'
     Log.debug(f'{os.environ=}')
     if not any([is_win, is_mac, is_linux]):
@@ -330,7 +390,7 @@ def main():
     # get_args()
     Shuffle()
     socket.setdefaulttimeout(TIMEOUT)
-    is_need_mirror()
+    IS_MIRROR = is_need_mirror()
     i_mamba()
     i_mocap()
     Log.info(f"✅ {msg}`")
@@ -338,5 +398,4 @@ def main():
 
 
 if __name__ == "__main__":
-    i_mamba()
     main()

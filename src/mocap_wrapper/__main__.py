@@ -1,13 +1,11 @@
 #!/bin/python
 import os
 import copy
-import atexit
 import argparse
 import asyncio as aio
 from typing import Sequence
-from mocap_wrapper.logger import cleanup
 from mocap_wrapper.lib import DIR, RUNS, CONFIG, PACKAGE, TYPE_RUNS, QRCODE, ffmpeg_or_link, mkdir, path_expand, res_path, __version__
-from mocap_wrapper.install.lib import ENV, install, mamba
+from mocap_wrapper.lib.install import ENV, install, mamba
 DEFAULT: Sequence[TYPE_RUNS] = ('wilor', 'gvhmr')
 OUTPUT_DIR = os.path.join(DIR, 'output')
 def version(): return f'{PACKAGE} {__version__} 👻\tconfig: {CONFIG.path}\tcode: https://github.com/AClon314/mocap-wrapper'
@@ -63,7 +61,6 @@ def mocap(
     Range: str, at: str, by: Sequence[TYPE_RUNS],
     _args: list[str]
 ):
-    atexit.register(cleanup)
     global DIR
     if at:
         DIR = CONFIG['search_dir'] = path_expand(at)

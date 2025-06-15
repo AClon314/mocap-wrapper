@@ -34,8 +34,8 @@ jobs:
       #   with:
       #     python-version: ${{ matrix.python }}
 
-      - name: (install mocap-wrapper) mamba.py
-        run: python src/mocap_wrapper/script/mamba.py #| tee ./.log/init.log
+      - name: (pre-install mocap-wrapper)
+        run: python src/mocap_wrapper/install/pixi.py #| tee ./.log/init.log
 
       - name: set CN mirror
         if: ${{ env.ACT == 'true' }}

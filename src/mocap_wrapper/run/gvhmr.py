@@ -1,4 +1,4 @@
-#!/usr/bin/env -S pixi -e mocap -- python
+#!/bin/env -S pixi -e mocap -- python
 """
 ⚠️ This [file](https://github.com/zju3dv/GVHMR/blob/main/tools/demo/demo.py) is protected under the GVHMR license agreement, not the AGPL of this repository. See: https://github.com/zju3dv/GVHMR/blob/main/LICENSE
 
