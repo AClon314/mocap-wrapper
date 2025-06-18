@@ -8,15 +8,17 @@ import re
 import sys
 import json
 import socket
+import shlex
 import shutil
 import logging
 import argparse
 import subprocess
 from time import time
-from typing import Literal
 from site import getuserbase
-from warnings import deprecated
 from urllib.request import urlretrieve, urlopen
+from typing import Iterable, Literal, Sequence
+
+from mirror_cn.mirror_cn import try_script
 IS_DEBUG = os.getenv('GITHUB_ACTIONS', None) or os.getenv('LOG', None)
 __package__ = 'mocap_wrapper'
 _LEVEL = logging.DEBUG if IS_DEBUG else logging.INFO
@@ -35,32 +37,36 @@ else:
     BIN = os.path.join(getuserbase(), 'bin') if os.getuid() != 0 else '/usr/local/bin'
 ENV = 'base' if IS_DEBUG else 'nogil'
 FOLDER = 'mocap'
-MAMBA = '/root/miniforge3/bin/mamba'
-CONDA = '/root/miniforge3/bin/conda'
 TIMEOUT = 12
 SLOW_SPEED = 0.5  # MB/s
 _RE = {
-    'mamba_prefix': 'PREFIX=(.*)\n',
     'python': r'Python (\d+).(\d+)',
 }
 RE = {k: re.compile(v) for k, v in _RE.items()}
+_ID = 0
+def _shlex_quote(args: Iterable[str]): return ' '.join(shlex.quote(str(arg)) for arg in args)
+def _get_cmd(cmds: Iterable[str] | str): return cmds if isinstance(cmds, str) else _shlex_quote(cmds)
+def _strip(s: str): return s.strip() if s else ''
 
 
-def run(cmd, timeout=15 * 60, log=True):
-    Log.info(f'run❯ {cmd}') if log else None
-    p = subprocess.run(cmd, shell=True, capture_output=True, text=True, timeout=timeout)
-    p.stdout = p.stdout.strip()
-    p.stderr = p.stderr.strip()
-    if log:
-        Log.info(p.stdout) if p.stdout else None
-        Log.error(p.stderr) if p.stderr else None
-        Log.debug(p.returncode) if p.returncode != 0 else None
-    return p
-
-
-def call(cmd):
-    Log.info(f'call❯ {cmd}')
-    return os.system(cmd)
+def call(cmd: Sequence[str] | str, Print=True):
+    '''⚠️ Strongly recommended use list[str] instead of str to pass commands, 
+    to avoid shell injection risks for online service.'''
+    global _ID
+    _ID += 1
+    prefix = f'{cmd[0]}_{_ID}'
+    cmd = _get_cmd(cmd)
+    Log.info(f'{prefix}🐣❯ {cmd}') if Print else None
+    try:
+        process = subprocess.run(cmd, shell=True, text=True, capture_output=True, check=True)
+    except subprocess.CalledProcessError as e:
+        process = e
+    if Print:
+        stdout = _strip(process.stdout)
+        stderr = _strip(process.stderr)
+        Log.info(f'{prefix}❯ {stdout}') if stdout else None
+        Log.error(f'{prefix}❯ {stderr}') if stderr else None
+    return process
 
 
 def dl_progress(begin_time: float, filename: str = '', log: bool = True):
@@ -205,7 +211,7 @@ else:
     _PYTHON = 'python'
     _ARGV.insert(0, _PYTHON)
 try:
-    from mirror_cn import GITHUB_RELEASE, is_need_mirror, global_git, global_pip, global_pixi, Shuffle
+    from mirror_cn import is_need_mirror, global_pixi, global_git, Shuffle, try_script
 except ImportError:
     _py_path = os.path.join(_SELF_DIR, 'mirror_cn.py')
     if os.path.exists(_py_path):
@@ -215,153 +221,59 @@ except ImportError:
     os.execvp(_PYTHON, _ARGV)
 
 
-@deprecated('use `pixi` instead')
-def get_envs(manager: Literal['mamba', 'conda'] | str = 'mamba'):
-    """
-    Args:
-        manager (str): 'mamba', 'conda'
-        kwargs (dict): `subprocess.Popen()` args
-
-    Returns:
-        env (dict): eg: {'base': '~/miniforge3'}
-        now (str): currently env name like 'base'
-    """
-    p = run(f'{manager} env list --json', log=False)
-    _envs: list = json.loads(p.stdout)['envs']
-    env = {os.path.split(v)[-1]: v for v in _envs}
-    p = run(f'{manager} info --json', log=False)
-    _info = json.loads(p.stdout)
-    _prefix = ''
-    if manager.endswith('mamba'):
-        _prefix = 'miniforge3'
-        now = _info['environment']
-    elif manager.endswith('conda'):
-        _prefix = 'miniconda3'
-        now = _info['active_prefix_name']
-    else:
-        raise ValueError(f"Unsupported manager: {manager}. Use 'mamba' or 'conda'.")
-    env['base'] = env[_prefix]
-    env.pop(_prefix)
-    return env, now
-
-
-@deprecated('use `pixi` instead')
-def i_mamba():
-    if shutil.which('mamba'):
-        Log.info("✅ Mamba is already installed.")
-        return
-    Log.info("📦 Install Mamba")
-    if is_win:
-        setup = "Miniforge3-Windows-x86_64.exe"
-    else:
-        p = run("echo Miniforge3-$(uname)-$(uname -m).sh")
-        setup = p.stdout
-    if os.path.exists(setup):
-        p = mamba_exe(setup)
-        if 'md5sum mismatch' in p.stderr:
-            os.remove(setup)  # remove broken setup
-        else:
-            return
+def i_pixi():
+    if shutil.which('pixi') and not IS_MIRROR:
+        return call(['pixi', 'self-update'])
+    _ext = 'ps1' if is_win else 'sh'
+    _file = f'install.{_ext}'
+    url = f'https://pixi.sh/{_file}'
+    file, _ = download(url, to_path=_file)
+    Log.info(f'{file=}')
     tag = get_latest_release_tag()
-    url = f"/conda-forge/miniforge/releases/download/{tag}/"
-    url += setup
-    for m in GITHUB_RELEASE:
-        _url = m[0] + url
-        Log.info(f"🔍 From {_url} ({m[-1]})")
-        try:
-            setup, _ = download(_url, setup, log=False)
+    os.environ['PIXI_VERSION'] = tag
+    for p in try_script(os.path.join('.', file)):
+        if p.returncode == 0:
             break
-        except Exception as e:
-            Log.warning(f"Skip: {e}")
-    if not os.path.exists(setup):
-        raise FileNotFoundError(f"Download: {setup}")
-    mamba_exe(setup)
-
-
-@deprecated('use `pixi` instead')
-def mamba_exe(setup, cleanup=not IS_DEBUG):
-    if is_win:
-        p = run(f'start /wait "" {setup} /InstallationType=JustMe /RegisterPython=0 /S /D=%UserProfile%\\Miniforge3')
-    else:
-        p = run(f'bash "{setup}" -b')
-    global_mamba_path(p.stdout)
-    if cleanup:
-        os.remove(setup)
-    symlink(MAMBA, os.path.join(BIN, 'mamba')) if not is_win else None  # TODO: mac?
+    path = re.search(r"is installed into '(/.*?)'", p.stdout)
+    path = path.group(1) if path else None
+    if not path:
+        assert False, "Failed to extract path from stdout"
+    Log.info(f'{path=}')
+    # warn: Could not detect shell type.
+    # Please permanently add '/root/.pixi/bin' to your $PATH to enable the 'pixi' command.
+    if p and 'PATH' in p.stderr:
+        _export = f'export PATH=$PATH:{path}'
+        _bashrc = os.path.expanduser('~/.bashrc')
+        if os.path.exists(_bashrc):
+            with open(_bashrc, 'r') as f:
+                content = f.read()
+            if _export not in content:
+                Log.info(f'Adding to {_bashrc}: {_export}')
+        with open(_bashrc, 'a') as f:
+            f.write(f'\n{_export}\n')
+    if not os.path.exists(path):
+        assert False, "Failed to install pixi"
+    Log.info(f"✅ pixi installed: {file}")
     return p
 
 
-@deprecated('use `pixi` instead')
-def global_mamba_path(output: str):
-    _prefix = RE['mamba_prefix'].search(output)
-    if _prefix:
-        prefix: str = _prefix.group(1).strip()
-        global MAMBA, CONDA
-        MAMBA = os.path.join(prefix, 'bin', 'mamba')
-        CONDA = os.path.join(prefix, 'bin', 'conda')
-    else:
-        raise ValueError(f"Failed to parse mamba prefix from output: {output}")
-
-
-@deprecated('use `pixi` instead')
-def i_micromamba():
-    Log.info("📦 Install Micro-mamba")
-    if is_win:
-        p = run('Invoke-Expression ((Invoke-WebRequest -Uri https://micro.mamba.pm/install.ps1 -UseBasicParsing).Content)')
-    else:
-        p = run(r'"${SHELL}" <(curl -L micro.mamba.pm/install.sh)')
-    global_mamba_path(p.stdout)
-    symlink(MAMBA, os.path.join(BIN, 'mamba')) if not is_win else None
+def i_uv():
+    if not shutil.which('pixi'):
+        raise Exception("pixi is not installed")
+    p = call(['pixi', 'global', 'install', 'uv'])  # install uv
+    if (uv := shutil.which('uv')) or p.returncode == 0:
+        Log.info(f"✅ uv installed: {uv=}\t{p.returncode=}")
 
 
 def i_mocap():
+    if not shutil.which('uv'):
+        raise Exception("uv is not installed")
     if shutil.which('mocap'):
         Log.info("⚠️ Reinstall mocap")
-    try:
-        if (envs_now := get_envs(MAMBA)):
-            envs, now = envs_now
-            if ENV not in envs.keys():
-                raise FileNotFoundError(f"Environment '{ENV}' not found.")
-    except:
-        if ENV != 'base':
-            p = run(f"{MAMBA} create -n {ENV} python-freethreading -y")  # don't install in `base`
-
-    envs, _ = get_envs(MAMBA)
-    py_bin = os.path.join(envs[ENV], 'bin')
-    PY = ['pip', 'python']
-    PY = {p: os.path.join(py_bin, p) for p in PY}
-    tag = '[dev]' if IS_DEBUG else ''
-    if IS_DEBUG:
-        pkg = f'-e ".[dev]"'
-    else:
-        github = 'gitee' if IS_MIRROR else 'github'
-        url = f'git+https://{github}.com/AClon314/mocap-wrapper.git'
-        pkg = f'"{__package__}{tag} @ {url}"'
-    for i in range(5):
-        p = run(f'{PY["pip"]} install {pkg}')
-        error = p.stderr.lower()
-        if p.returncode == 0:
-            break
-        elif any([kw in error for kw in ('network', 'git clone')]):
-            global_git() if 'git clone' in error else None
-            global_pip() if 'network' in error else None
-            continue
-        else:
-            raise Exception(f"Failed to install python package.")
-    mocap = os.path.join(os.path.dirname(PY['pip']), 'mocap')
-    symlink(mocap, os.path.join(BIN, 'mocap')) if not is_win else None
-    # Log.debug(f'{p.__dict__=}')
-    # os.makedirs('mocap', exist_ok=True)
-    # os.chdir('mocap')
-    mocap = shutil.which('mocap')
-    if mocap is None:
-        raise FileNotFoundError("mocap executable not found.")
-
-
-def get_shell():
-    p = run('ps -p $$', log=False)
-    shell = p.stdout.splitlines()[1].split()[-1]
-    return shell
+    git = 'https://gitee.com/AClon314/mocap-wrapper' if IS_MIRROR else 'https://github.com/AClon314/mocap-wrapper'
+    p = call(['uv', 'pip', 'install', f'git+{git}'])
+    if (mocap := shutil.which('mocap')) or p.returncode == 0:
+        Log.info(f"✅ mocap installed: {mocap=}\t{p.returncode=}")
 
 
 def set_timeout(timeout: int = TIMEOUT):
@@ -370,31 +282,37 @@ def set_timeout(timeout: int = TIMEOUT):
     socket.setdefaulttimeout(TIMEOUT)
 
 
-def argParse():
-    parser = argparse.ArgumentParser(description='Install mamba & mocap-wrapper script. mamba和mocap-wrapper的预安装脚本。')
-    parser.add_argument('-y', '--yes', action='store_true', help='Skip confirmation prompts. 无人值守，跳过确认提示。')
+def is_post_install():
+    parser = argparse.ArgumentParser(description=f'Pre-install script for {__package__}. {__package__}的预安装脚本。')
+    parser.add_argument('-y', action='store_true', help='⭐ Unattended, only pre-install. 无人值守，仅预安装。')
+    parser.add_argument('--yes', action='store_true', help='Unattended, will run `mocap --install` after pre-install. 无人值守，预安装后将运行 `mocap --install`。')
     args = parser.parse_args()
-    if not args.yes:
-        confirm = input("Install mamba as python env manager, and mocap-wrapper? (y/N): ").strip().lower()
+    if not (args.y or args.yes):
+        confirm = input("Install pixi & uv as python env manager, and mocap-wrapper? (y/N): ").strip().lower()
         if confirm != 'y':
-            Log.info("Installation cancelled.")
             sys.exit(0)
+    elif args.yes:
+        return True
+    return False
 
 
 def main():
     global IS_MIRROR
-    msg = f'Run `mamba activate {ENV}` and `mocap --install -b wilor,gvhmr` to continue!'
+    msg = f'Run `mocap --install -b wilor,gvhmr` to continue!'
     Log.debug(f'{os.environ=}')
-    if not any([is_win, is_mac, is_linux]):
-        Log.warning(f"❓ Unsupported OS={sys.platform}")
-    # get_args()
+    IS_POST_INSTALL = is_post_install()
     Shuffle()
-    socket.setdefaulttimeout(TIMEOUT)
+    set_timeout()
     IS_MIRROR = is_need_mirror()
-    i_mamba()
+    if IS_MIRROR:
+        global_git()
+    i_pixi()
+    i_uv()
     i_mocap()
-    Log.info(f"✅ {msg}`")
-    # os.execvp('mocap', ['mocap', '--install'])
+    if IS_POST_INSTALL:
+        os.execvp('mocap', ['mocap', '--install'])
+    else:
+        Log.info(f"✅ {msg}`")
 
 
 if __name__ == "__main__":

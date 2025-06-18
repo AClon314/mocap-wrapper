@@ -35,7 +35,7 @@ jobs:
       #     python-version: ${{ matrix.python }}
 
       - name: (pre-install mocap-wrapper)
-        run: python src/mocap_wrapper/install/pixi.py #| tee ./.log/init.log
+        run: python src/mocap_wrapper/install/pixi.py -y #| tee ./.log/init.log
 
       - name: set CN mirror
         if: ${{ env.ACT == 'true' }}
@@ -46,4 +46,4 @@ jobs:
 
       #  `-rs` flag is used to debug for the test failure
       - name: pytest
-        run: mamba run -n base python -m pytest -rs tests #| tee ./.log/test.log
+        run: pixi run python -m pytest -rs tests #| tee ./.log/test.log
