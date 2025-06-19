@@ -3,7 +3,7 @@ from mocap_wrapper.install.Gdown import google_drive
 from mocap_wrapper.install.smpl import i_smpl
 from mirror_cn import is_need_mirror
 # from mocap_wrapper.install.dpvo import i_dpvo
-DIR_GVHMR = path_expand(os.path.join(DIR, 'GVHMR'))
+DIR_GVHMR = os.path.join(DIR, 'GVHMR')
 Log = getLogger(__name__)
 
 
@@ -15,7 +15,6 @@ def i_gvhmr_config(Dir=DIR_GVHMR, file='gvhmr.yaml'):
 
 async def i_gvhmr_models(Dir=DIR_GVHMR, **kwargs):
     Log.info("📦 Download GVHMR pretrained models (📝 By downloading, you agree to the GVHMR's corresponding licences)")
-    # Dir = path_expand(Dir)
     is_mirror = is_need_mirror()
     DOMAIN = 'hf-mirror.com' if is_mirror else 'huggingface.co'
     HUG_GVHMR = f'https://{DOMAIN}/camenduru/GVHMR/resolve/main/'
@@ -90,7 +89,7 @@ async def i_gvhmr(Dir=DIR_GVHMR, env=ENV, **kwargs):
     os.chdir(DIR_GVHMR)
     i_gvhmr_config(Dir)
     p = mamba(env=env, python='3.10', **kwargs)
-    dir_checkpoints = path_expand(os.path.join(Dir, 'inputs', 'checkpoints'))
+    dir_checkpoints = os.path.join(Dir, 'inputs', 'checkpoints')
     os.makedirs(os.path.join(dir_checkpoints, 'body_models'), exist_ok=True)
 
     async def i_gvhmr_post():

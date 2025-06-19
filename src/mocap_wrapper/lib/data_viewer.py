@@ -4,15 +4,15 @@
 from data_viewer import convert_npt
 ```
 """
+import os
+import re
+import json
+import argparse
+from typing import Any
 try:
-    import re
-    import os
-    import json
-    import argparse
     import pickle
     import numpy as np
     import torch
-    from typing import Any
 except ImportError as e:
     ...
 _FILE = []

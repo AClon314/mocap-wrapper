@@ -506,7 +506,7 @@ def export_obj(renderer, verts, cam_t, is_right, out='{filename}_hand{idx:02d}.o
     tmesh.export(out)
 
 
-def video_wilor(input='video.mp4', out_dir=OUTDIR, progress: Progress | None = None):
+def video_wilor(input='video.mp4', out_dir=OUTDIR, progress: None = None):
     WiLorHandPose3dEstimationPipeline = Import()
     device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
     dtype = torch.float16

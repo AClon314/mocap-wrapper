@@ -1,9 +1,8 @@
-from mocap_wrapper.install.lib import *
+from mocap_wrapper.lib import *
 
 
 async def i_dpvo(Dir=DIR, env=ENV, **kwargs):
     Log.info("📦 Install DPVO")
-    Dir = path_expand(Dir)
     f = await download(
         'https://gitlab.com/libeigen/eigen/-/archive/3.4.0/eigen-3.4.0.zip',
         md5='994092410ba29875184f7725e0371596',

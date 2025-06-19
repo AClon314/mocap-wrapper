@@ -13,16 +13,12 @@ import asyncio
 from pathlib import Path
 from sys import platform
 from shutil import get_terminal_size
-from typing_extensions import deprecated
 from typing import Coroutine, Literal, Sequence
-from .logger import Log
-from mocap_wrapper.lib import CONFIG, copy_kwargs
-from mocap_wrapper.lib.aria import _TIMEOUT_MINUTE
-DIR = CONFIG['search_dir']
+from .logger import Log, getLogger
+from . import copy_kwargs, _TIMEOUT_MINUTE, DIR
+from typing_extensions import deprecated
+Log = getLogger(__name__)
 _RUN_ID = 0
-is_linux = platform == 'linux'
-is_win = platform == 'win32'
-is_mac = platform == 'darwin'
 def run_async(func: Coroutine, timeout=_TIMEOUT_MINUTE, loop=asyncio.get_event_loop()): return asyncio.run_coroutine_threadsafe(func, loop).result(timeout)
 def shlex_quote(args: Sequence[str]): return ' '.join(shlex.quote(str(arg)) for arg in args)
 

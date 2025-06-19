@@ -41,8 +41,7 @@ def tue_mpg_download(
                         从已登录的 cookie 中获取的 PHPSESSID，**在下次登录后过期**
         user_agent (str, optional): not necessary. User-Agent to prevent error 403
     """
-    Dir = path_expand(Dir)
-    path = path_expand(os.path.join(Dir, 'cookies.txt'))
+    path = os.path.join(Dir, 'cookies.txt')
     cookies = [{
         'domain': DIR + referer.split('/')[2],  # MAYBE BUGGY
         'name': 'PHPSESSID',
@@ -98,7 +97,7 @@ async def i_smpl(
     #     if not (v and isinstance(v, str)):
     #         Log.warning(f"🍪 cookies: PHPSESSID for {k}={v} could cause download failure")
 
-    Dir = path_expand(kwargs.setdefault('Dir', DIR))
+    Dir = kwargs.setdefault('Dir', DIR)
     tasks = [
         tue_mpg(
             **kwargs,   # type: ignore

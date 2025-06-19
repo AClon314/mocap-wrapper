@@ -1,4 +1,4 @@
-from mocap_wrapper.install.lib import *
+from mocap_wrapper.lib import *
 Log = getLogger(__name__)
 
 

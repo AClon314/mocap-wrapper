@@ -3,12 +3,12 @@
 **/.pytest_cache/
 **/venv/
 **/.env
+**/*.lock
+**/mirror_cn.py
 
 *.egg-info/
 *.log
 output/
 out/
 ./test*.py
-# pixi environments
-.pixi
 *.egg-info

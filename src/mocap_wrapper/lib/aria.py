@@ -1,14 +1,13 @@
 #!/bin/env python
+import os
 import asyncio
 import hashlib
-import os
 from typing import TypedDict, Unpack
-from mocap_wrapper.lib import path_expand
 from worker import worker    # type: ignore
-from datetime import timedelta
-from .logger import Log
+from .logger import getLogger
+from . import _TIMEOUT_MINUTE
+Log = getLogger(__name__)
 _ARIA_PORTS = [6800, 16800]
-_TIMEOUT_MINUTE = timedelta(minutes=10).seconds
 _TIMEOUT_SEC = 15      # seconds for next http request, to prevent being 403 blocked
 _OPT = {
     'dir': '',  # you can edit dir here
@@ -134,7 +133,7 @@ async def aria(
         else:
             Log.info(status)
 
-    dl.path = path_expand(dl.files[0].path)
+    dl.path = dl.files[0].path
     # dl.url = Url()
     if dl.is_complete:
         Log.info(f"✅ {dl.path} from '{dl.url}'")
@@ -183,10 +182,8 @@ async def download(
     Path = os.path.join(str(options['dir']), filename)   # if out is just filenmae
     out = str(options.get('out'))
     if out:
-        out = path_expand(out)
         if os.path.exists(out):  # if out is path/filename
             Path = out
-    Path = path_expand(Path)
 
     if md5 and os.path.exists(Path):
         _md5 = await calc_md5(Path)

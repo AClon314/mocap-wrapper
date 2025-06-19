@@ -4,8 +4,7 @@ import copy
 import argparse
 import asyncio as aio
 from typing import Sequence
-from mocap_wrapper.lib import DIR, RUNS, CONFIG, PACKAGE, TYPE_RUNS, QRCODE, ffmpeg_or_link, mkdir, path_expand, res_path, __version__
-from mocap_wrapper.lib.install import ENV, install, mamba
+from mocap_wrapper.lib import DIR, RUNS, CONFIG, PACKAGE, TYPE_RUNS, QRCODE, res_path, run_fg, __version__
 DEFAULT: Sequence[TYPE_RUNS] = ('wilor', 'gvhmr')
 OUTPUT_DIR = os.path.join(DIR, 'output')
 def version(): return f'{PACKAGE} {__version__} 👻\tconfig: {CONFIG.path}\tcode: https://github.com/AClon314/mocap-wrapper'
@@ -20,7 +19,7 @@ async def Python(run: TYPE_RUNS, *args: str):
         run = 'wilorMini'   # type: ignore
     py = res_path(module='run', file=f'{run}.py')
     cmd = f'python {py} {_arg}'
-    return await mamba(cmd, env=ENV)
+    return run_fg(cmd)
 
 
 async def run(runs: Sequence[TYPE_RUNS], input: str, outdir: str, Range='', args: Sequence[str] = []):
@@ -63,9 +62,9 @@ def mocap(
 ):
     global DIR
     if at:
-        DIR = CONFIG['search_dir'] = path_expand(at)
-    mkdir(DIR)
-    mkdir(outdir)
+        DIR = CONFIG['search_dir'] = at
+    os.makedirs(DIR, exist_ok=True)
+    os.makedirs(outdir, exist_ok=True)
 
     _by = list(copy.deepcopy(by))
     for i in by:
@@ -73,7 +72,6 @@ def mocap(
             _by.remove(i)
     aio.run(install(runs=_by))
     if inputs:
-        cleanup()
         for i in inputs:
             # TODO: auto parallelize if vram > 6gb
             aio.run(run(by, i, outdir, Range=Range, args=_args))

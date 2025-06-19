@@ -6,8 +6,9 @@ from ffmpeg import probe as ffprobe
 from fractions import Fraction
 from datetime import datetime, timedelta
 from .process import mkdir, relink
-from .logger import Log, IS_DEBUG
+from .logger import IS_DEBUG, getLogger
 from typing import Any, Literal
+Log = getLogger(__name__)
 
 
 def is_vbr(metadata: dict[str, Any], codec_type: Literal['video', 'audio'] = 'video'):

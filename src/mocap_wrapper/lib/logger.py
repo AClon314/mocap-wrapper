@@ -1,9 +1,8 @@
 """```python
 from mocap_wrapper.logger import PG_DL, IS_DEBUG, LOGLEVEL
 ```"""
-import atexit
 import logging
-from os import environ, path
+from os import environ
 IS_DEBUG = False
 _LOGLEVEL = environ.get('LOG')
 if _LOGLEVEL and _LOGLEVEL.upper().startswith('D'):

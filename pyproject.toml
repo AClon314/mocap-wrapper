@@ -41,7 +41,7 @@ classifiers = [
 requires-python = ">=3.11" # 💡 you can remove the codes about `typing Unpack` to lower the python version
 
 [tool.setuptools.package-data]
-"*" = ["*.txt", "*.yaml", "*.yml"]
+"*" = ["*.yaml", "*.yml", ".toml"]
 
 [project.optional-dependencies]
 dev = ["pytest", "pytest-asyncio", "fake-bpy-module-4.3", "mcp[cli]"]

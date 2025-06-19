@@ -2,13 +2,14 @@
 - system package manager(apt/dnf/brew/winget)
 - python package manager(pixi)
 """
+import os
+import re
 import json
 # from sys import path as PATH
 from shutil import which, copy as cp
 from mocap_wrapper.lib import *
-from mocap_wrapper.logger import getLogger
-from typing import Dict, Literal, Union, get_args
-
+from typing import Literal, Dict, Sequence, Tuple, Union, get_args
+from typing_extensions import deprecated
 Log = getLogger(__name__)
 ENV = 'mocap'
 BIN_PKG = {
@@ -191,7 +192,7 @@ async def mamba(
 
     _txt = ''
     if txt:
-        if os.path.exists(path_expand(txt)):
+        if os.path.exists(txt):
             if py_mgr == 'pip':
                 _txt = '-r ' + str(txt)
             else:
@@ -237,8 +238,7 @@ def txt_pip_retry(txt: str | Path, tmp_dir=DIR, env=ENV):
     2. install package that start with `# ` (not like `##...`or`# #...`)
     """
     filename = os.path.basename(txt)
-    txt = path_expand(txt)
-    tmp = os.path.join(path_expand(tmp_dir), filename)
+    tmp = os.path.join(tmp_dir, filename)
     if not os.path.exists(txt):
         raise FileNotFoundError(f"{txt} not found")
     cp(txt, tmp)
