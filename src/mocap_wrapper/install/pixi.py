@@ -6,21 +6,21 @@ curl https://raw.githubusercontent.com/AClon314/mocap-wrapper/refs/heads/master/
 import os
 import re
 import sys
-import json
 import socket
-import shlex
 import shutil
 import logging
 import argparse
 import subprocess
 from time import time
-from site import getuserbase
-from urllib.request import urlretrieve, urlopen
-from typing import Iterable, Literal, Sequence
-
-from mirror_cn.mirror_cn import try_script
+from locale import getdefaultlocale
+from urllib.request import urlretrieve
+from typing import Literal
 IS_DEBUG = os.getenv('GITHUB_ACTIONS', None) or os.getenv('LOG', None)
-__package__ = 'mocap_wrapper'
+IS_MIRROR = os.getenv('IS_MIRROR', None)
+SEARCH_DIR = 'mocap'
+TIMEOUT = 12
+SLOW_SPEED = 0.5  # MB/s
+_pkg_ = __package__ or 'mocap_wrapper'
 _LEVEL = logging.DEBUG if IS_DEBUG else logging.INFO
 _SLASH_R = r'\r\033[K' if IS_DEBUG else ''
 _SLASH_N = '\n' if IS_DEBUG else ''
@@ -31,42 +31,22 @@ Log = logging.getLogger(__name__)
 is_win = sys.platform.startswith('win')
 is_mac = sys.platform.startswith('darwin')
 is_linux = sys.platform.startswith('linux')
-if is_win:
-    BIN = r'C:\\Windows\\System32'  # TODO: dirty but working
-else:
-    BIN = os.path.join(getuserbase(), 'bin') if os.getuid() != 0 else '/usr/local/bin'
-ENV = 'base' if IS_DEBUG else 'nogil'
-FOLDER = 'mocap'
-TIMEOUT = 12
-SLOW_SPEED = 0.5  # MB/s
+MIRROR_CN_PY = 'https://gitee.com/aclon314/mirror-cn/raw/main/src/mirror_cn/mirror_cn.py' if getdefaultlocale()[0] == 'zh_CN' else 'https://raw.githubusercontent.com/AClon314/mirror-cn/main/src/mirror_cn/mirror_cn.py'
+_HOME = os.path.expanduser('~')
+PIXI_BIN = os.getenv('PIXI_BIN', None) or os.path.join(_HOME, '.pixi', 'bin')
+VENV = os.path.join(_HOME, '.venv')
+os.environ['PATH'] = os.pathsep.join([os.getenv('PATH', ''), PIXI_BIN, os.path.join(VENV, 'bin')])
+_BIN_PYTHON = os.sep.join(sys.executable.split(os.sep)[-2:])
 _RE = {
     'python': r'Python (\d+).(\d+)',
 }
 RE = {k: re.compile(v) for k, v in _RE.items()}
-_ID = 0
-def _shlex_quote(args: Iterable[str]): return ' '.join(shlex.quote(str(arg)) for arg in args)
-def _get_cmd(cmds: Iterable[str] | str): return cmds if isinstance(cmds, str) else _shlex_quote(cmds)
-def _strip(s: str): return s.strip() if s else ''
 
 
-def call(cmd: Sequence[str] | str, Print=True):
-    '''⚠️ Strongly recommended use list[str] instead of str to pass commands, 
-    to avoid shell injection risks for online service.'''
-    global _ID
-    _ID += 1
-    prefix = f'{cmd[0]}_{_ID}'
-    cmd = _get_cmd(cmd)
-    Log.info(f'{prefix}🐣❯ {cmd}') if Print else None
-    try:
-        process = subprocess.run(cmd, shell=True, text=True, capture_output=True, check=True)
-    except subprocess.CalledProcessError as e:
-        process = e
-    if Print:
-        stdout = _strip(process.stdout)
-        stderr = _strip(process.stderr)
-        Log.info(f'{prefix}❯ {stdout}') if stdout else None
-        Log.error(f'{prefix}❯ {stderr}') if stderr else None
-    return process
+def system(args: list):
+    cmd = ' '.join(args)
+    Log.info(f'{cmd=}')
+    return os.system(cmd)
 
 
 def dl_progress(begin_time: float, filename: str = '', log: bool = True):
@@ -145,18 +125,6 @@ def download(
     return filename, http_headers
 
 
-def get_latest_release_tag(owner='conda-forge', repo='miniforge') -> str:
-    url = f"https://api.github.com/repos/{owner}/{repo}/releases/latest"
-    try:
-        with urlopen(url, timeout=TIMEOUT) as response:
-            data = json.loads(response.read().decode('utf-8'))
-            return data['tag_name']
-    except Exception as e:
-        tag = '25.3.0-3'   # 2025-6-2
-        Log.warning(f"Failed to fetch latest release tag, fallback to {tag}: {e}")
-        return tag
-
-
 def symlink(src: str, dst: str, is_src_dir=False, overwrite=True,
             *args, dir_fd: int | None = None):
     Log.debug(f'🔗 symlink {src} → {dst}')
@@ -211,58 +179,61 @@ else:
     _PYTHON = 'python'
     _ARGV.insert(0, _PYTHON)
 try:
-    from mirror_cn import is_need_mirror, global_pixi, global_git, Shuffle, try_script
+    from mirror_cn import is_need_mirror, global_git, global_pixi, global_uv, get_latest_release_tag, try_script, run
 except ImportError:
     _py_path = os.path.join(_SELF_DIR, 'mirror_cn.py')
     if os.path.exists(_py_path):
-        raise
-    Log.debug('❗ mirror_cn module not found, fixing...')
-    download('https://gitee.com/aclon314/mirror-cn/raw/main/src/mirror_cn/mirror_cn.py', _py_path)
+        os.remove(_py_path)
+    Log.debug('❗ fix mirror_cn module...')
+    download(MIRROR_CN_PY, _py_path)
     os.execvp(_PYTHON, _ARGV)
 
 
 def i_pixi():
-    if shutil.which('pixi') and not IS_MIRROR:
-        return call(['pixi', 'self-update'])
+    global PIXI_BIN
+    if shutil.which('pixi'):
+        if IS_MIRROR:
+            Log.warning('Skip pixi self-update')
+            return 0
+        return system(['pixi', 'self-update'])
+    Log.debug(f'{shutil.which("pixi")=}\t{locals()=}')
     _ext = 'ps1' if is_win else 'sh'
     _file = f'install.{_ext}'
     url = f'https://pixi.sh/{_file}'
     file, _ = download(url, to_path=_file)
     Log.info(f'{file=}')
-    tag = get_latest_release_tag()
+    tag = get_latest_release_tag('prefix-dev/pixi')
     os.environ['PIXI_VERSION'] = tag
     for p in try_script(os.path.join('.', file)):
         if p.returncode == 0:
             break
-    path = re.search(r"is installed into '(/.*?)'", p.stdout)
-    path = path.group(1) if path else None
-    if not path:
-        assert False, "Failed to extract path from stdout"
-    Log.info(f'{path=}')
-    # warn: Could not detect shell type.
-    # Please permanently add '/root/.pixi/bin' to your $PATH to enable the 'pixi' command.
-    if p and 'PATH' in p.stderr:
-        _export = f'export PATH=$PATH:{path}'
-        _bashrc = os.path.expanduser('~/.bashrc')
-        if os.path.exists(_bashrc):
-            with open(_bashrc, 'r') as f:
-                content = f.read()
-            if _export not in content:
-                Log.info(f'Adding to {_bashrc}: {_export}')
-        with open(_bashrc, 'a') as f:
-            f.write(f'\n{_export}\n')
-    if not os.path.exists(path):
-        assert False, "Failed to install pixi"
-    Log.info(f"✅ pixi installed: {file}")
+    pixi_bin = re.search(r"is installed into '(.*?)'", p.stdout)
+    pixi_bin = pixi_bin.group(1) if pixi_bin else None
+    PIXI_BIN = pixi_bin or PIXI_BIN  # pixi_bin if pixi_bin else PIXI_BIN
+    os.environ['PATH'] = os.pathsep.join([PIXI_BIN, os.getenv('PATH', '')])
+    if not os.path.exists(PIXI_BIN):
+        raise Exception(f"Post check failed, {PIXI_BIN=} does not exist.")
+    Log.info(f"✅ pixi installed in: {PIXI_BIN=}")
     return p
 
 
 def i_uv():
-    if not shutil.which('pixi'):
+    if not shutil.which(os.path.join(PIXI_BIN, 'pixi')):
         raise Exception("pixi is not installed")
-    p = call(['pixi', 'global', 'install', 'uv'])  # install uv
-    if (uv := shutil.which('uv')) or p.returncode == 0:
-        Log.info(f"✅ uv installed: {uv=}\t{p.returncode=}")
+    if IS_MIRROR:
+        global_pixi()
+    returncode = system(['pixi', 'global', 'install', 'uv'])  # install uv
+    if (UV := shutil.which('uv')) or returncode == 0:
+        Log.info(f"✅ uv installed: {UV=}\t{returncode=}")
+
+    global_uv() if IS_MIRROR else None
+    while (ret := system(['uv', 'python', 'install', '-v'])) and ret != 0:
+        if IS_MIRROR:
+            global_uv()
+    ret = system(['uv', 'venv', VENV, '-v'])
+    PYTHON = os.path.join(VENV, _BIN_PYTHON)
+    if os.path.exists(PYTHON):
+        Log.info(f"✅ uv global .venv installed: {PYTHON=}")
 
 
 def i_mocap():
@@ -270,10 +241,55 @@ def i_mocap():
         raise Exception("uv is not installed")
     if shutil.which('mocap'):
         Log.info("⚠️ Reinstall mocap")
+
+    os.environ['UV_PYTHON'] = os.path.join(VENV, _BIN_PYTHON)
     git = 'https://gitee.com/AClon314/mocap-wrapper' if IS_MIRROR else 'https://github.com/AClon314/mocap-wrapper'
-    p = call(['uv', 'pip', 'install', f'git+{git}'])
-    if (mocap := shutil.which('mocap')) or p.returncode == 0:
-        Log.info(f"✅ mocap installed: {mocap=}\t{p.returncode=}")
+    install = ['-e', '.[dev]'] if os.getcwd().endswith(_pkg_.replace('_', '-')) else [f'git+{git}']
+    _v = ['-v'] if IS_DEBUG else []
+    ret = system(['uv', 'pip', 'install', *install, *_v])
+    if (mocap := shutil.which('mocap')) or ret == 0:
+        Log.info(f"✅ mocap installed: {mocap=}\t{ret=}")
+
+
+def set_activate_cmd():
+    Log.info('Appending activate venv in shell profile...')
+    if is_win:
+        _activate = r'~\.venv\Scripts\activate'  # .venv\Scripts\activate
+        p = run(['powershell', '-Command', '$PROFILE.AllUsersCurrentHost'])
+        profile = p.stdout.strip()
+        os.makedirs(os.path.dirname(profile), exist_ok=True)
+        script = rf'''if (Test-Path "{_activate}") {{
+    & "{_activate}"
+}}
+'''
+        if os.path.exists(profile):
+            with open(profile, 'r', encoding='utf-8') as f:
+                content = f.read()
+        else:
+            content = ''
+
+        if _activate not in content:
+            with open(profile, 'a', encoding='utf-8') as f:
+                f.write(script)
+            Log.info(f'✅ {_activate} → {profile}')
+        return _activate
+    _activate = '. ~/.venv/bin/activate'    # source .venv/bin/activate
+    _export = f'export PATH="$PATH:{PIXI_BIN}"'
+    shells = [_sh for _sh in ['bash', 'zsh', 'xonsh'] if shutil.which(_sh)]
+    for sh in shells:
+        _shrc = os.path.expanduser(f'~/.{sh}rc')
+        if not os.path.exists(_shrc):
+            with open(_shrc, 'w') as f:
+                ...
+        with open(_shrc, 'r') as f:
+            content = f.read()
+        if _activate not in content:
+            with open(_shrc, 'a') as f:
+                f.write(f'\n{_activate}\n{_export}\n')
+            Log.info(f'✅ {_activate} → {_shrc}')
+    if not shells:
+        Log.warning(f'⚠️ Add to your shell init file manually: {_activate}')
+    return _activate
 
 
 def set_timeout(timeout: int = TIMEOUT):
@@ -282,37 +298,36 @@ def set_timeout(timeout: int = TIMEOUT):
     socket.setdefaulttimeout(TIMEOUT)
 
 
-def is_post_install():
-    parser = argparse.ArgumentParser(description=f'Pre-install script for {__package__}. {__package__}的预安装脚本。')
-    parser.add_argument('-y', action='store_true', help='⭐ Unattended, only pre-install. 无人值守，仅预安装。')
-    parser.add_argument('--yes', action='store_true', help='Unattended, will run `mocap --install` after pre-install. 无人值守，预安装后将运行 `mocap --install`。')
+def is_unattended():
+    parser = argparse.ArgumentParser(description=f'Pre-install script for {_pkg_}. {_pkg_}的预安装脚本。')
+    parser.add_argument('-y', '--yes', action='store_true', help='Unattended, only pre-install. 无人值守，仅预安装。')
     args = parser.parse_args()
-    if not (args.y or args.yes):
+    if not args.yes:
         confirm = input("Install pixi & uv as python env manager, and mocap-wrapper? (y/N): ").strip().lower()
         if confirm != 'y':
             sys.exit(0)
-    elif args.yes:
-        return True
-    return False
+        return False
+    return True
 
 
 def main():
     global IS_MIRROR
     msg = f'Run `mocap --install -b wilor,gvhmr` to continue!'
     Log.debug(f'{os.environ=}')
-    IS_POST_INSTALL = is_post_install()
-    Shuffle()
+    IS_AUTO = is_unattended()
     set_timeout()
-    IS_MIRROR = is_need_mirror()
+    if IS_MIRROR is None:
+        IS_MIRROR = is_need_mirror()
+        os.environ['IS_MIRROR'] = str(1)
     if IS_MIRROR:
         global_git()
     i_pixi()
     i_uv()
     i_mocap()
-    if IS_POST_INSTALL:
-        os.execvp('mocap', ['mocap', '--install'])
-    else:
-        Log.info(f"✅ {msg}`")
+    Log.info(f"✅ {msg}`")
+    set_activate_cmd()
+    SHELL = 'powershell' if is_win else os.getenv('SHELL', 'zsh' if is_mac else 'bash')
+    os.execvp(SHELL, [SHELL]) if not IS_AUTO else None
 
 
 if __name__ == "__main__":

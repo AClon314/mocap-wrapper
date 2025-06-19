@@ -1,7 +1,7 @@
 # mocap-wrapper 动捕套壳
 Use with: [mocap_importer](https://github.com/AClon314/mocap_importer_blender)
 
-A bunch of python scripts that wrap around various mocap libraries to provide a unified interface.  
+Wrapping code repositories of various motion capture papers & researches, to provide a unified interface through CLI. Simplify their installation and running.  
 Only tested on Linux. Not stable yet.
 
 sincerelly thanks to gvhmr/wilor/wilor-mini developers and others that help each other♥️
@@ -16,20 +16,25 @@ sincerelly thanks to gvhmr/wilor/wilor-mini developers and others that help each
 > - use `pixi` and `uv` instead of `mamba`
 >   - pixi global support: https://github.com/prefix-dev/pixi/issues/3725
 >   - simplify by override toml: https://github.com/prefix-dev/pixi/issues/3890
-> - test case and CI, to make the installation process hardly > failed.
+> - test case and CI, to make the installation process hardly failed.
 > - wilor continuous predict.
-> pixi workspace platform add $(python -c "import subprocess as p,json;print(json.loads(p.check_output('pixi info --json',shell=True,text=True))['platform'])")
 pixi config set --local run-post-link-scripts insecure
-UV_HTTP_TIMEOUT = 15
 
-Platform support:
-| 🐧Linux | 🪟Windows | 🍎 MacOS | 📔Jupyter Notebook |
-| ------ | -------- | ------- | ----------------- |
-| 🚧      | ❓        | ❓       | ❓                 |
-
-> [!WARNING]Warning 警告
+> [!WARNING] Warning 警告
 > There's a huge code refactoring in the up-comming release v0.2.1. The run part in v0.2.0 should be ok, see [issue#2](https://github.com/AClon314/mocap-wrapper/issues/2)
 > 即将发布的 v0.2.1 版本中将进行大规模代码重构，v0.2.0的运行部分应该没有问题，请参阅 [#2](https://github.com/AClon314/mocap-wrapper/issues/2)
+
+| Feature 功能      |                |
+| ----------------- | -------------- |
+| ✅ Done            | GVHMR, WiLoR   |
+| 🚀 国内镜像加速    | 🚧              |
+| 🐧Linux            | 🚧 Implementing |
+| 🪟Windows          | ❓ Need tested  |
+| 🍎 OSX             | ❓              |
+| 📔Jupyter Notebook | ❓              |
+| 🤖 MCP             | 🕒 TODO         |
+
+
 
 ## solutions 方案
 <details><summary>
@@ -88,21 +93,39 @@ Rank: [body🕺](https://paperswithcode.com/task/3d-human-pose-estimation "3D人
 - *🍎`iphone≥X(12/13 best)`for **better face mocap result** on UE live link, though you can use android🤖 to do live link.*
 
 ## install 安装
+The scripts will smartly skip or update `pixi,uv,mocap-wrapper,7z,aria2c,ffmpeg,git` if they're installed or in system $PATH.
+
 ```sh
 # sudo -i; bash <(curl -sSL https://gitee.com/SuperManito/LinuxMirrors/raw/main/ChangeMirrors.sh) # 一键设置linux镜像(可选)
-curl https://raw.githubusercontent.com/AClon314/mocap-wrapper/refs/heads/master/src/mocap_wrapper/install/pixi.py | python
+curl https://raw.githubusercontent.com/AClon314/mocap-wrapper/refs/heads/master/src/mocap_wrapper/install/pixi.py | python -- -y
 mocap --install -b gvhmr,wilor
 ```
 
-This will create new conda env `nogil` for mocap-wrapper, and will install mocap/wilor in `mocap` env. Manually like this:
-```sh
-mamba env create -n nogil python-freethreading
-mamba activate nogil
-pip install git+https://github.com/AClon314/mocap-wrapper.git
+The python scripts are equivalent to the following:
+```bash
+#!/bin/bash -eou pipefail
+# 1. pixi.py: use system python
+curl -fsSL https://pixi.sh/install.sh | sh
+pixi global install uv
+uv python install
+~/.venv/bin/pip install 'mocap-wrapper @ git+https://github.com/AClon314/mocap-wrapper'
 
-# If you want to debug run/gvhmr.py
-mamba activate mocap
-./gvhmr.py
+# 2. mocap --install
+sudo apt install 7z aria2 ffmpeg git # pixi global install 7z aria2 ffmpeg git
+git clone https://github.com/zju3dv/GVHMR
+aria2c hmr4d.ckpt   # download pre-trained
+```
+
+```mermaid
+%%{init:{'flowchart':{'padding':0, 'htmlLabels':false}, 'htmlLabels':false, 'theme':'base', 'themeVariables':{'primaryColor':'#fff','clusterBkg':'#fff','edgeLabelBackground':'#fff','lineColor':'#000','primaryTextColor':'#000','primaryBorderColor':'#000','secondaryTextColor':'#000', 'clusterBorder':'#888','tertiaryTextColor':'#000'} }}%%
+graph TD
+p[pixi]
+u[uv]
+m[mocap]
+p --global install--> u
+u --global venv--> m
+p --search_dir--> gvhmr,wilor...
+m --> 7z,aria2c,ffmpeg...
 ```
 
 ## usage 用法

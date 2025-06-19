@@ -8,6 +8,7 @@ authors = [
 ]
 dependencies = [
   "mcp",
+  "toml",
   "numpy",
   "gdown",
   "mirror_cn @ git+https://gitee.com/aclon314/mirror-cn.git",

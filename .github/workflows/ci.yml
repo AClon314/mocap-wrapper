@@ -42,7 +42,7 @@ jobs:
         run: curl -I https://www.google.com/ --max-time 4 || bash <(curl -sSL https://gitee.com/SuperManito/LinuxMirrors/raw/main/ChangeMirrors.sh) --source mirrors.aliyun.com --protocol http --use-intranet-source false --backup true --upgrade-software false --clean-cache false --ignore-backup-tips
 
       - name: (install 7z,aria2c,gvhmr,wilor) mocap --install
-        run: mocap --install -b '' # 2>&1 | tee ./.log/install.log
+        run: ~/.venv/bin/mocap --install -b '' # 2>&1 | tee ./.log/install.log
 
       #  `-rs` flag is used to debug for the test failure
       - name: pytest
