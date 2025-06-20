@@ -3,13 +3,13 @@
 - python package manager(pixi)
 """
 import os
-import re
 import json
+import asyncio
 # from sys import path as PATH
 from shutil import which, copy as cp
-from mocap_wrapper.lib import *
-from typing import Literal, Dict, Sequence, Tuple, Union, get_args
-from typing_extensions import deprecated
+from . import *
+from . import TIMEOUT_MINUTE, TIMEOUT_QUATER, DIR
+from typing import Literal, Dict, Tuple, Union, get_args
 Log = getLogger(__name__)
 ENV = 'mocap'
 BIN_PKG = {
@@ -110,8 +110,7 @@ def get_pkg_mgr():
 
 async def pkg(action: TYPE_PKG_ACT, package: list[str] = [], **kwargs):
     p = f"{SU}{PKG_MGR} {PKG_MGRS[PKG_MGR][action]} {' '.join(package)}"
-    p = await popen(p, **kwargs)
-    return p
+    return run_tail(p, **kwargs)
 
 
 async def i_pkgs(**kwargs):
@@ -137,7 +136,7 @@ async def get_envs(manager: Literal['mamba', 'conda'] = 'mamba', **kwargs):
         echo(f'{manager} env list --json', **kwargs),
         echo(f'{manager} info --json', **kwargs)
     ]
-    p_env, p_info = await aio.gather(*tasks)
+    p_env, p_info = await asyncio.gather(*tasks)
     _envs: list = json.loads(p_env[1])['envs']
     env = {os.path.split(v)[-1]: v for v in _envs}
     _info = json.loads(p_info[1])
@@ -156,158 +155,28 @@ async def get_envs(manager: Literal['mamba', 'conda'] = 'mamba', **kwargs):
     return env, now
 
 
-@deprecated('use `pixi` instead')
-async def mamba(
-    cmd: str = '',
-    py_mgr: TYPE_PY_MGRS = 'mamba',
-    env=ENV,
-    python: str = '',
-    txt: Literal['requirements.txt'] | Path | str | None = '',
-    pkgs=[],
-    **kwargs
-):
-    """By default do 2 things:
-    1. create env if no exist
-    2. install from `pkgs` and `txt`
-    3. if `cmd` then, run `cmd` in the env
-
-    Args:
-        py_mgr (str): use `mamba` to install.
-        kwargs (dict): `subprocess.Popen` args
-
-    Returns:
-        TODO: return failed list
-    """
-    envs = {}
-    python = f'python={python}' if python else ''
-    if py_mgr is None:
-        py_mgr = PY_MGR
-    if py_mgr == 'pip':
-        envs, _ = await get_envs('mamba')
-        Log.info(f"skipped creating env for unsupported {py_mgr}")
-    else:
-        envs, _ = await get_envs(py_mgr)
-        if env and env not in envs:
-            p = await popen(f"{py_mgr} create -y -n {env} {python}", **kwargs)
-
-    _txt = ''
-    if txt:
-        if os.path.exists(txt):
-            if py_mgr == 'pip':
-                _txt = '-r ' + str(txt)
-            else:
-                _txt = '--file ' + str(txt)
-        else:
-            Log.warning(f"{_txt} not found as requirements.txt")
-    else:
-        txt = ''
-
-    py_bin = os.path.join(envs[env], 'bin')
-    PY = ['pip', 'python']  # TODO: cache re.compile
-    PY = {p: os.path.join(py_bin, p) for p in PY}
-    if pkgs or txt:
-        if py_mgr == 'pip':
-            p = await popen(f"{PY['pip']} install {_txt} {' '.join(pkgs)}", **kwargs)
-        else:
-            p = await popen(f"{py_mgr} install -y -n {env} {_txt} {' '.join(pkgs)}", **kwargs)
-
-    if cmd:
-        cmd = re.sub(r"'(['])", r"\\\1", cmd)
-        if is_win:
-            _c = '/c'
-        else:
-            _c = '-c'
-
-        is_sub = False
-        for k, v in PY.items():
-            pattern = re.compile(rf'^{k}(?= )')
-            if pattern.match(cmd):
-                cmd = re.sub(pattern, v, cmd)
-                is_sub = True
-                break
-        if not is_sub:
-            cmd = ' '.join(filter(None, (py_mgr, 'run -n', env, SHELL, _c, f"'{cmd}'")))
-        p = await popen(cmd, **kwargs)
-    return True  # TODO: return failed list
-
-
-@deprecated('use `pixi` instead')
-def txt_pip_retry(txt: str | Path, tmp_dir=DIR, env=ENV):
-    """
-    1. remove installed lines
-    2. install package that start with `# ` (not like `##...`or`# #...`)
-    """
-    filename = os.path.basename(txt)
-    tmp = os.path.join(tmp_dir, filename)
-    if not os.path.exists(txt):
-        raise FileNotFoundError(f"{txt} not found")
-    cp(txt, tmp)
-    with open(tmp, 'r', encoding='UTF-8') as f:
-        raw = f.read()
-    raw = re.sub(r'^(?!#).*', '', raw, flags=re.MULTILINE)
-    raw = re.sub(r'^# ', '', raw, flags=re.MULTILINE)
-    with open(tmp, 'w', encoding='UTF-8') as f:
-        f.write(raw)
-    p = mamba(py_mgr='pip', txt=tmp, env=env)
-    # remove_if_p(tmp, p)
-    return p
-
-
-async def git_pull(**kwargs):
+def git_pull(**kwargs):
     """```sh
     git fetch --all
     git pull
     git submodule update --init --recursive
     ```"""
-    kwargs.setdefault('Raise', False)
-    p = cmd('git fetch --all', **kwargs)
-    p = cmd('git pull', **kwargs)
-    p = cmd('gitcmd= submodule update --init --recursive', **kwargs)
+    kwargs.setdefault('timeout', TIMEOUT_QUATER)
+    p = run_tail('git fetch --all', **kwargs)
+    p = run_tail('git pull', **kwargs)
+    p = run_tail('git submodule update --init --recursive', **kwargs)
     return p
 
 
-async def install(runs: Sequence[TYPE_RUNS], **kwargs):
-    global Aria
-    tasks = []
-
-    pkgs = {p: which(p) for p in BINS}
-    Log.debug(f'installed: {pkgs}')
-    pkgs = [p for p, v in pkgs.items() if not v]
-    if any(pkgs):
-        await i_pkgs()
-
-    p_aria = None
-    if Aria is None:
-        # try to start aria2c
-        p_aria = await popen('aria2c --enable-rpc --rpc-listen-port=6800', timeout=None, mode='no-wait', **kwargs)
-        await aio.sleep(1.5)
-        Aria = try_aria_port()
-        if Aria is None:
-            raise Exception("Failed to connect rpc to aria2, is aria2c/Motrix running?")
-    Log.debug(Aria)
-
-    # Log.debug(f'{runs=}')
-    if 'gvhmr' in runs:
-        from mocap_wrapper.install.gvhmr import i_gvhmr
-        tasks.append(i_gvhmr(**kwargs))
-    if 'wilor' in runs:
-        from mocap_wrapper.install.wilor_mini import i_wilor_mini
-        tasks.append(i_wilor_mini(**kwargs))
-
-    ret = await aio.gather(*tasks)
-    p_aria.kill(9) if p_aria else None
-    return ret
-
-
-async def clean():
-    p = await cmd('pixcmd=i cache purge')
+def clean(**kwargs):
+    kwargs.setdefault('timeout', TIMEOUT_MINUTE)
+    cmds = [
+        'pixi cache clean',
+        'uv cache clean',
+    ]
+    for cmd in cmds:
+        run_tail(cmd, **kwargs)
 
 
 SHELL = get_shell()
 PKG_MGR = get_pkg_mgr()
-try:
-    if __name__ == '__main__':
-        aio.run(install(runs=['gvhmr', ]))
-except ImportError:
-    Log.error(f"⚠️ detect missing packages, please check your current conda environment.")
-    raise

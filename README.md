@@ -12,15 +12,13 @@ sincerelly thanks to gvhmr/wilor/wilor-mini developers and others that help each
 > Currently broken! Code refactoring....
 > TODO code refactor in v0.2.1:
 > - MCP standard support: json-rpc
-> - `popen() download() aria()` using `aexpect` lib instead of `pexpect`
 > - use `pixi` and `uv` instead of `mamba`
->   - pixi global support: https://github.com/prefix-dev/pixi/issues/3725
 >   - simplify by override toml: https://github.com/prefix-dev/pixi/issues/3890
 > - test case and CI, to make the installation process hardly failed.
 > - wilor continuous predict.
 pixi config set --local run-post-link-scripts insecure
 
-> [!WARNING] Warning 警告
+> [!WARNING]
 > There's a huge code refactoring in the up-comming release v0.2.1. The run part in v0.2.0 should be ok, see [issue#2](https://github.com/AClon314/mocap-wrapper/issues/2)
 > 即将发布的 v0.2.1 版本中将进行大规模代码重构，v0.2.0的运行部分应该没有问题，请参阅 [#2](https://github.com/AClon314/mocap-wrapper/issues/2)
 
@@ -108,16 +106,22 @@ The python scripts are equivalent to the following:
 curl -fsSL https://pixi.sh/install.sh | sh
 pixi global install uv
 uv python install
-~/.venv/bin/pip install 'mocap-wrapper @ git+https://github.com/AClon314/mocap-wrapper'
+~/.pixi/bin/uv pip install git+https://github.com/AClon314/mocap-wrapper
 
-# 2. mocap --install
+# 2. mocap --install -b ''
 sudo apt install 7z aria2 ffmpeg git # pixi global install 7z aria2 ffmpeg git
 git clone https://github.com/zju3dv/GVHMR
 aria2c hmr4d.ckpt   # download pre-trained
+
+# 3. mocap-wrapper in uv; gvhmr/wilor... in pixi env seperately
+. ~/.venv/bin/activate
+mocap -i input.mp4 -b gvhmr
+cd $SEARCH_DIR/GVHMR
+pixi run run/gvhmr.py
 ```
 
 ```mermaid
-%%{init:{'flowchart':{'padding':0, 'htmlLabels':false}, 'htmlLabels':false, 'theme':'base', 'themeVariables':{'primaryColor':'#fff','clusterBkg':'#fff','edgeLabelBackground':'#fff','lineColor':'#000','primaryTextColor':'#000','primaryBorderColor':'#000','secondaryTextColor':'#000', 'clusterBorder':'#888','tertiaryTextColor':'#000'} }}%%
+%%{init:{'flowchart':{'padding':0, 'htmlLabels':false}, 'htmlLabels':false, 'theme':'base', 'themeVariables':{'primaryColor':'#fff','clusterBkg':'#fff','edgeLabelBackground':'#fff','lineColor':'#888','primaryTextColor':'#000','primaryBorderColor':'#000','secondaryTextColor':'#000', 'clusterBorder':'#888','tertiaryTextColor':'#000'} }}%%
 graph TD
 p[pixi]
 u[uv]
@@ -182,4 +186,3 @@ By using this repository, you must also comply with the terms of these external 
 | GVHMR         | [Copyright 2022-2023 3D Vision Group at the State Key Lab of CAD&CG, Zhejiang University. All Rights Reserved. ![CC BY-NC-SA](https://licensebuttons.net/l/by-nc-sa/3.0/88x31.png)](https://github.com/zju3dv/GVHMR/blob/main/LICENSE "CC BY-NC-SA") |
 | WiLoR         | [![CC BY-NC-ND 4.0](https://licensebuttons.net/l/by-nc-nd/3.0/88x31.png)](https://github.com/rolpotamias/WiLoR/blob/main/license.txt "CC BY-NC-ND 4.0")                                                                                              |
 | mocap-wrapper | [AGPL v3](./LICENSE)                                                                                                                                                                                                                                 |
-| conda         | [use conda source to install pytorch-cuda12.1](https://www.anaconda.com/pricing)                                                                                                                                                                     |

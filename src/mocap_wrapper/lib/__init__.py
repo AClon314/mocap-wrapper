@@ -15,7 +15,8 @@ __version__ = _version(PACKAGE)
 is_linux = platform == 'linux'
 is_win = platform == 'win32'
 is_mac = platform == 'darwin'
-_TIMEOUT_MINUTE = timedelta(minutes=10).seconds
+TIMEOUT_MINUTE = timedelta(minutes=2).seconds
+TIMEOUT_QUATER = timedelta(minutes=15).seconds
 QRCODE = """
 █▀▀▀▀▀█  ▀▀█▄ █ ▄ █▀▀▀▀▀█
 █ ███ █ ▄▀██▄▄█▄█ █ ███ █
@@ -32,7 +33,7 @@ QRCODE = """
 ▀▀▀▀▀▀▀ ▀ ▀▀  ▀ ▀ ▀▀▀▀  ▀"""[1:]
 
 
-def copy_kwargs(
+def copy_args(
     kwargs_call: Callable[_PS, Any]
 ) -> Callable[[Callable[..., _TV]], Callable[_PS, _TV]]:
     """Decorator does nothing but returning the casted original function"""
@@ -41,7 +42,7 @@ def copy_kwargs(
     return return_func
 
 
-def res_path(pkg=__package__, module='requirements', file='requirements.txt'):
+def res_path(pkg=__package__, module='pixi', file='pixi.toml'):
     if pkg is None:
         return Path(DIR_SELF, '..', module, file)
     else:

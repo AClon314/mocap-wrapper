@@ -1,5 +1,5 @@
 """```python
-from mocap_wrapper.logger import PG_DL, IS_DEBUG, LOGLEVEL
+from .logger import IS_DEBUG, LOGLVL
 ```"""
 import logging
 from os import environ

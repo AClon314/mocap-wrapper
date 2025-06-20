@@ -1,5 +1,4 @@
 #!/bin/env python
-import signal
 import pytest
 import shutil
 import logging
@@ -10,7 +9,7 @@ from time import sleep
 from mocap_wrapper.run.lib import euler, quat_rotAxis
 CWD = getcwd()
 PATH.append(CWD)
-from mocap_wrapper.install.lib import *
+from mocap_wrapper.lib import *
 DRY_RUN = False
 ENV = 'test'
 URLS = [
@@ -25,23 +24,38 @@ Log = logging.getLogger(__name__)
 @pytest.mark.parametrize(
     'cmds, func',
     [
-        # (['echo "Hello!"'] * 2, run_fg),
-        # (['mamba env list --json', 'mamba info --json'], run_fg),
-        (['aria2c --enable-rpc --rpc-listen-port=16800'] * 2, run_fg),
-        # (['curl -I https://www.bing.com'] * 2, run_bg),
+        (['sleep 0.5', 'sleep 4', 'sleep 0.5'], run_tail),
+        (['aria2c --enable-rpc --rpc-listen-port=16800'] * 2, run_tail),
+        (['curl -I https://www.bing.com'] * 2, run_tail),
     ]
 )
-def test_aexpect(cmds: list[str], func):
-    aexpects: list['aexpect.Expect' | tuple[int, str]] = [func(cmd) for cmd in cmds]
+def test_aexpect_sync(cmds: list[str], func):
+    aexpects: list['aexpect.Expect'] = [func(cmd, timeout=2) for cmd in cmds]
     failed = []
     while aexpects:
-        p = aexpects.pop(0)
+        p = aexpects.pop()
         if isinstance(p, (aexpect.Expect, aexpect.Spawn)):
             p.kill()
             failed.append(p.command) if p.get_status() != 0 else None
-        elif p[0] != 0:
+        elif p[0] != 0 and p[1]:
+            # run_tail
             failed.append(p[1])
-    assert not failed, f"status != 0: {failed}"
+        else:
+            aexpects.append(p)  # re-append if not finished
+        # Log.info(f'{p.command} {p.get_status()}')
+
+
+@pytest.mark.parametrize(
+    'cmds, func',
+    [
+        (['sleep 0.5', 'sleep 4', 'sleep 0.5'], run_tail),
+    ]
+)
+async def test_aexpect(cmds: list[str], func: Callable[[str], Spawn]):
+    tasks = [func(cmd).Await() for cmd in cmds]
+    Log.info(f'{len(tasks)=}')
+    results = await asyncio.gather(*tasks)
+    Log.info(results)
 
 
 async def test_aria():
@@ -53,8 +67,8 @@ async def test_aria():
     [(URLS, {'dir': os.path.join(CWD, 'output')}),]
 )
 async def test_download(urls, kwargs):
-    tasks = [download(url, dry_run=DRY_RUN, **kwargs) for url in urls]
-    dls = await aio.gather(*tasks)
+    tasks = [download(url, **kwargs) for url in urls]
+    dls = await asyncio.gather(*tasks)
     for d in dls:
         assert d.completed_length > 1, d
         # os.remove(d.path)
@@ -67,9 +81,9 @@ async def test_download(urls, kwargs):
     ]
 )
 async def test_unzip(Zip, From, To):
-    p = unzip(Zip, From, To)
+    p = await unzip(Zip, From, To)
     shutil.rmtree(To)
-    assert p.exitstatus == 0, p
+    assert p.get_status() == 0, p
 
 
 @pytest.mark.parametrize(
@@ -77,8 +91,8 @@ async def test_unzip(Zip, From, To):
     [(URLS),]
 )
 async def test_resume(urls):
-    coros = [aio.create_task(is_resumable_file(url)) for url in urls]
-    for c in aio.as_completed(coros):
+    coros = [asyncio.create_task(is_resumable_file(url)) for url in urls]
+    for c in asyncio.as_completed(coros):
         try:
             is_resume, filename = await c
         except aiohttp.ServerConnectionError as e:
@@ -86,11 +100,11 @@ async def test_resume(urls):
             continue
 
 
+@pytest.skip('requires aria2c')
 @pytest.mark.parametrize(
     "video",
     [
-        '/home/n/download/背越式跳高（慢动作）.mp4',
-        '/home/n/download/跳水.mp4'
+        'https://github.com/warmshao/WiLoR-mini/raw/refs/heads/main/assets/video.mp4',
     ]
 )
 async def test_ffmpeg(video, dry_run=False):
@@ -140,7 +154,7 @@ def setup_progress():
 
 if __name__ == '__main__':
     ...
-    aio.run(
+    asyncio.run(
         test_download(URLS, {'dir': CWD})
         # test_worker()
     )

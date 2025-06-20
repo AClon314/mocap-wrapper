@@ -1,9 +1,12 @@
-from mocap_wrapper.lib.pkg_mgr import *
-from mocap_wrapper.install.Gdown import google_drive
-from mocap_wrapper.install.smpl import i_smpl
+import shutil
 from mirror_cn import is_need_mirror
-# from mocap_wrapper.install.dpvo import i_dpvo
+from mocap_wrapper.lib import *
+from mocap_wrapper.lib import TIMEOUT_MINUTE, TIMEOUT_QUATER
+from .smpl import i_smpl
+from .Gdown import google_drive
+# from .dpvo import i_dpvo
 DIR_GVHMR = os.path.join(DIR, 'GVHMR')
+_IS_MIRROR = os.getenv('IS_MIRROR', None)
 Log = getLogger(__name__)
 
 
@@ -14,9 +17,11 @@ def i_gvhmr_config(Dir=DIR_GVHMR, file='gvhmr.yaml'):
 
 
 async def i_gvhmr_models(Dir=DIR_GVHMR, **kwargs):
+    global _IS_MIRROR
     Log.info("📦 Download GVHMR pretrained models (📝 By downloading, you agree to the GVHMR's corresponding licences)")
-    is_mirror = is_need_mirror()
-    DOMAIN = 'hf-mirror.com' if is_mirror else 'huggingface.co'
+    if _IS_MIRROR is None:
+        _IS_MIRROR = is_need_mirror()
+    DOMAIN = 'hf-mirror.com' if _IS_MIRROR else 'huggingface.co'
     HUG_GVHMR = f'https://{DOMAIN}/camenduru/GVHMR/resolve/main/'
     HUG_SMPLX = f'https://{DOMAIN}/camenduru/SMPLer-X/resolve/main/'
     LFS = {
@@ -60,7 +65,7 @@ async def i_gvhmr_models(Dir=DIR_GVHMR, **kwargs):
             url = HUG_SMPLX + out[-1]
             t = download(url, md5=dic['md5'], out=os.path.join(Dir, *out))
             coros.append(t)
-        results = await aio.gather(*coros)
+        results = await asyncio.gather(*coros)
 
         coros = []
         PATH_MODEL = [os.path.join(Dir, *out) for out in LFS.keys()]
@@ -74,7 +79,7 @@ async def i_gvhmr_models(Dir=DIR_GVHMR, **kwargs):
         IS_SMPL = all([os.path.exists(p) for p in PATH_SMPL])
         if not IS_SMPL:
             coros.append(i_smpl(Dir=os.path.join(Dir, 'body_models'), **kwargs))
-        results = await aio.gather(*coros)
+        results = await asyncio.gather(*coros)
 
         Log.info("✔ Download GVHMR pretrained models")
     except Exception as e:
@@ -85,30 +90,45 @@ async def i_gvhmr(Dir=DIR_GVHMR, env=ENV, **kwargs):
     Log.info(f"📦 Install GVHMR at {DIR_GVHMR}")
     if not os.path.exists(Dir):
         os.makedirs(Dir)
-    p = await popen(f'git clone https://github.com/zju3dv/GVHMR {Dir}', Raise=False, **kwargs)
+    p = await run_tail(f'git clone https://github.com/zju3dv/GVHMR {Dir}', **kwargs).Await(TIMEOUT_MINUTE)
     os.chdir(DIR_GVHMR)
     i_gvhmr_config(Dir)
-    p = mamba(env=env, python='3.10', **kwargs)
+
+    pixi = res_path(file='gvhmr.toml')
+    shutil.copy(pixi, DIR_GVHMR)
+    p = await run_tail(['pixi', 'install', '-v']).Await(TIMEOUT_QUATER)
+    # p = mamba(env=env, python='3.10', **kwargs)
     dir_checkpoints = os.path.join(Dir, 'inputs', 'checkpoints')
     os.makedirs(os.path.join(dir_checkpoints, 'body_models'), exist_ok=True)
 
-    async def i_gvhmr_post():
-        txt = res_path(file='gvhmr.txt')
-        p = await mamba(env=env, txt=txt, **kwargs)
-        p = await txt_pip_retry(txt, env=env)
-        p = await mamba(f'pip install -e {Dir}', env=env, **kwargs)
-        return p
-
     tasks = [
         git_pull(),
-        i_gvhmr_post(),
         # i_dpvo(Dir=os.path.join(Dir, 'third-party/DPVO'), env=env, **kwargs),
         i_gvhmr_models(Dir=dir_checkpoints, **kwargs)
     ]
-    tasks = await aio.gather(*tasks)
     Log.info("✔ Installed GVHMR")
     CONFIG['gvhmr'] = True
 
+
+async def i_dpvo(Dir=DIR, env=ENV, **kwargs):
+    Log.info("📦 Install DPVO")
+    f = await download(
+        'https://gitlab.com/libeigen/eigen/-/archive/3.4.0/eigen-3.4.0.zip',
+        md5='994092410ba29875184f7725e0371596',
+        dir=Dir
+    )
+    if f.is_complete and os.path.exists(f.path):
+        p = await unzip(f.path, to=os.path.join(Dir, 'thirdparty'), **kwargs)
+        # remove_if_p(f.path)    # TODO: remove_if_p
+    else:
+        Log.error("❌ Can't unzip Eigen to third-party/DPVO/thirdparty")
+
+    p = await run_tail(['pixi', 'add', '--pypi', '.']).Await(TIMEOUT_QUATER)  # TODO
+
+    Log.info("✔ Add DPVO")
+    return p
+
+
 if __name__ == '__main__':
     i_gvhmr_config('../GVHMR')
-    # aio.run(i_gvhmr())
+    # asyncio.run(i_gvhmr())

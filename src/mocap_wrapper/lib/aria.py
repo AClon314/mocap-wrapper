@@ -5,7 +5,7 @@ import hashlib
 from typing import TypedDict, Unpack
 from worker import worker    # type: ignore
 from .logger import getLogger
-from . import _TIMEOUT_MINUTE
+from . import TIMEOUT_MINUTE
 Log = getLogger(__name__)
 _ARIA_PORTS = [6800, 16800]
 _TIMEOUT_SEC = 15      # seconds for next http request, to prevent being 403 blocked
@@ -232,7 +232,7 @@ import aiohttp
 Aria = try_aria_port()
 
 
-async def is_resumable_file(url: str, timeout=_TIMEOUT_MINUTE):
+async def is_resumable_file(url: str, timeout=TIMEOUT_MINUTE):
     """```python
     return resumable(True/False), filename(str/None)
     ```"""
@@ -255,4 +255,4 @@ async def is_resumable_file(url: str, timeout=_TIMEOUT_MINUTE):
 
 if __name__ == '__main__':
     ...
-    # run_fg('python -c "from tqdm import tqdm; import time; import sys; [time.sleep(0.02) for _ in tqdm(range(100),file=sys.stdout)]"')
+    # run_tail('python -c "from tqdm import tqdm; import time; import sys; [time.sleep(0.02) for _ in tqdm(range(100),file=sys.stdout)]"')

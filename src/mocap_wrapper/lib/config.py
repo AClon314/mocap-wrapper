@@ -1,7 +1,7 @@
 import toml
 from pathlib import Path
 from platformdirs import user_config_path
-from mocap_wrapper.lib import PACKAGE
+from . import PACKAGE
 from typing import Any, Literal, TypedDict, Union, Unpack
 TYPE_KEYS_CONFIG = Union[Literal['search_dir'], str]  # I think python type system is not mature enough to handle this
 
@@ -45,7 +45,7 @@ class Config(dict):
         with open(file, "w") as f:
             toml.dump(dict(self), f)    # dict() for not recursive
 
-    def __getitem__(self, key: TYPE_KEYS_CONFIG) -> Any:
+    def __getitem__(self, key: TYPE_KEYS_CONFIG):
         return super().__getitem__(key)
 
     def __setitem__(self, key: TYPE_KEYS_CONFIG, value: Any) -> None:

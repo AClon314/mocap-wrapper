@@ -1,5 +1,5 @@
 from mocap_wrapper.lib import *
-from typing import Dict, TypedDict
+from typing import Dict, List, TypedDict
 
 
 class Kw_itmd_coro(TypedDict, total=False):
@@ -77,7 +77,7 @@ async def tue_mpg(
             eg: {'basicmodel_neutral_lbs_10_207_0_v1.1.0.pkl': 'SMPL_NEUTRAL.pkl'}
     """
     f = await tue_mpg_download(**kwargs)
-    p = unzip(f.path, From=From, to=to, **kwargs)
+    p = await unzip(f.path, From=From, to=to, **kwargs)
     for From, to in map.items():
         os.symlink(From, to)
     return f
@@ -123,7 +123,7 @@ async def i_smpl(
                 PHPSESSID=PHPSESSIDs['smplx'],)
         ),
     ]
-    dls = await aio.gather(*await run_1by1(tasks))  # TODO: download 1by1 when in same domain!!!
+    dls = await asyncio.gather(*await run_1by1(tasks))  # TODO: download 1by1 when in same domain!!!
 
     if any([not dl.is_complete for dl in dls]):
         Log.error("❌ please check your cookies:PHPSESSID if it's expired, or change your IP address by VPN")

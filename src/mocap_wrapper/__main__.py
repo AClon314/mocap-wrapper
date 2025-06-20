@@ -1,15 +1,15 @@
 #!/bin/python
 import os
 import copy
+import asyncio
 import argparse
-import asyncio as aio
 from typing import Sequence
-from mocap_wrapper.lib import DIR, RUNS, CONFIG, PACKAGE, TYPE_RUNS, QRCODE, res_path, run_fg, __version__
+from .lib import DIR, RUNS, CONFIG, PACKAGE, TYPE_RUNS, QRCODE, res_path, run_tail, ffmpeg_or_link, __version__
+from .install import install
 DEFAULT: Sequence[TYPE_RUNS] = ('wilor', 'gvhmr')
 OUTPUT_DIR = os.path.join(DIR, 'output')
 def version(): return f'{PACKAGE} {__version__} 👻\tconfig: {CONFIG.path}\tcode: https://github.com/AClon314/mocap-wrapper'
-async def gather(*args, **kwargs): return await aio.gather(*args, **kwargs)
-# TODO： 兼容notebook环境pip，避免循环导入，解耦模块
+async def gather(*args, **kwargs): return await asyncio.gather(*args, **kwargs)
 
 
 async def Python(run: TYPE_RUNS, *args: str):
@@ -19,7 +19,7 @@ async def Python(run: TYPE_RUNS, *args: str):
         run = 'wilorMini'   # type: ignore
     py = res_path(module='run', file=f'{run}.py')
     cmd = f'python {py} {_arg}'
-    return run_fg(cmd)
+    return await run_tail(cmd, output_prefix='', output_func=print).Await()
 
 
 async def run(runs: Sequence[TYPE_RUNS], input: str, outdir: str, Range='', args: Sequence[str] = []):
@@ -34,7 +34,7 @@ class ArgParser(argparse.ArgumentParser):
         print(f'example: mocap -I -@ .. -i input.mp4')
         super().print_help(file)
         tasks = [Python(m, '--help')for m in DEFAULT]
-        aio.run(gather(*tasks))
+        asyncio.run(gather(*tasks))
 
 
 def argParse():
@@ -70,11 +70,11 @@ def mocap(
     for i in by:
         if CONFIG[i] == True:   # TODO os.path.exists(CONFIG[i])
             _by.remove(i)
-    aio.run(install(runs=_by))
+    asyncio.run(install(runs=_by))
     if inputs:
         for i in inputs:
             # TODO: auto parallelize if vram > 6gb
-            aio.run(run(by, i, outdir, Range=Range, args=_args))
+            asyncio.run(run(by, i, outdir, Range=Range, args=_args))
 
 
 def script_entry():
