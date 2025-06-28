@@ -9,8 +9,11 @@ authors = [
 dependencies = [
   "mcp",
   "toml",
+  "tqdm",
   "numpy",
   "gdown",
+  "fastapi",
+  "fastmcp",
   "mirror_cn @ git+https://gitee.com/aclon314/mirror-cn.git",
   "aria2p[tui]",
   "aiohttp",
@@ -18,7 +21,6 @@ dependencies = [
   "platformdirs",
   "prompt_toolkit",
   "typed-ffmpeg", ## mamba failed:
-  "python-worker",
   "netscape-cookies",
 ]
 description = "GVHMR, TRAM, WiLoR...mocap install/run with blender/unreal in one command"
@@ -44,14 +46,14 @@ requires-python = ">=3.11" # 💡 you can remove the codes about `typing Unpack`
 "*" = ["*.yaml", "*.yml", ".toml"]
 
 [project.optional-dependencies]
-dev = ["pytest", "pytest-asyncio", "fake-bpy-module-4.3", "mcp[cli]"]
+dev = ["pytest", "pytest-asyncio", "fake-bpy-module-4.3"]
 
 [project.urls]
 Download = "http://github.com/AClon314/mocap-wrapper/releases"
 Homepage = "http://github.com/AClon314/mocap-wrapper"
 
 [project.scripts]
-mocap = "mocap_wrapper:__main__.script_entry"
+mocap = "mocap_wrapper:script_entry"
 
 [tool.pixi.workspace]
 channels = ["conda-forge"]

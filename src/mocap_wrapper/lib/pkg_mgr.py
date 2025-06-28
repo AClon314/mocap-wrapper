@@ -3,12 +3,12 @@
 - python package manager(pixi)
 """
 import os
-import json
-import asyncio
+import shutil
+from pathlib import Path
 # from sys import path as PATH
-from shutil import which, copy as cp
-from . import *
-from . import TIMEOUT_MINUTE, TIMEOUT_QUATER, DIR
+from . import TIMEOUT_MINUTE, TIMEOUT_QUATER, is_win, is_linux, is_mac, get_cmds
+from .logger import getLogger
+from .process import run_tail
 from typing import Literal, Dict, Tuple, Union, get_args
 Log = getLogger(__name__)
 ENV = 'mocap'
@@ -97,13 +97,13 @@ def remove_if_p(path: str | Path):
 
 def get_shell():
     for s in SHELLS:
-        if which(s):
+        if shutil.which(s):
             return s
 
 
 def get_pkg_mgr():
     for mgr in PKG_MGRS.keys():
-        if which(mgr):
+        if shutil.which(mgr):
             return mgr
     raise FileNotFoundError(f"Not found any of {PKG_MGRS.keys()}")
 
@@ -122,58 +122,25 @@ async def i_pkgs(**kwargs):
     return True
 
 
-async def get_envs(manager: Literal['mamba', 'conda'] = 'mamba', **kwargs):
-    """
-    Args:
-        manager (str): 'mamba', 'conda'
-        kwargs (dict): `subprocess.Popen()` args
-
-    Returns: 
-        env (dict): eg: {'base': '~/miniforge3'}
-        now (str): currently env name like 'base'
-    """
-    tasks = [
-        echo(f'{manager} env list --json', **kwargs),
-        echo(f'{manager} info --json', **kwargs)
-    ]
-    p_env, p_info = await asyncio.gather(*tasks)
-    _envs: list = json.loads(p_env[1])['envs']
-    env = {os.path.split(v)[-1]: v for v in _envs}
-    _info = json.loads(p_info[1])
-    _prefix = ''
-    if manager.endswith('mamba'):
-        _prefix = 'miniforge3'
-        now = _info['environment']
-    elif manager.endswith('conda'):
-        _prefix = 'miniconda3'
-        now = _info['active_prefix_name']
-    else:
-        raise ValueError(f"Unsupported manager: {manager}. Use 'mamba' or 'conda'.")
-    env['base'] = env[_prefix]
-    env.pop(_prefix)
-    Log.debug(f'{env=}')
-    return env, now
-
-
 def git_pull(**kwargs):
-    """```sh
-    git fetch --all
-    git pull
-    git submodule update --init --recursive
-    ```"""
+    """
+git fetch --all  
+git pull  
+git submodule update --init --recursive
+    """
     kwargs.setdefault('timeout', TIMEOUT_QUATER)
-    p = run_tail('git fetch --all', **kwargs)
-    p = run_tail('git pull', **kwargs)
-    p = run_tail('git submodule update --init --recursive', **kwargs)
-    return p
+    cmds = get_cmds(git_pull.__doc__)
+    for cmd in cmds:
+        run_tail(cmd, **kwargs)
 
 
 def clean(**kwargs):
+    '''
+pixi cache clean  
+uv cache clean
+    '''
     kwargs.setdefault('timeout', TIMEOUT_MINUTE)
-    cmds = [
-        'pixi cache clean',
-        'uv cache clean',
-    ]
+    cmds = get_cmds(clean.__doc__)
     for cmd in cmds:
         run_tail(cmd, **kwargs)
 

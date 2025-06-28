@@ -78,7 +78,7 @@ async def ffmpeg_or_link(from_file: str, to_dir: str, Range='', fps_times=5):
     Returns:
         to_file (str): path of final video file
     """
-    kw, is_ffmpeg_from = need_ffmpeg(from_file, Range, fps_times)
+    kw, is_ffmpeg_from = is_need_ffmpeg(from_file, Range, fps_times)
     filename = os.path.splitext(os.path.basename(from_file))[0]
     to_dir = os.path.join(to_dir, filename)   # output/xxx
     to_file = os.path.join(to_dir, filename + '.mp4')
@@ -86,7 +86,7 @@ async def ffmpeg_or_link(from_file: str, to_dir: str, Range='', fps_times=5):
 
     is_ffmpeg_to = os.path.exists(to_file)
     if is_ffmpeg_to:
-        _, is_ffmpeg_to = need_ffmpeg(to_file, fps_times=fps_times)
+        _, is_ffmpeg_to = is_need_ffmpeg(to_file, fps_times=fps_times)
     else:
         is_ffmpeg_to = True
 
@@ -106,7 +106,7 @@ async def ffmpeg_or_link(from_file: str, to_dir: str, Range='', fps_times=5):
     return to_file
 
 
-def need_ffmpeg(from_file, Range='', fps_times=5):
+def is_need_ffmpeg(from_file, Range='', fps_times=5):
     kw: dict[str, Any] = {}
     metadata = ffprobe(from_file)
     from_fps = Fraction(metadata['streams'][0]['r_frame_rate'])

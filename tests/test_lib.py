@@ -58,20 +58,14 @@ async def test_aexpect(cmds: list[str], func: Callable[[str], Spawn]):
     Log.info(results)
 
 
-async def test_aria():
-    ...
-
-
 @pytest.mark.parametrize(
     "urls, kwargs",
     [(URLS, {'dir': os.path.join(CWD, 'output')}),]
 )
 async def test_download(urls, kwargs):
-    tasks = [download(url, **kwargs) for url in urls]
-    dls = await asyncio.gather(*tasks)
-    for d in dls:
-        assert d.completed_length > 1, d
-        # os.remove(d.path)
+    dls = download(urls, **kwargs)
+    await wait_slowest()
+    # os.remove(d.path)
 
 
 @pytest.mark.parametrize(

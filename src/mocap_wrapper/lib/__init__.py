@@ -51,6 +51,13 @@ def res_path(pkg=__package__, module='pixi', file='pixi.toml'):
             return P.absolute()
 
 
+def get_cmds(doc: str | None):
+    cmds = doc.strip().splitlines() if doc else []
+    cmds = [cmd.strip() for cmd in cmds]
+    cmds = [cmd for cmd in cmds if cmd]
+    return cmds
+
+
 from .aria import *
 from .config import *
 from .data_viewer import *
