@@ -22,7 +22,7 @@ BIN_PKG = {
         'winget': '7z',
         'dnf': '7z',
         'brew': 'p7zip',
-        'apt': 'p7zip-full p7zip-rar',
+        'apt': 'p7zip-full',    # TODO: p7zip-rar
     },
     'git': {
         None: 'git',
@@ -35,49 +35,49 @@ TYPE_SHELLS = Literal['zsh', 'bash', 'ps']
 SHELLS: Tuple[TYPE_SHELLS] = get_args(TYPE_SHELLS)
 TYPE_PY_MGRS = Literal['mamba', 'conda', 'pip']
 PY_MGRS: Tuple[TYPE_PY_MGRS] = get_args(TYPE_PY_MGRS)
-SU = '' if is_win or os.geteuid() == 0 else 'sudo '
+SU = '' if is_win or os.geteuid() == 0 else 'sudo'
 TYPE_PKG_ACT = Union[None, Literal['install', 'remove', 'update']]
-PKG_MGRS: Dict[str, Dict[TYPE_PKG_ACT, str]] = {
+PKG_MGRS: Dict[str, Dict[TYPE_PKG_ACT, str | list]] = {
     'winget': {
         # windows # https://github.com/microsoft/winget-pkgs , `t` search file in `manifest`
-        'update': 'upgrade --all --silent',
-        'install': 'install --accept-package-agreements',
+        'update': 'upgrade --all --silent'.split(),
+        'install': 'install --accept-package-agreements'.split(),
         'remove': 'uninstall'
     },
     'apt': {
         # debian, ubuntu # https://packages.debian.org/search?keywords=
-        'update': 'update -y',
-        'install': 'install -y --ignore-missing',
+        'update': 'update -y'.split(),
+        'install': 'install -y --ignore-missing'.split(),
         'remove': 'remove'
     },
     'pacman': {
         # arch # https://archlinux.org/packages/?repo=Extra&q=
         'update': '-Sy',
-        'install': '-S --noconfirm',
+        'install': '-S --noconfirm'.split(),
         'remove': '-R'
     },
     'dnf': {
         # fedora # https://pkgs.org/search/?q=
-        'update': 'check-update -y',
-        'install': 'install -y --skip-unavailable',
+        'update': 'check-update -y'.split(),
+        'install': 'install -y --skip-unavailable'.split(),
         'remove': 'remove'
     },
     'zypper': {
         # suse # https://packagehub.suse.com/search/?q=
         'update': 'refresh',
-        'install': 'install -n --ignore-unknown',
+        'install': 'install -n --ignore-unknown'.split(),
         'remove': 'remove'
     },
     'emerge': {
         # gentoo # https://packages.gentoo.org/packages/search?q=
         'update': '--sync',
-        'install': '--ask=n --keep-going',
+        'install': '--ask=n --keep-going'.split(),
         'remove': '--unmerge'
     },
     'brew': {
         # macos, linux # https://formulae.brew.sh/formula/
-        'update': 'update -y',
-        'install': 'install -y',
+        'update': 'update -y'.split(),
+        'install': 'install -y'.split(),
         'remove': 'remove'
     },
 }
@@ -109,7 +109,9 @@ def get_pkg_mgr():
 
 
 async def pkg(action: TYPE_PKG_ACT, package: list[str] = [], **kwargs):
-    p = f"{SU}{PKG_MGR} {PKG_MGRS[PKG_MGR][action]} {' '.join(package)}"
+    act = PKG_MGRS[PKG_MGR][action]
+    act = [act] if isinstance(act, str) else act
+    p = [SU] if SU else [] + [PKG_MGR] + act + package
     return run_tail(p, **kwargs)
 
 
@@ -122,16 +124,16 @@ async def i_pkgs(**kwargs):
     return True
 
 
-def git_pull(**kwargs):
+async def git_pull(**kwargs):
     """
 git fetch --all  
 git pull  
 git submodule update --init --recursive
     """
-    kwargs.setdefault('timeout', TIMEOUT_QUATER)
+    timeout = kwargs.pop('timeout', TIMEOUT_QUATER)
     cmds = get_cmds(git_pull.__doc__)
     for cmd in cmds:
-        run_tail(cmd, **kwargs)
+        await run_tail(cmd, timeout=timeout, **kwargs).Await(timeout=timeout)
 
 
 def clean(**kwargs):

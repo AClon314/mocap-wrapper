@@ -125,24 +125,6 @@ def download(
     return filename, http_headers
 
 
-def symlink(src: str, dst: str, is_src_dir=False, overwrite=True,
-            *args, dir_fd: int | None = None):
-    Log.debug(f'🔗 symlink {src} → {dst}')
-    if not os.path.exists(src):
-        Log.error(f"{src=} does NOT exist.")
-        return None
-    dst_dir = dst if os.path.isdir(dst) else os.path.dirname(dst)
-    os.makedirs(dst_dir, exist_ok=True)
-    try:
-        if overwrite and os.path.exists(dst):
-            os.remove(dst)
-        os.symlink(src=src, dst=dst, target_is_directory=is_src_dir, *args, dir_fd=dir_fd)
-        return dst
-    except Exception as e:
-        Log.error(f"symlink: {e}")
-        return None
-
-
 def get_argv():
     """fallback to sys.argv if fails"""
     import shlex
@@ -220,17 +202,17 @@ def i_pixi():
 def i_uv():
     if not shutil.which(os.path.join(PIXI_BIN, 'pixi')):
         raise Exception("pixi is not installed")
-    if IS_MIRROR:
-        global_pixi()
-    returncode = system(['pixi', 'global', 'install', 'uv'])  # install uv
-    if (UV := shutil.which('uv')) or returncode == 0:
-        Log.info(f"✅ uv installed: {UV=}\t{returncode=}")
+    global_pixi() if IS_MIRROR else None
+    if not shutil.which('uv'):
+        returncode = system(['pixi', 'global', 'install', 'uv'])  # install uv
+        if (UV := shutil.which('uv')) or returncode == 0:
+            Log.info(f"✅ uv installed: {UV=}\t{returncode=}")
 
     global_uv() if IS_MIRROR else None
     while (ret := system(['uv', 'python', 'install', '-v'])) and ret != 0:
         if IS_MIRROR:
             global_uv()
-    ret = system(['uv', 'venv', VENV, '-v'])
+    ret = system(['uv', 'venv', VENV])
     PYTHON = os.path.join(VENV, _BIN_PYTHON)
     if os.path.exists(PYTHON):
         Log.info(f"✅ uv global .venv installed: {PYTHON=}")
@@ -245,8 +227,8 @@ def i_mocap():
     os.environ['UV_PYTHON'] = os.path.join(VENV, _BIN_PYTHON)
     git = 'https://gitee.com/AClon314/mocap-wrapper' if IS_MIRROR else 'https://github.com/AClon314/mocap-wrapper'
     install = ['-e', '.[dev]'] if os.getcwd().endswith(_pkg_.replace('_', '-')) else [f'git+{git}']
-    _v = ['-v'] if IS_DEBUG else []
-    ret = system(['uv', 'pip', 'install', *install, *_v])
+    # _v = ['-v'] if IS_DEBUG else []
+    ret = system(['uv', 'pip', 'install', *install])
     if (mocap := shutil.which('mocap')) or ret == 0:
         Log.info(f"✅ mocap installed: {mocap=}\t{ret=}")
 
@@ -274,7 +256,7 @@ def set_activate_cmd():
             Log.info(f'✅ {_activate} → {profile}')
         return _activate
     _activate = '. ~/.venv/bin/activate'    # source .venv/bin/activate
-    _export = f'export PATH="$PATH:{PIXI_BIN}"'
+    _export = f'export PATH="$PATH:{PIXI_BIN}:$HOME/.venv/bin"'
     shells = [_sh for _sh in ['bash', 'zsh', 'xonsh'] if shutil.which(_sh)]
     for sh in shells:
         _shrc = os.path.expanduser(f'~/.{sh}rc')

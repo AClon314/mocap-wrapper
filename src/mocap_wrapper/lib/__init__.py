@@ -44,7 +44,7 @@ def copy_args(
 
 def res_path(pkg=__package__, module='pixi', file='pixi.toml'):
     if pkg is None:
-        return Path(DIR_SELF, '..', module, file)
+        return Path(DIR_SELF, '..', module, file).resolve().absolute()
     else:
         pkg = pkg.split('.')[0]
         with _res_path(f'{pkg}.{module}', file) as P:

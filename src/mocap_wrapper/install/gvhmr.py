@@ -1,29 +1,23 @@
 import shutil
-from mirror_cn import is_need_mirror
+from mirror_cn import replace_github_with_mirror
 from mocap_wrapper.lib import *
 from mocap_wrapper.lib import TIMEOUT_MINUTE, TIMEOUT_QUATER
-from .smpl import i_smpl
+from .smpl import i_smplx
 from .Gdown import google_drive
-# from .dpvo import i_dpvo
 DIR_GVHMR = os.path.join(DIR, 'GVHMR')
-_IS_MIRROR = os.getenv('IS_MIRROR', None)
 Log = getLogger(__name__)
 
 
-def i_gvhmr_config(Dir=DIR_GVHMR, file='gvhmr.yaml'):
+def i_config(Dir=DIR_GVHMR, file='gvhmr.yaml'):
     src = res_path(module='install', file=file)
     dst = os.path.join(Dir, 'hmr4d', 'configs', file)
-    relink(src, dst)
+    symlink(str(src), dst)
 
 
-async def i_gvhmr_models(Dir=DIR_GVHMR, **kwargs):
-    global _IS_MIRROR
+async def i_models(Dir=DIR_GVHMR):
     Log.info("📦 Download GVHMR pretrained models (📝 By downloading, you agree to the GVHMR's corresponding licences)")
-    if _IS_MIRROR is None:
-        _IS_MIRROR = is_need_mirror()
-    DOMAIN = 'hf-mirror.com' if _IS_MIRROR else 'huggingface.co'
+    DOMAIN = 'hf-mirror.com' if IS_MIRROR else 'huggingface.co'
     HUG_GVHMR = f'https://{DOMAIN}/camenduru/GVHMR/resolve/main/'
-    HUG_SMPLX = f'https://{DOMAIN}/camenduru/SMPLer-X/resolve/main/'
     LFS = {
         ('dpvo', 'dpvo.pth'): {
             'GD_ID': '1DE5GVftRCfZOTMp8YWF0xkGudDxK0nr0',   # Google Drive ID
@@ -46,89 +40,76 @@ async def i_gvhmr_models(Dir=DIR_GVHMR, **kwargs):
             'md5': '1b82eaab0786b77a43e2394856604f08',
         },
     }
-    LFS_SMPL = {
-        ('body_models', 'smpl', 'SMPL_NEUTRAL.pkl'): {
-            'md5': 'b78276e5938b5e57864b75d6c96233f7'
-        },
-        ('body_models', 'smplx', 'SMPLX_NEUTRAL.npz'): {
-            'md5': '6eed2e6dfee62a3f4fb98dcd41f94e06'
-        }
-    }
-    coros = []
-    try:
-        for out, dic in LFS.items():
-            url = HUG_GVHMR + '/'.join(out)
-            Log.info(f'md5={dic["md5"]}, url={url}, out={os.path.join(Dir, *out)}')
-            t = download(url, md5=dic['md5'], out=os.path.join(Dir, *out))
-            coros.append(t)
-        for out, dic in LFS_SMPL.items():
-            url = HUG_SMPLX + out[-1]
-            t = download(url, md5=dic['md5'], out=os.path.join(Dir, *out))
-            coros.append(t)
-        results = await asyncio.gather(*coros)
-
-        coros = []
-        PATH_MODEL = [os.path.join(Dir, *out) for out in LFS.keys()]
-        IS_MODEL = all([os.path.exists(p) for p in PATH_MODEL])
-        if not IS_MODEL:
-            for out, dic in LFS.items():
-                url = google_drive(id=dic['GD_ID'])
-                t = download(url, md5=dic['md5'], out=os.path.join(Dir, *out))
-                coros.append(t)
-        PATH_SMPL = [os.path.join(Dir, *out) for out in LFS_SMPL.keys()]
-        IS_SMPL = all([os.path.exists(p) for p in PATH_SMPL])
-        if not IS_SMPL:
-            coros.append(i_smpl(Dir=os.path.join(Dir, 'body_models'), **kwargs))
-        results = await asyncio.gather(*coros)
-
-        Log.info("✔ Download GVHMR pretrained models")
-    except Exception as e:
-        Log.error(f"❌ please download GVHMR pretrained models manually from: 'https://drive.google.com/drive/folders/1eebJ13FUEXrKBawHpJroW0sNSxLjh9xD?usp=drive_link', error: {e}")
+    files: list[File] = []
+    for out, dic in LFS.items():
+        urls = [HUG_GVHMR + '/'.join(out)]
+        try:
+            urls.append(google_drive(id=dic['GD_ID']))
+        except Exception as e:
+            Log.info(f'Skip Google drive for {out} from {dic["GD_ID"]}: {e}')
+        files.append(File(*urls, path=Path(Dir, *out), md5=dic['md5']))
+    dls = download(*files)
+    await wait_slowest(*dls)
+    if not is_complete(dls):
+        Log.error(f"Please download GVHMR models at {HUG_GVHMR} or https://drive.google.com/drive/folders/1eebJ13FUEXrKBawHpJroW0sNSxLjh9xD?usp=drive_link")
+    if is_complete(dls):
+        Log.info("✔ Download GVHMR models")
+    return dls
 
 
-async def i_gvhmr(Dir=DIR_GVHMR, env=ENV, **kwargs):
+async def i_python_env(Dir=DIR_GVHMR):
+    pixi_toml = res_path(file='gvhmr.toml')
+    if not IS_MIRROR:
+        shutil.copy(pixi_toml, DIR_GVHMR)
+        p = await run_tail(['pixi', 'install', '-q', '-v']).Await(TIMEOUT_QUATER)
+        return p
+    for file, mirror in replace_github_with_mirror(str(pixi_toml)):
+        shutil.copy(file, DIR_GVHMR)
+        p = await run_tail(['pixi', 'install', '-q', '-v']).Await(TIMEOUT_QUATER)
+        if p.get_status() == 0:
+            return p
+
+
+async def i_gvhmr(Dir=DIR_GVHMR, **kwargs):
     Log.info(f"📦 Install GVHMR at {DIR_GVHMR}")
-    if not os.path.exists(Dir):
-        os.makedirs(Dir)
+    os.makedirs(Dir, exist_ok=True)
     p = await run_tail(f'git clone https://github.com/zju3dv/GVHMR {Dir}', **kwargs).Await(TIMEOUT_MINUTE)
-    os.chdir(DIR_GVHMR)
-    i_gvhmr_config(Dir)
-
-    pixi = res_path(file='gvhmr.toml')
-    shutil.copy(pixi, DIR_GVHMR)
-    p = await run_tail(['pixi', 'install', '-v']).Await(TIMEOUT_QUATER)
-    # p = mamba(env=env, python='3.10', **kwargs)
-    dir_checkpoints = os.path.join(Dir, 'inputs', 'checkpoints')
-    os.makedirs(os.path.join(dir_checkpoints, 'body_models'), exist_ok=True)
+    dir_checkpoints = Path(Dir, 'inputs', 'checkpoints')
+    os.makedirs(Path(dir_checkpoints, 'body_models'), exist_ok=True)
+    os.chdir(Dir)
+    i_config(Dir)
 
     tasks = [
         git_pull(),
-        # i_dpvo(Dir=os.path.join(Dir, 'third-party/DPVO'), env=env, **kwargs),
-        i_gvhmr_models(Dir=dir_checkpoints, **kwargs)
+        i_python_env(Dir=Dir),
+        # i_dpvo(Dir=Path(Dir, 'third-party/DPVO')),
+        i_smplx(Dir=Dir, **kwargs),
+        i_models(Dir=str(dir_checkpoints)),
     ]
-    Log.info("✔ Installed GVHMR")
-    CONFIG['gvhmr'] = True
+    results = await asyncio.gather(*tasks, return_exceptions=True)
+    exceptions = [r for r in results if isinstance(r, Exception)]
+    if exceptions:
+        Log.error(f"❌ {exceptions}")
+    else:
+        Log.info("✔ Installed GVHMR")
+        CONFIG['gvhmr'] = True
 
 
-async def i_dpvo(Dir=DIR, env=ENV, **kwargs):
+async def i_dpvo(Dir=DIR, **kwargs):
     Log.info("📦 Install DPVO")
-    f = await download(
-        'https://gitlab.com/libeigen/eigen/-/archive/3.4.0/eigen-3.4.0.zip',
-        md5='994092410ba29875184f7725e0371596',
-        dir=Dir
-    )
-    if f.is_complete and os.path.exists(f.path):
-        p = await unzip(f.path, to=os.path.join(Dir, 'thirdparty'), **kwargs)
+    f = File('https://gitlab.com/libeigen/eigen/-/archive/3.4.0/eigen-3.4.0.zip',
+             path=Path(Dir, 'eigen-3.4.0.zip'), md5='994092410ba29875184f7725e0371596')
+    dl = download(f, dir=Dir)
+    if is_complete(dl) and f.exists():
+        p = await unzip(f, to=os.path.join(Dir, 'thirdparty'), **kwargs)
         # remove_if_p(f.path)    # TODO: remove_if_p
     else:
         Log.error("❌ Can't unzip Eigen to third-party/DPVO/thirdparty")
-
     p = await run_tail(['pixi', 'add', '--pypi', '.']).Await(TIMEOUT_QUATER)  # TODO
-
     Log.info("✔ Add DPVO")
     return p
 
 
 if __name__ == '__main__':
-    i_gvhmr_config('../GVHMR')
+    i_config('../GVHMR')
     # asyncio.run(i_gvhmr())

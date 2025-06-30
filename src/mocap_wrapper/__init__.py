@@ -1,6 +1,7 @@
 #!/bin/python
 import os
 import logging
+from .install import pixi as _os_path_init
 from warnings import filterwarnings
 from .lib import TYPE_RUNS, res_path, run_tail, ffmpeg_or_link
 SELF_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -67,7 +68,7 @@ def argParse():
     return ns, args
 
 
-def mocap(
+async def mocap(
     inputs: list[str] = [], outdir=OUTPUT_DIR,
     Range='', at=DIR, by: Sequence[TYPE_RUNS] = RUNS,
     args: list[str] = []
@@ -82,11 +83,11 @@ def mocap(
     for i in by:
         if CONFIG[i] == True:   # TODO os.path.exists(CONFIG[i])
             _by.remove(i)
-    asyncio.run(install(runs=_by))
+    await install(runs=_by)
     if inputs:
         for i in inputs:
             # TODO: auto parallelize if vram > 6gb
-            asyncio.run(run(by, i, outdir, Range=Range, args=args))
+            await run(by, i, outdir, Range=Range, args=args)
 
 
 def script_entry():
@@ -106,14 +107,14 @@ def script_entry():
         for r in by:
             CONFIG[r] = False
 
-    mocap(
+    asyncio.run(mocap(
         inputs=args.input,
         outdir=args.outdir,
         Range=args.range,
         at=args.at,
         by=by,
         args=_args,
-    )
+    ))
 
 
 if __name__ == "__main__":

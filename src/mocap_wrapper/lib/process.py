@@ -37,12 +37,16 @@ def mkdir(dir):
     Log.info(f'📁 Created: {dir}')
 
 
-def relink(src, dst, dst_is_dir=False):
-    """remove dst link and create a symlink"""
-    if os.path.islink(dst):
+def symlink(src: str, dst: str, overwrite=True, is_src_dir=False, dir_fd: int | None = None):
+    Log.info(f'🔗 symlink {src} → {dst}')
+    if not os.path.exists(src):
+        raise FileNotFoundError(f"Source path does not exist: {src}")
+    dst_dir = dst if os.path.isdir(dst) else os.path.dirname(dst)
+    os.makedirs(dst_dir, exist_ok=True)
+    if overwrite and os.path.exists(dst):
         os.remove(dst)
-    os.symlink(src, dst, target_is_directory=dst_is_dir)
-    Log.info(f'🔗 symlink: {dst} → {src}')
+    os.symlink(src=src, dst=dst, target_is_directory=is_src_dir, dir_fd=dir_fd)
+    return dst
 
 
 async def Await(self: 'aexpect.Spawn', timeout: int | float | None = None, interval=_INTERVAL):

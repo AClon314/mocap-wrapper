@@ -38,8 +38,8 @@ async def test_mamba(pkgs, env, cmd):
       'smplx=8flff24q1cuirp28c1v959r00n')]
 )
 async def test_smpl(smpl, smplx):
-    from mocap_wrapper.install.smpl import i_smpl
-    dls = await i_smpl()
+    from mocap_wrapper.install.smpl import i_smplx_tue_mde
+    dls = await i_smplx_tue_mde()
     for d in dls:
         assert d.completed_length > 1, d
         os.remove(d.path)

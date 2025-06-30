@@ -2,10 +2,10 @@ import asyncio
 from functools import partial
 from fastapi import FastAPI
 from fastmcp import FastMCP, Context
-from mocap_wrapper import SELF_DIR, mocap
-from mocap_wrapper.lib import RUNS, LOG_LEVEL, TYPE_RUNS, __version__
+from mocap_wrapper import OUTPUT_DIR, SELF_DIR, mocap
+from mocap_wrapper.lib import DIR, RUNS, LOG_LEVEL, PACKAGE, TYPE_RUNS, __version__
 from typing import Callable, Sequence
-TITLE = 'mocap-wrapper {} backend server'
+TITLE = f'{PACKAGE} {{}} backend server'
 HOST = '0.0.0.0'
 PORT = 23333
 MCP = FastMCP(TITLE.format('MCP'), version=__version__)
@@ -41,30 +41,31 @@ async def root():
 
 
 @tool_post
-async def install(by: Sequence[TYPE_RUNS], ctx: Context | None = None):
-    '''Install all runs, or specified runs if `by` is provided.'''
+async def install(by: Sequence[TYPE_RUNS], at=DIR, ctx: Context | None = None):
+    '''Install default runs with gvhmr, or specified runs if `by` is provided.'''
     if ctx:
-        await ctx.info('start install...')
-        progress = 0
-        while progress < 1.0:
-            progress += 10
-            await ctx.report_progress(progress, 100, f'Installing at {progress}...')
-            await asyncio.sleep(2)
-    mocap(by=by)
-    return True
+        await ctx.info(f'Install {by} {at=}...')
+        # progress = 0
+        # while progress < 1.0:
+        #     progress += 10
+        #     await ctx.report_progress(progress, 100, f'Installing at {progress}...')
+        #     await asyncio.sleep(2)
+    await mocap(by=by, at=at)
+    return at
 
 
 @tool_post
-async def run(by: Sequence[TYPE_RUNS], ctx: Context | None = None):
-    '''Run the specified run or all runs if `by` is not provided.'''
+async def run(inputs: list[str], outdir=OUTPUT_DIR, Range='', by: Sequence[TYPE_RUNS] = RUNS, ctx: Context | None = None):
+    '''Run the mocap model and get results.'''
     if ctx:
-        await ctx.info(f'Start running {by or "all runs"}...')
-        progress = 0
-        while progress < 1.0:
-            progress += 10
-            await ctx.report_progress(progress, 100, f'Running at {progress}...')
-            await asyncio.sleep(2)
-    return True
+        await ctx.info(f'Run {by}...')
+        # progress = 0
+        # while progress < 1.0:
+        #     progress += 10
+        #     await ctx.report_progress(progress, 100, f'Running at {progress}...')
+        #     await asyncio.sleep(2)
+    await mocap(inputs=inputs, outdir=outdir, Range=Range, by=by)
+    return outdir
 
 APP.mount("/", APP_MCP)
 

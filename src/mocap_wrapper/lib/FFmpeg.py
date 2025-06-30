@@ -5,7 +5,7 @@ import asyncio
 from ffmpeg import probe as ffprobe
 from fractions import Fraction
 from datetime import datetime, timedelta
-from .process import mkdir, relink
+from .process import mkdir, symlink
 from .logger import IS_DEBUG, getLogger
 from typing import Any, Literal
 Log = getLogger(__name__)
@@ -102,7 +102,7 @@ async def ffmpeg_or_link(from_file: str, to_dir: str, Range='', fps_times=5):
                 poll = p.poll()
                 await asyncio.sleep(0.2)
         else:
-            relink(from_file, to_file)
+            symlink(from_file, to_file)
     return to_file
 
 
