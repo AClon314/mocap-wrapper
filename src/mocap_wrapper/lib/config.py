@@ -5,6 +5,7 @@ from mirror_cn import is_need_mirror
 from . import PACKAGE
 from typing import Any, Literal, TypedDict, Union, Unpack
 TYPE_KEYS_CONFIG = Union[Literal['search_dir'], str]  # I think python type system is not mature enough to handle this
+IS_MIRROR = is_need_mirror()
 
 
 class TYPE_CONFIG(TypedDict, total=False):
@@ -16,7 +17,7 @@ class TYPE_CONFIG(TypedDict, total=False):
 
 class Config(dict):
     default: TYPE_CONFIG = {
-        'is_mirror': is_need_mirror(),
+        'is_mirror': IS_MIRROR,
         'search_dir': '.',
         'gvhmr': False,
         'wilor': False,

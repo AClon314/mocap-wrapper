@@ -34,7 +34,7 @@ QRCODE = """
 
 
 def copy_args(
-    kwargs_call: Callable[_PS, Any]
+    func: Callable[_PS, Any]
 ) -> Callable[[Callable[..., _TV]], Callable[_PS, _TV]]:
     """Decorator does nothing but returning the casted original function"""
     def return_func(func: Callable[..., _TV]) -> Callable[_PS, _TV]:

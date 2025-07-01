@@ -59,12 +59,14 @@ async def i_models(Dir=DIR_GVHMR):
 
 async def i_python_env(Dir=DIR_GVHMR):
     pixi_toml = res_path(file='gvhmr.toml')
+    if (txt := Path(Dir, 'requirements.txt')).exists():
+        shutil.move(txt, Path(Dir, 'requirements.txt.bak'))
     if not IS_MIRROR:
-        shutil.copy(pixi_toml, DIR_GVHMR)
+        shutil.copy(pixi_toml, Dir)
         p = await run_tail(['pixi', 'install', '-q', '-v']).Await(TIMEOUT_QUATER)
         return p
     for file, mirror in replace_github_with_mirror(str(pixi_toml)):
-        shutil.copy(file, DIR_GVHMR)
+        shutil.copy(file, Dir)
         p = await run_tail(['pixi', 'install', '-q', '-v']).Await(TIMEOUT_QUATER)
         if p.get_status() == 0:
             return p
@@ -80,11 +82,11 @@ async def i_gvhmr(Dir=DIR_GVHMR, **kwargs):
     i_config(Dir)
 
     tasks = [
-        git_pull(),
         i_python_env(Dir=Dir),
-        # i_dpvo(Dir=Path(Dir, 'third-party/DPVO')),
         i_smplx(Dir=Dir, **kwargs),
         i_models(Dir=str(dir_checkpoints)),
+        # git_pull(),
+        # i_dpvo(Dir=Path(Dir, 'third-party/DPVO')),
     ]
     results = await asyncio.gather(*tasks, return_exceptions=True)
     exceptions = [r for r in results if isinstance(r, Exception)]
@@ -93,6 +95,7 @@ async def i_gvhmr(Dir=DIR_GVHMR, **kwargs):
     else:
         Log.info("✔ Installed GVHMR")
         CONFIG['gvhmr'] = True
+    return results
 
 
 async def i_dpvo(Dir=DIR, **kwargs):

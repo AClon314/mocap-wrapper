@@ -16,7 +16,7 @@ from locale import getdefaultlocale
 from urllib.request import urlretrieve
 from typing import Literal
 IS_DEBUG = os.getenv('GITHUB_ACTIONS', None) or os.getenv('LOG', None)
-IS_MIRROR = os.getenv('IS_MIRROR', None)
+IS_MIRROR = None
 SEARCH_DIR = 'mocap'
 TIMEOUT = 12
 SLOW_SPEED = 0.5  # MB/s
@@ -298,9 +298,7 @@ def main():
     Log.debug(f'{os.environ=}')
     IS_AUTO = is_unattended()
     set_timeout()
-    if IS_MIRROR is None:
-        IS_MIRROR = is_need_mirror()
-        os.environ['IS_MIRROR'] = str(1)
+    IS_MIRROR = is_need_mirror()
     if IS_MIRROR:
         global_git()
     i_pixi()

@@ -100,10 +100,10 @@ def _aexpect(prefix: str, func):
         cmd0 = commands.split()[0] if isinstance(commands, str) else commands[0]
 
         kwargs.setdefault('output_func', Log.info)
-        kwargs.setdefault('output_prefix', f'{prefix}_{_RUN_ID}❯{cmd0}:\t')
+        kwargs.setdefault('output_prefix', f'{prefix}{_RUN_ID}❯{cmd0}:\t')
         kwargs.setdefault('timeout', _INTERVAL)
 
-        Log.info(f'{prefix}🐣_{_RUN_ID}:\t{cmd}')
+        Log.info(f'{prefix}{_RUN_ID}🐣:\t{cmd}')
         ret = func(command=cmd, *args, **kwargs)
         _RUN_ID += 1
         return ret
@@ -115,7 +115,7 @@ def run_fg(cmds: Sequence[str], *args, **kwargs) -> tuple[int | None, str | None
 @copy_args(aexpect.run_bg)
 def run_bg(cmds: str | Sequence[str], *args, **kwargs) -> Expect: return _aexpect('bg', aexpect.run_bg)(cmds, *args, **kwargs)
 @copy_args(aexpect.run_tail)
-def run_tail(cmds: str | Sequence[str], *args, **kwargs) -> Tail: return _aexpect('tail', aexpect.run_tail)(cmds, *args, **kwargs)
+def run_tail(cmds: str | Sequence[str], *args, **kwargs) -> Tail: return _aexpect('', aexpect.run_tail)(cmds, *args, **kwargs)
 
 
 async def unzip(
