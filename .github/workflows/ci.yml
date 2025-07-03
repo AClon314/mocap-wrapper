@@ -39,6 +39,7 @@ jobs:
         run: grep -q "mirror" /etc/apt/sources.list || curl -I https://www.google.com/ --max-time 4 || bash <(curl -sSL https://gitee.com/SuperManito/LinuxMirrors/raw/main/ChangeMirrors.sh) --source mirrors.aliyun.com --protocol http --use-intranet-source false --backup true --upgrade-software false --clean-cache false --ignore-backup-tips
 
       - name: apt upgrade
+        if: ${{ env.ACT == 'true' }}
         run: sudo apt update && sudo apt upgrade -y
 
       #  This will remove unnecessary files to free up space. This has done because some package needs more space to install. e.g.) torch
