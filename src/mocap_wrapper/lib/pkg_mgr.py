@@ -111,7 +111,7 @@ def get_pkg_mgr():
 async def pkg(action: TYPE_PKG_ACT, package: list[str] = [], **kwargs):
     act = PKG_MGRS[PKG_MGR][action]
     act = [act] if isinstance(act, str) else act
-    p = [SU] if SU else [] + [PKG_MGR] + act + package
+    p = ([SU] if SU else []) + [PKG_MGR] + act + package
     return run_tail(p, **kwargs)
 
 

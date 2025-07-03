@@ -124,7 +124,7 @@ def download(
     dls = []
     for f in files:
         _options = {**_OPT, **options, 'dir': f.parent, 'out': f.name}
-        dls.append(Aria.add_uris(f.urls, options=_options))
+        dls.append(Aria.add_uris(f.urls, options=_options))  # type: ignore
     DOWNLOADS.extend(dls)
     return dls
 

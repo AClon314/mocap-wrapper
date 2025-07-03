@@ -5,6 +5,7 @@ from ..lib import getLogger, TYPE_RUNS, BINS, i_pkgs, run_tail, try_aria_port, A
 from typing import Sequence
 Log = getLogger(__name__)
 TORCH_REPO = 'MiroPsota/torch_packages_builder'
+def _Log_info(msg: str, *args, **kwargs): Log.info(msg.strip(), *args, **kwargs)
 
 
 async def install(runs: Sequence[TYPE_RUNS], **kwargs):
@@ -20,7 +21,9 @@ async def install(runs: Sequence[TYPE_RUNS], **kwargs):
     p_aria = None
     if Aria is None:
         # try to start aria2c
-        p_aria = await run_tail('aria2c --enable-rpc --rpc-listen-port=6800').Await()
+        p_aria = await run_tail(
+            'aria2c --enable-rpc --rpc-listen-port=6800',
+            output_func=_Log_info).Await()
         await asyncio.sleep(1.5)
         Aria = try_aria_port()
         if Aria is None:
