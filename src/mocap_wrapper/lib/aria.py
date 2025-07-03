@@ -151,7 +151,7 @@ async def wait_slowest(*dl: 'aria2p.Download'):
 def is_complete(dls: Sequence['aria2p.Download|None']): return not dls or all([dl.is_complete for dl in dls if dl])
 
 
-def try_aria_port() -> 'aria2p.API':
+def try_aria_port() -> aria2p.API:
     for port in _ARIA_PORTS:
         try:
             aria2 = aria2p.API(aria2p.Client(
@@ -162,11 +162,14 @@ def try_aria_port() -> 'aria2p.API':
             aria2.get_stats()
             return aria2
         except Exception as e:
-            Log.warning(f"Failed to connect to aria2 on port {port}: {e}")
+            Log.debug(f"Failed to connect to aria2 on port {port}: {e}")
     raise ConnectionError(f"Failed to connect to aria2 on ports {_ARIA_PORTS}")
 
 
-Aria = try_aria_port()
+try:
+    Aria = try_aria_port()
+except Exception:
+    Aria = None
 
 
 if __name__ == '__main__':
