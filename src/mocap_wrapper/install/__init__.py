@@ -21,9 +21,7 @@ async def install(runs: Sequence[TYPE_RUNS], **kwargs):
     p_aria = None
     if Aria is None:
         # try to start aria2c
-        p_aria = await run_tail(
-            'aria2c --enable-rpc --rpc-listen-port=6800',
-            output_func=_Log_info).Await()
+        p_aria = run_tail('aria2c --enable-rpc --rpc-listen-port=6800', output_func=_Log_info)
         await asyncio.sleep(1.5)
         Aria = try_aria_port()
         if Aria is None:
