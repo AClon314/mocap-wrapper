@@ -1,7 +1,6 @@
 #!/bin/python
 import os
 import logging
-# from .install import pixi as _os_path_init
 from warnings import filterwarnings
 from .lib import TYPE_RUNS, res_path, run_tail, ffmpeg_or_link
 SELF_DIR = os.path.dirname(os.path.abspath(__file__))

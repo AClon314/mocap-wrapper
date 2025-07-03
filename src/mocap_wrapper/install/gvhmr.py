@@ -16,7 +16,7 @@ def i_config(Dir=DIR_GVHMR, file='gvhmr.yaml'):
 
 async def i_models(Dir=DIR_GVHMR):
     Log.info("📦 Download GVHMR pretrained models (📝 By downloading, you agree to the GVHMR's corresponding licences)")
-    DOMAIN = 'hf-mirror.com' if IS_MIRROR else 'huggingface.co'
+    DOMAIN = 'hf-mirror.com' if CONFIG.is_mirror else 'huggingface.co'
     HUG_GVHMR = f'https://{DOMAIN}/camenduru/GVHMR/resolve/main/'
     LFS = {
         ('dpvo', 'dpvo.pth'): {
@@ -61,7 +61,7 @@ async def i_python_env(Dir=DIR_GVHMR):
     pixi_toml = res_path(file='gvhmr.toml')
     if (txt := Path(Dir, 'requirements.txt')).exists():
         shutil.move(txt, Path(Dir, 'requirements.txt.bak'))
-    if not IS_MIRROR:
+    if not CONFIG.is_mirror:
         shutil.copy(pixi_toml, Dir)
         p = await run_tail(['pixi', 'install', '-q', '-v']).Await(TIMEOUT_QUATER)
         return p

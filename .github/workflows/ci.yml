@@ -23,10 +23,6 @@ jobs:
       SERVICE_API_KEY: ${{ secrets.SERVICE_API_KEY }}
 
     steps:
-      #  This will remove unnecessary files to free up space. This has done because some package needs more space to install. e.g.) torch
-      - name: Clean up space for action
-        run: rm -rf /opt/hostedtoolcache || true
-
       - uses: actions/checkout@v4
 
       # - name: Setup Python
@@ -34,16 +30,24 @@ jobs:
       #   with:
       #     python-version: ${{ matrix.python }}
 
-      - name: (pre-install mocap-wrapper)
+      - name: (pre-install) pixi.py -y
+        if: ${{ env.SKIP == '' }}
         run: python src/mocap_wrapper/install/pixi.py -y #| tee ./.log/init.log
 
       - name: set CN mirror
         if: ${{ env.ACT == 'true' }}
         run: grep -q "mirror" /etc/apt/sources.list || curl -I https://www.google.com/ --max-time 4 || bash <(curl -sSL https://gitee.com/SuperManito/LinuxMirrors/raw/main/ChangeMirrors.sh) --source mirrors.aliyun.com --protocol http --use-intranet-source false --backup true --upgrade-software false --clean-cache false --ignore-backup-tips
 
+      - name: apt upgrade
+        run: sudo apt update && sudo apt upgrade -y
+
+      #  This will remove unnecessary files to free up space. This has done because some package needs more space to install. e.g.) torch
+      # - name: Cleanup
+      #   run: rm -rf /opt/hostedtoolcache ; sudo apt-get clean ; sudo apt-get autoremove -y ; sudo rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
+
       - name: (install 7z,aria2c,gvhmr,wilor) mocap --install
-        run: ~/.venv/bin/mocap --install -b '' # 2>&1 | tee ./.log/install.log
+        run: . ~/.profile && mocap --install -b '' # 2>&1 | tee ./.log/install.log
 
       #  `-rs` flag is used to debug for the test failure
       - name: pytest
-        run: ~/.pixi/bin/uv run python -m pytest -rs tests #| tee ./.log/test.log
+        run: uv run python -m pytest -rs tests #| tee ./.log/test.log

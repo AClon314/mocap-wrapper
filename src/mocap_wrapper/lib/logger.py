@@ -53,7 +53,6 @@ class CustomFormatter(logging.Formatter):
 
 class TqdmJson(tqdm):
     def display(self, *args, **kwargs): print(self.get_json(), file=sys.stderr) if IS_JSON else super().display(*args, **kwargs)
-    def refresh(self, *args, **kwargs): print(self.get_json(), file=sys.stderr) if IS_JSON else super().refresh(*args, **kwargs)
 
     @copy_args(tqdm.__init__)
     def __init__(self, *args, **kwargs):
@@ -64,7 +63,9 @@ class TqdmJson(tqdm):
 
     def get_json(self):
         fmt = self.format_dict if hasattr(self, 'format_dict') else {}
-        fmt = {'time': float(f"{fmt.get('elapsed'):.1f}"), 'rate': fmt.get('rate'), 'unit': fmt.get('unit')}
+        rate: float = fmt.get('rate')   # type:ignore
+        eta = int((self.total - self.n) / float(rate)) if rate else None
+        fmt = {'time': float(f"{fmt.get('elapsed'):.1f}"), 'eta': eta, 'rate': rate, 'unit': fmt['unit']}
         obj = {
             'progress': self.id,
             'n': self.n,
@@ -104,7 +105,7 @@ if __name__ == '__main__':
     from time import sleep
     Log.debug('Hello, world!')
     TOTAL = 20
-    for i in tqdm(range(5), desc="Outer Loop"):
-        for j in tqdm(range(10), desc=f"Inner Loop {i}"):
+    for i in tqdm(range(2), desc="Outer Loop"):
+        for j in tqdm(range(5), desc=f"Inner Loop {i}"):
             Log.info(f"Processing {i}-{j} \" ' ")
-            sleep(0.05)
+            sleep(0.2)

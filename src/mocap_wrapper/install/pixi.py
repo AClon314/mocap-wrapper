@@ -118,7 +118,7 @@ def download(
     if if_exist == 'skip' and to_path and os.path.exists(to_path):
         Log.info(f"🔍❗ Already exists at {to_path}: {from_url}") if log else None
         return filename, {}
-    Log.info(f"🔍 Download from {from_url}") if log else None
+    Log.info(f"🔍 Download: {from_url}") if log else None
     filename, http_headers = urlretrieve(
         from_url, filename=to_path,
         reporthook=dl_progress(begin_time=time(), filename=filename, log=log))
@@ -162,11 +162,12 @@ else:
     _ARGV.insert(0, _PYTHON)
 try:
     from mirror_cn import is_need_mirror, global_git, global_pixi, global_uv, get_latest_release_tag, try_script, run
-except ImportError:
+except (ImportError, SyntaxError) as e:
+    if 'mirror_cn' not in str(e):
+        raise
     _py_path = os.path.join(_SELF_DIR, 'mirror_cn.py')
     if os.path.exists(_py_path):
         os.remove(_py_path)
-    Log.debug('❗ fix mirror_cn module...')
     download(MIRROR_CN_PY, _py_path)
     os.execvp(_PYTHON, _ARGV)
 
@@ -184,7 +185,11 @@ def i_pixi():
     url = f'https://pixi.sh/{_file}'
     file, _ = download(url, to_path=_file)
     Log.info(f'{file=}')
-    tag = get_latest_release_tag('prefix-dev/pixi')
+    try:
+        tag = get_latest_release_tag('prefix-dev/pixi')
+    except Exception as e:
+        tag = 'v0.49.0'  # TODO: 2025/07/02
+        Log.warning(f'Fallback to {tag=}, {e}')
     os.environ['PIXI_VERSION'] = tag
     for p in try_script(os.path.join('.', file)):
         if p.returncode == 0:
@@ -229,12 +234,12 @@ def i_mocap():
     install = ['-e', '.[dev]'] if os.getcwd().endswith(_pkg_.replace('_', '-')) else [f'git+{git}']
     # _v = ['-v'] if IS_DEBUG else []
     ret = system(['uv', 'pip', 'install', *install])
-    if (mocap := shutil.which('mocap')) or ret == 0:
+    if (mocap := shutil.which('mocap')) and ret == 0:
         Log.info(f"✅ mocap installed: {mocap=}\t{ret=}")
 
 
-def set_activate_cmd():
-    Log.info('Appending activate venv in shell profile...')
+def set_shell_init_venv_PATH():
+    Log.info('Setup activate venv/PATH in shell profile...')
     if is_win:
         _activate = r'~\.venv\Scripts\activate'  # .venv\Scripts\activate
         p = run(['powershell', '-Command', '$PROFILE.AllUsersCurrentHost'])
@@ -257,20 +262,16 @@ def set_activate_cmd():
         return _activate
     _activate = '. ~/.venv/bin/activate'    # source .venv/bin/activate
     _export = f'export PATH="$PATH:{PIXI_BIN}:$HOME/.venv/bin"'
-    shells = [_sh for _sh in ['bash', 'zsh', 'xonsh'] if shutil.which(_sh)]
-    for sh in shells:
-        _shrc = os.path.expanduser(f'~/.{sh}rc')
-        if not os.path.exists(_shrc):
-            with open(_shrc, 'w') as f:
-                ...
-        with open(_shrc, 'r') as f:
-            content = f.read()
-        if _activate not in content:
-            with open(_shrc, 'a') as f:
-                f.write(f'\n{_activate}\n{_export}\n')
-            Log.info(f'✅ {_activate} → {_shrc}')
-    if not shells:
-        Log.warning(f'⚠️ Add to your shell init file manually: {_activate}')
+    _profile = os.path.expanduser(f'~/.profile')
+    if not os.path.exists(_profile):
+        with open(_profile, 'w') as f:
+            ...
+    with open(_profile, 'r') as f:
+        content = f.read()
+    if _activate not in content:
+        with open(_profile, 'a') as f:
+            f.write(f'\n{_activate}\n{_export}\n')
+    Log.warning(f'⚠️⚠️⚠️ venv/PATH update at {_profile}, to apply that: 1.source {_profile} 2.log-off then login 3.re-connect SSH ⚠️⚠️⚠️')
     return _activate
 
 
@@ -305,7 +306,7 @@ def main():
     i_uv()
     i_mocap()
     Log.info(f"✅ {msg}`")
-    set_activate_cmd()
+    set_shell_init_venv_PATH()
     SHELL = 'powershell' if is_win else os.getenv('SHELL', 'zsh' if is_mac else 'bash')
     os.execvp(SHELL, [SHELL]) if not IS_AUTO else None
 

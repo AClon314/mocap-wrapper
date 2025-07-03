@@ -2,7 +2,7 @@ import aria2p
 import asyncio
 from pathlib import Path
 from netscape_cookies import save_cookies_to_file
-from mocap_wrapper.lib import DIR, File, IS_MIRROR, getLogger, symlink, unzip, download, is_complete, wait_slowest
+from mocap_wrapper.lib import CONFIG, DIR, File, getLogger, symlink, unzip, download, is_complete, wait_slowest
 from typing import Dict, TypedDict, Unpack
 Log = getLogger(__name__)
 HUG_SMPLX = 'https://{}/camenduru/SMPLer-X/resolve/main/'
@@ -91,7 +91,7 @@ async def dl_unzip_ln(
 def i_smplx_hugging_face(Dir: str):
     global HUG_SMPLX
     Log.info("📦 Download SMPL/X pretrained models (📝 By downloading, you agree to the SMPL & SMPL-X's corresponding licences)")
-    DOMAIN = 'hf-mirror.com' if IS_MIRROR else 'huggingface.co'
+    DOMAIN = 'hf-mirror.com' if CONFIG.is_mirror else 'huggingface.co'
     HUG_SMPLX = HUG_SMPLX.format(DOMAIN)
     LFS_SMPL = {
         ('body_models', 'smpl', 'SMPL_NEUTRAL.pkl'): {
