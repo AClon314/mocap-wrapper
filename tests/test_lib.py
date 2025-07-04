@@ -64,7 +64,7 @@ async def test_aexpect(cmds: list[str], func: Callable[[str], Spawn]):
 )
 async def test_download(urls, kwargs):
     dls = download(urls, **kwargs)
-    await wait_slowest()
+    await wait_all_dl()
     # os.remove(d.path)
 
 

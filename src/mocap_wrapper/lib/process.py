@@ -19,6 +19,7 @@ _RUN_ID = 0
 _INTERVAL = 0.1
 def run_async(func: Coroutine, timeout=TIMEOUT_MINUTE, loop=asyncio.get_event_loop()): return asyncio.run_coroutine_threadsafe(func, loop).result(timeout)
 def shlex_quote(args: Sequence[str]): return ' '.join(shlex.quote(str(arg)) for arg in args)
+def _Log_info(msg: str, *args, **kwargs): Log.info(msg, *args, **kwargs) if msg.rstrip() else None
 
 
 def is_main_thread():
@@ -99,7 +100,7 @@ def _aexpect(prefix: str, func):
         cmd = commands if isinstance(commands, str) else shlex_quote(commands)
         cmd0 = commands.split()[0] if isinstance(commands, str) else commands[0]
 
-        kwargs.setdefault('output_func', Log.info)
+        kwargs.setdefault('output_func', _Log_info)
         kwargs.setdefault('output_prefix', f'{prefix}{_RUN_ID}❯{cmd0}:\t')
         kwargs.setdefault('timeout', _INTERVAL)
 

@@ -1,11 +1,9 @@
 import shutil
 import signal
 import asyncio
-from ..lib import getLogger, TYPE_RUNS, BINS, i_pkgs, run_tail, try_aria_port, Aria
+from ..lib import TYPE_RUNS, BINS, Aria, getLogger, i_pkgs, run_tail, try_aria_port, wait_all_dl
 from typing import Sequence
 Log = getLogger(__name__)
-TORCH_REPO = 'MiroPsota/torch_packages_builder'
-def _Log_info(msg: str, *args, **kwargs): Log.info(msg.strip(), *args, **kwargs)
 
 
 async def install(runs: Sequence[TYPE_RUNS], **kwargs):
@@ -21,7 +19,7 @@ async def install(runs: Sequence[TYPE_RUNS], **kwargs):
     p_aria = None
     if Aria is None:
         # try to start aria2c
-        p_aria = run_tail('aria2c --enable-rpc --rpc-listen-port=6800', output_func=_Log_info)
+        p_aria = run_tail('aria2c --enable-rpc --rpc-listen-port=6800')
         await asyncio.sleep(1.5)
         Aria = try_aria_port()
         if Aria is None:
@@ -36,6 +34,12 @@ async def install(runs: Sequence[TYPE_RUNS], **kwargs):
         from .wilor_mini import i_wilor_mini
         tasks.append(i_wilor_mini(**kwargs))
 
-    ret = await asyncio.gather(*tasks)
+    done, pending = await asyncio.wait(
+        [asyncio.gather(*tasks), asyncio.create_task(wait_all_dl())],
+        return_when=asyncio.FIRST_COMPLETED
+    )
+    ret = done.pop().result()
+    for task in pending:
+        task.cancel()
     p_aria.kill(signal.SIGKILL) if p_aria else None
     return ret

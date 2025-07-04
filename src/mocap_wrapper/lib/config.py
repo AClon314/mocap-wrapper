@@ -11,14 +11,14 @@ TYPE_CONFIG_KEYS = Union[Literal['search_dir', 'gvhmr', 'wilor'], str]  # I thin
 
 class Config(UserDict):
     default = {
-        'search_dir': '.',
+        'search_dir': str(Path('.').absolute()),
         'gvhmr': False,
         'wilor': False,
     }
     @cached_property
     def is_mirror(self): return is_need_mirror()
 
-    def __init__(self, dic: dict = {}, file: Path | str = "config.toml") -> None:
+    def __init__(self, dic: dict = {}, file: Path | str = "config.toml"):
         """
         This will sync to config file:
         ```python
@@ -26,14 +26,13 @@ class Config(UserDict):
         ```
         """
         self.path = user_config_path(appname=PACKAGE, ensure_exists=True).joinpath(file)
-        super().__init__(**self.default, **dic)
         if Path(self.path).exists():
             config = toml.load(self.path)
-            self.update(config)
+            dic.update(config)
             # except toml.TomlDecodeError as e:
             #     # TODO: auto recover from this exception
             #     Log.warning(f"Load failed {self.path}: {e}")
-        self.dump()
+        super().__init__(**{**self.default, **dic})
 
     def dump(self, file: Path | str = '') -> None:
         """将self dict保存到TOML文件"""

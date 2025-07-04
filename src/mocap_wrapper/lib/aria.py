@@ -8,7 +8,7 @@ import hashlib
 from pathlib import Path
 from datetime import timedelta
 from typing import Callable, Literal, Sequence, TypedDict, Unpack, get_args
-from .logger import getLogger
+from .logger import IS_DEBUG, getLogger
 Log = getLogger(__name__)
 _ARIA_PORTS = [6800, 16800]
 _INTERVAL = 0.5
@@ -41,12 +41,12 @@ class Kw_download(TypedDict, total=False):
 
 def calc_hash(file_path: str | Path, algorithm: TYPE_HASH | str = 'md5') -> str:
     # TODO: multi process/thread
-    Log.info(f"🖩 Calc {algorithm}: {file_path}")
+    Log.debug(f"🖩 Calc {algorithm}: {file_path}")
     with open(file_path, 'rb') as f:
         return getattr(hashlib, algorithm)(f.read()).hexdigest()
 
 
-class File(Path):
+class File():
     '''use with `download()`
 
     Args:
@@ -59,41 +59,37 @@ class File(Path):
     `max-tries`: default `-m 3`, see `_OPT`  
     ~~`header`~~: not implemented due to aria2p only accept `str` for 1 header
     '''
+    @classmethod
+    def abs(cls, *path): return Path(*path).resolve().absolute()
+    @property
+    def md5(self): return calc_hash(self.path, 'md5')
+    @md5.setter
+    def md5(self, value: str): self.expect_md5 = value
 
     def __init__(
-            self, *urls: str, path: Sequence[str] | str | Path | None = None,
+            self, *urls: str, path: Sequence[str] | str | Path,
             md5: str | None = None, sha256: str | None = None, **options):
-        if path is None:
-            path = urls[0].split('/')[-1]
-        super().__init__(path) if isinstance(path, (str, Path)) else super().__init__(*path)
-        self = self.resolve().absolute()
         self.urls = list(urls)
+        self.path = File.abs(path) if isinstance(path, (str, Path)) else File.abs(*path)
         self.expect_md5 = md5
         self.expect_sha256 = sha256
         for k, v in options.items():
             setattr(self, k, v)
 
-    @property
-    def md5(self): return calc_hash(self, 'md5')
-    @md5.setter
-    def md5(self, value: str): self.expect_md5 = value
-
-    def exists(self, *, check_hash=True, follow_symlinks: bool = True):
+    def exists(self, check_hash=True, follow_symlinks: bool = True):
         '''return is_exist and checksum'''
-        is_exist = super().exists(follow_symlinks=follow_symlinks)
-        is_hash = self.checksum()
-        return (is_exist and is_hash) if check_hash else is_exist
+        is_exist = self.path.exists(follow_symlinks=follow_symlinks)
+        return (is_exist and self.checksum()) if check_hash else is_exist
 
     def checksum(self, hash: str | None = None, algorithm: TYPE_HASH = 'md5') -> bool:
         '''raise ValueError if no hash is set, return True if hash matches'''
-        _hash = calc_hash(self, algorithm)
+        _hash = calc_hash(self.path, algorithm)
         if not hash:
             hash = next((h for h in (self.expect_md5, self.expect_sha256) if h), None)
         if not hash:
             raise ValueError(f"unset `md5` or `sha256`: {self}")
         is_hash = _hash == hash
-        Log.warning(f"{self}: {hash}(expected) ≠ {_hash}(current)") if is_hash == False else None
-        Log.debug(f"{self}: {hash}(expected)") if is_hash == True else None
+        Log.warning(f"{self.path.name}: {hash}(expected) ≠ {_hash}(current)") if is_hash == False else Log.debug(f"{self.path.name}: {hash}(expected)")
         return is_hash
 
 
@@ -118,20 +114,21 @@ def download(
     [⚙️for more options](https://aria2.github.io/manual/en/html/aria2c.html#input-file)
     """
     files = [d for d in file if not d.exists()]
-    Log.info(f'⬇ {files=}')
-    if not files:
-        return []
+    if files:
+        _info = [f'({f.path},{f.urls})\t' for f in files] if IS_DEBUG else [str(f.path.name) for f in files]
+        Log.debug(f'⬇ {_info}') if IS_DEBUG else Log.info(f'⬇ {"\t".join(_info)}')
     dls = []
     for f in files:
-        _options = {**_OPT, **options, 'dir': f.parent, 'out': f.name}
-        dls.append(Aria.add_uris(f.urls, options=_options))  # type: ignore
+        _options = {**_OPT, **options, 'dir': str(f.path.parent), 'out': str(f.path.name)}
+        dls.append(Aria.add_uris(f.urls, options=_options))
     DOWNLOADS.extend(dls)
     return dls
 
 
-def get_slowest(*dl: 'aria2p.Download') -> 'aria2p.Download | None':
+def get_slowest(dl: Sequence[aria2p.Download] = DOWNLOADS) -> aria2p.Download | None:
     """return the slowest download"""
-    dls = dl if dl else DOWNLOADS
+    gids = [d.gid for d in dl]
+    dls = Aria.get_downloads(gids) if gids else []
     longest_eta = timedelta()
     _slowest = None
     for _dl in dls:
@@ -141,11 +138,28 @@ def get_slowest(*dl: 'aria2p.Download') -> 'aria2p.Download | None':
     return _slowest
 
 
-async def wait_slowest(*dl: 'aria2p.Download'):
-    dls = dl if dl else DOWNLOADS
-    while (slowest := get_slowest(*dls)):
-        Log.info(f"⏳ Waiting for {slowest.name} to complete, ETA: {slowest.eta}") if not dl else None
+async def wait_slowest_dl(dl: Sequence[aria2p.Download]):
+    while get_slowest(dl):
         await asyncio.sleep(_INTERVAL)
+
+
+async def wait_all_dl():
+    '''⚠️ Warn: this run **forever**! You need manually kill this.
+    ```python
+    done, pending = await asyncio.wait(
+        [asyncio.gather(*tasks), asyncio.create_task(wait_all_dl())],
+        return_when=asyncio.FIRST_COMPLETED
+    )
+    ret = done.pop().result()
+    for task in pending:
+        task.cancel()
+    ```
+    '''
+    while True:
+        slowest = get_slowest(DOWNLOADS)
+        if slowest:
+            Log.info(f"⏳ Waiting for {slowest.name} to complete, ETA: {slowest.eta}")
+        await asyncio.sleep(TIMEOUT_SECONDS)
 
 
 def is_complete(dls: Sequence['aria2p.Download|None']): return not dls or all([dl.is_complete for dl in dls if dl])
@@ -167,9 +181,9 @@ def try_aria_port() -> aria2p.API:
 
 
 try:
-    Aria = try_aria_port()
+    Aria: aria2p.API = try_aria_port()
 except Exception:
-    Aria = None
+    Aria = None  # type: ignore
 
 
 if __name__ == '__main__':

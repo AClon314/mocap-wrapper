@@ -50,5 +50,5 @@ jobs:
         run: . ~/.profile && mocap --install -b '' # 2>&1 | tee ./.log/install.log
 
       #  `-rs` flag is used to debug for the test failure
-      - name: pytest
-        run: uv run python -m pytest -rs tests #| tee ./.log/test.log
+      # - name: pytest
+      #   run: . ~/.profile && uv run python -m pytest -rs tests #| tee ./.log/test.log

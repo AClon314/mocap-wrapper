@@ -239,6 +239,7 @@ def i_mocap():
 
 
 def set_shell_init_venv_PATH():
+    '''. ~/.venv/bin/activate && export PATH=... > ~/.profile ; source ~/.profile > ~/.bashrc, ~/.zshrc, ~/.xonshrc'''
     Log.info('Setup activate venv/PATH in shell profile...')
     if is_win:
         _activate = r'~\.venv\Scripts\activate'  # .venv\Scripts\activate
@@ -249,30 +250,36 @@ def set_shell_init_venv_PATH():
     & "{_activate}"
 }}
 '''
-        if os.path.exists(profile):
-            with open(profile, 'r', encoding='utf-8') as f:
-                content = f.read()
-        else:
-            content = ''
-
-        if _activate not in content:
-            with open(profile, 'a', encoding='utf-8') as f:
-                f.write(script)
-            Log.info(f'✅ {_activate} → {profile}')
+        write(script, profile)
         return _activate
-    _activate = '. ~/.venv/bin/activate'    # source .venv/bin/activate
+    _activate = '. ~/.venv/bin/activate'
     _export = f'export PATH="$PATH:{PIXI_BIN}:$HOME/.venv/bin"'
-    _profile = os.path.expanduser(f'~/.profile')
-    if not os.path.exists(_profile):
-        with open(_profile, 'w') as f:
-            ...
-    with open(_profile, 'r') as f:
-        content = f.read()
-    if _activate not in content:
-        with open(_profile, 'a') as f:
-            f.write(f'\n{_activate}\n{_export}\n')
-    Log.warning(f'⚠️⚠️⚠️ venv/PATH update at {_profile}, to apply that: 1.source {_profile} 2.log-off then login 3.re-connect SSH ⚠️⚠️⚠️')
+    profile = os.path.expanduser(f'~/.profile')
+    _source = f'. {profile}'   # because re-source ~/.bashrc would break some ENV, and usually ~/.profile is simple.
+    write('\n'.join([_activate, _export]), profile)
+
+    shells = [_sh for _sh in ['bash', 'zsh', 'xonsh'] if shutil.which(_sh)]
+    for sh in shells:
+        _shrc = os.path.expanduser(f'~/.{sh}rc')
+        write(_source, _shrc)
+    if not shells:
+        Log.warning(f'⚠️⚠️⚠️ venv/PATH update at {profile}, add to your .*shrc: {_source} ⚠️⚠️⚠️')
     return _activate
+
+
+def write(text: str, file: str):
+    '''Write text to file if the first line is not already present.'''
+    if os.path.exists(file):
+        with open(file, 'r') as f:
+            content = f.read()
+    else:
+        content = ''
+    if text.strip().split('\n')[0].strip() not in content:
+        with open(file, 'a') as f:
+            f.write(f'\n{text}\n')
+        Log.info(f'✅ {file} ← {text}')
+        return True
+    return False
 
 
 def set_timeout(timeout: int = TIMEOUT):

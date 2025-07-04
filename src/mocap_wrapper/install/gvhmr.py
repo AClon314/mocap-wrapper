@@ -43,13 +43,14 @@ async def i_models(Dir=DIR_GVHMR):
     files: list[File] = []
     for out, dic in LFS.items():
         urls = [HUG_GVHMR + '/'.join(out)]
-        try:
-            urls.append(google_drive(id=dic['GD_ID']))
-        except Exception as e:
-            Log.info(f'Skip Google drive for {out} from {dic["GD_ID"]}: {e}')
+        if not CONFIG.is_mirror:
+            try:
+                urls.append(google_drive(id=dic['GD_ID']))
+            except Exception as e:
+                Log.info(f'Skip Google drive for {out} from {dic["GD_ID"]}: {e}')
         files.append(File(*urls, path=Path(Dir, *out), md5=dic['md5']))
     dls = download(*files)
-    await wait_slowest(*dls)
+    await wait_slowest_dl(dls)
     if not is_complete(dls):
         Log.error(f"Please download GVHMR models at {HUG_GVHMR} or https://drive.google.com/drive/folders/1eebJ13FUEXrKBawHpJroW0sNSxLjh9xD?usp=drive_link")
     if is_complete(dls):
@@ -78,7 +79,6 @@ async def i_gvhmr(Dir=DIR_GVHMR, **kwargs):
     p = await run_tail(f'git clone https://github.com/zju3dv/GVHMR {Dir}', **kwargs).Await(TIMEOUT_MINUTE)
     dir_checkpoints = Path(Dir, 'inputs', 'checkpoints')
     os.makedirs(Path(dir_checkpoints, 'body_models'), exist_ok=True)
-    os.chdir(Dir)
     i_config(Dir)
 
     tasks = [
@@ -91,7 +91,7 @@ async def i_gvhmr(Dir=DIR_GVHMR, **kwargs):
     results = await asyncio.gather(*tasks, return_exceptions=True)
     exceptions = [r for r in results if isinstance(r, Exception)]
     if exceptions:
-        Log.error(f"❌ {exceptions}")
+        [Log.exception(e, exc_info=e) for e in exceptions]
     else:
         Log.info("✔ Installed GVHMR")
         CONFIG['gvhmr'] = True
@@ -104,7 +104,7 @@ async def i_dpvo(Dir=DIR, **kwargs):
              path=Path(Dir, 'eigen-3.4.0.zip'), md5='994092410ba29875184f7725e0371596')
     dl = download(f, dir=Dir)
     if is_complete(dl) and f.exists():
-        p = await unzip(f, to=os.path.join(Dir, 'thirdparty'), **kwargs)
+        p = await unzip(f.path, to=os.path.join(Dir, 'thirdparty'), **kwargs)
         # remove_if_p(f.path)    # TODO: remove_if_p
     else:
         Log.error("❌ Can't unzip Eigen to third-party/DPVO/thirdparty")
