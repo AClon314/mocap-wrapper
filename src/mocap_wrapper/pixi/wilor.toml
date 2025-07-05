@@ -3,7 +3,7 @@ channels = ["nvidia", "pytorch", "conda-forge"]
 platforms = ["linux-64"] # "osx-arm64", "osx-64" 
 version = "2025.6.13"
 [environments]
-default = ["wilor", "gpu", "dev"]
+default = ["wilor", "gpu"]
 
 [feature.gpu.system-requirements]
 cuda = "12.1"

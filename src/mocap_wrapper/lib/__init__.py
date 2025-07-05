@@ -59,10 +59,10 @@ def get_cmds(doc: str | None):
     return cmds
 
 
-from .aria import *
-from .config import *
-from .data_viewer import *
-from .FFmpeg import *
 from .logger import *
-from .pkg_mgr import *
+from .config import *
 from .process import *
+from .aria import *
+from .pkg_mgr import *
+from .FFmpeg import *
+from .data_viewer import *
