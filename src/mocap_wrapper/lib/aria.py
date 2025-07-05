@@ -176,19 +176,18 @@ def try_aria_port() -> aria2p.API:
             return aria2
         except Exception as e:
             Log.debug(f"Failed to connect to aria2 on port {port}: {e}")
-    raise ConnectionError(f"Failed to connect to aria2 on ports {_ARIA_PORTS}")
+    raise ConnectionError(f"Failed to connect RPC to aria2 on ports {_ARIA_PORTS}, is aria2c/Motrix running?")
 
 
 async def get_aria():
-    Aria = try_aria_port()
     process = None
-    if Aria is None:
+    try:
+        Aria = try_aria_port()
+    except ConnectionError:
         from .process import run_tail
         process = run_tail('aria2c --enable-rpc --rpc-listen-port=6800')
         await asyncio.sleep(1.5)
         Aria = try_aria_port()
-        if Aria is None:
-            raise Exception("Failed to connect rpc to aria2, is aria2c/Motrix running?")
     Log.debug(Aria)
     return Aria, process
 

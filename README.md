@@ -9,18 +9,11 @@ sincerelly thanks to gvhmr/wilor/wilor-mini developers and others that help each
 ## WIP 进展
 
 > [!CAUTION]
-> Currently broken! Code refactoring....
+> Code refactoring....
 > TODO code refactor in v0.2.1:
 > - MCP standard support: json-rpc
-> - use `pixi` and `uv` instead of `mamba`
->   - simplify by override toml: https://github.com/prefix-dev/pixi/issues/3890
-> - test case and CI, to make the installation process hardly failed.
 > - wilor continuous predict.
 pixi config set --local run-post-link-scripts insecure
-
-> [!WARNING]
-> There's a huge code refactoring in the up-comming release v0.2.1. The run part in v0.2.0 should be ok, see [issue#2](https://github.com/AClon314/mocap-wrapper/issues/2)
-> 即将发布的 v0.2.1 版本中将进行大规模代码重构，v0.2.0的运行部分应该没有问题，请参阅 [#2](https://github.com/AClon314/mocap-wrapper/issues/2)
 
 | Feature 功能      |                |
 | ----------------- | -------------- |
