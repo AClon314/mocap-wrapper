@@ -51,4 +51,3 @@ class Config(UserDict):
 
 
 CONFIG = Config()
-DIR = CONFIG['search_dir']

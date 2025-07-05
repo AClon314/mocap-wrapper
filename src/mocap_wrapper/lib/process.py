@@ -13,11 +13,11 @@ from math import inf
 from pathlib import Path
 from typing import Coroutine, Literal, Sequence
 from .logger import Log, getLogger
-from . import copy_args, TIMEOUT_MINUTE, DIR
+from . import copy_args, TIMEOUT_MINUTE, CONFIG
 Log = getLogger(__name__)
 _RUN_ID = 0
 _INTERVAL = 0.1
-def run_async(func: Coroutine, timeout=TIMEOUT_MINUTE, loop=asyncio.get_event_loop()): return asyncio.run_coroutine_threadsafe(func, loop).result(timeout)
+def run_async(func: Coroutine, timeout=TIMEOUT_MINUTE, loop: asyncio.AbstractEventLoop | None = None): return asyncio.run_coroutine_threadsafe(func, loop=loop if loop else asyncio.get_event_loop()).result(timeout)
 def shlex_quote(args: Sequence[str]): return ' '.join(shlex.quote(str(arg)) for arg in args)
 def _Log_info(msg: str, *args, **kwargs): Log.info(msg, *args, **kwargs) if msg.rstrip() else None
 
@@ -31,11 +31,6 @@ def get_coro_sig(coro) -> tuple[str, dict]:
     func_name = coro.__qualname__
     args = coro.cr_frame.f_locals
     return func_name, args
-
-
-def mkdir(dir):
-    os.makedirs(dir, exist_ok=True)
-    Log.info(f'📁 Created: {dir}')
 
 
 def symlink(src: str, dst: str, overwrite=True, is_src_dir=False, dir_fd: int | None = None):
@@ -120,7 +115,7 @@ def run_tail(cmds: str | Sequence[str], *args, **kwargs) -> Tail: return _aexpec
 
 
 async def unzip(
-    zip_path: str | Path, From='', to: str = DIR, pwd='',
+    zip_path: str | Path, From='', to: str = CONFIG['search_dir'], pwd='',
     overwrite_rule: Literal['always', 'skip', 'rename_new', 'rename_old'] = 'skip',
     **kwargs
 ):

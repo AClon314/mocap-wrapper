@@ -8,11 +8,11 @@ import hashlib
 from pathlib import Path
 from datetime import timedelta
 from typing import Callable, Literal, Sequence, TypedDict, Unpack, get_args
+from . import TIMEOUT_SECONDS
 from .logger import IS_DEBUG, getLogger
 Log = getLogger(__name__)
 _ARIA_PORTS = [6800, 16800]
 _INTERVAL = 0.5
-TIMEOUT_SECONDS = 15      # seconds for next http request, to prevent being 403 blocked
 TYPE_HASH = Literal['md5', 'sha1', 'sha256', 'sha512', 'shake_128', 'shake_256']
 HASH = get_args(TYPE_HASH)
 _OPT = {
@@ -26,6 +26,8 @@ _OPT = {
 }
 _OPT = {k: str(v) for k, v in _OPT.items()}
 DOWNLOADS = []
+def is_complete(dls: Sequence['aria2p.Download|None']): return not dls or all([dl.is_complete for dl in dls if dl])
+def refresh_downloads(dls: Sequence['aria2p.Download'] = DOWNLOADS): return Aria.get_downloads([dl.gid for dl in dls]) if dls else []
 
 
 class Kw_download(TypedDict, total=False):
@@ -125,21 +127,20 @@ def download(
     return dls
 
 
-def get_slowest(dl: Sequence[aria2p.Download] = DOWNLOADS) -> aria2p.Download | None:
+def get_slowest(dls: Sequence[aria2p.Download] = DOWNLOADS, refresh=True) -> aria2p.Download | None:
     """return the slowest download"""
-    gids = [d.gid for d in dl]
-    dls = Aria.get_downloads(gids) if gids else []
+    dls = refresh_downloads(dls) if refresh else dls
     longest_eta = timedelta()
     _slowest = None
     for _dl in dls:
-        if longest_eta < _dl.eta:
+        if not _dl.is_complete and longest_eta < _dl.eta:
             longest_eta = _dl.eta
             _slowest = _dl
     return _slowest
 
 
-async def wait_slowest_dl(dl: Sequence[aria2p.Download]):
-    while get_slowest(dl):
+async def wait_slowest_dl(dls: Sequence[aria2p.Download]):
+    while get_slowest(dls):
         await asyncio.sleep(_INTERVAL)
 
 
@@ -156,13 +157,11 @@ async def wait_all_dl():
     ```
     '''
     while True:
-        slowest = get_slowest(DOWNLOADS)
+        dls = refresh_downloads(DOWNLOADS)
+        slowest = get_slowest(dls, refresh=False)
         if slowest:
-            Log.info(f"⏳ Waiting for {slowest.name} to complete, ETA: {slowest.eta}")
+            Log.info(f"⬇ {slowest.name} ETA: {slowest.eta}. {Aria.get_stats()}")
         await asyncio.sleep(TIMEOUT_SECONDS)
-
-
-def is_complete(dls: Sequence['aria2p.Download|None']): return not dls or all([dl.is_complete for dl in dls if dl])
 
 
 def try_aria_port() -> aria2p.API:
@@ -180,10 +179,21 @@ def try_aria_port() -> aria2p.API:
     raise ConnectionError(f"Failed to connect to aria2 on ports {_ARIA_PORTS}")
 
 
-try:
-    Aria: aria2p.API = try_aria_port()
-except Exception:
-    Aria = None  # type: ignore
+async def get_aria():
+    Aria = try_aria_port()
+    process = None
+    if Aria is None:
+        from .process import run_tail
+        process = run_tail('aria2c --enable-rpc --rpc-listen-port=6800')
+        await asyncio.sleep(1.5)
+        Aria = try_aria_port()
+        if Aria is None:
+            raise Exception("Failed to connect rpc to aria2, is aria2c/Motrix running?")
+    Log.debug(Aria)
+    return Aria, process
+
+
+Aria, Aria_process = asyncio.run(get_aria())
 
 
 if __name__ == '__main__':

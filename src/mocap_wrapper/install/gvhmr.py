@@ -1,20 +1,21 @@
-import shutil
-from mirror_cn import replace_github_with_mirror
-from mocap_wrapper.lib import *
-from mocap_wrapper.lib import TIMEOUT_MINUTE, TIMEOUT_QUATER
+import os
+import asyncio
+from pathlib import Path
+from . import i_python_env
 from .smpl import i_smplx
 from .Gdown import google_drive
-DIR_GVHMR = os.path.join(DIR, 'GVHMR')
+from ..lib import TIMEOUT_MINUTE, TIMEOUT_QUATER, CONFIG, getLogger, run_tail, symlink, res_path, File, download, is_complete, wait_slowest_dl, unzip
+DIR_GVHMR = Path(CONFIG['search_dir'], 'GVHMR')
 Log = getLogger(__name__)
 
 
-def i_config(Dir=DIR_GVHMR, file='gvhmr.yaml'):
+def i_config(Dir: str | Path = DIR_GVHMR, file='gvhmr.yaml'):
     src = res_path(module='install', file=file)
     dst = os.path.join(Dir, 'hmr4d', 'configs', file)
     symlink(str(src), dst)
 
 
-async def i_models(Dir=DIR_GVHMR):
+async def i_models(Dir: str | Path = DIR_GVHMR):
     Log.info("📦 Download GVHMR pretrained models (📝 By downloading, you agree to the GVHMR's corresponding licences)")
     DOMAIN = 'hf-mirror.com' if CONFIG.is_mirror else 'huggingface.co'
     HUG_GVHMR = f'https://{DOMAIN}/camenduru/GVHMR/resolve/main/'
@@ -51,40 +52,25 @@ async def i_models(Dir=DIR_GVHMR):
         files.append(File(*urls, path=Path(Dir, *out), md5=dic['md5']))
     dls = download(*files)
     await wait_slowest_dl(dls)
-    if not is_complete(dls):
-        Log.error(f"Please download GVHMR models at {HUG_GVHMR} or https://drive.google.com/drive/folders/1eebJ13FUEXrKBawHpJroW0sNSxLjh9xD?usp=drive_link")
     if is_complete(dls):
         Log.info("✔ Download GVHMR models")
+    else:
+        Log.error(f"Please download GVHMR models at {HUG_GVHMR} or https://drive.google.com/drive/folders/1eebJ13FUEXrKBawHpJroW0sNSxLjh9xD?usp=drive_link")
     return dls
 
 
-async def i_python_env(Dir=DIR_GVHMR):
-    pixi_toml = res_path(file='gvhmr.toml')
-    if (txt := Path(Dir, 'requirements.txt')).exists():
-        shutil.move(txt, Path(Dir, 'requirements.txt.bak'))
-    if not CONFIG.is_mirror:
-        shutil.copy(pixi_toml, Dir)
-        p = await run_tail(['pixi', 'install', '-q', '-v']).Await(TIMEOUT_QUATER)
-        return p
-    for file, mirror in replace_github_with_mirror(str(pixi_toml)):
-        shutil.copy(file, Dir)
-        p = await run_tail(['pixi', 'install', '-q', '-v']).Await(TIMEOUT_QUATER)
-        if p.get_status() == 0:
-            return p
-
-
-async def i_gvhmr(Dir=DIR_GVHMR, **kwargs):
+async def i_gvhmr(Dir: str | Path = DIR_GVHMR, **kwargs):
     Log.info(f"📦 Install GVHMR at {DIR_GVHMR}")
     os.makedirs(Dir, exist_ok=True)
     p = await run_tail(f'git clone https://github.com/zju3dv/GVHMR {Dir}', **kwargs).Await(TIMEOUT_MINUTE)
-    dir_checkpoints = Path(Dir, 'inputs', 'checkpoints')
+    dir_checkpoints = str(Path(Dir, 'inputs', 'checkpoints'))
     os.makedirs(Path(dir_checkpoints, 'body_models'), exist_ok=True)
     i_config(Dir)
 
     tasks = [
-        i_python_env(Dir=Dir),
-        i_smplx(Dir=Dir, **kwargs),
-        i_models(Dir=str(dir_checkpoints)),
+        i_python_env(Dir=Dir, pixi_toml='gvhmr.toml'),
+        i_smplx(Dir=dir_checkpoints, **kwargs),
+        i_models(Dir=dir_checkpoints),
         # git_pull(),
         # i_dpvo(Dir=Path(Dir, 'third-party/DPVO')),
     ]
@@ -98,11 +84,11 @@ async def i_gvhmr(Dir=DIR_GVHMR, **kwargs):
     return results
 
 
-async def i_dpvo(Dir=DIR, **kwargs):
+async def i_dpvo(Dir: str | Path = CONFIG['search_dir'], **kwargs):
     Log.info("📦 Install DPVO")
     f = File('https://gitlab.com/libeigen/eigen/-/archive/3.4.0/eigen-3.4.0.zip',
              path=Path(Dir, 'eigen-3.4.0.zip'), md5='994092410ba29875184f7725e0371596')
-    dl = download(f, dir=Dir)
+    dl = download(f)
     if is_complete(dl) and f.exists():
         p = await unzip(f.path, to=os.path.join(Dir, 'thirdparty'), **kwargs)
         # remove_if_p(f.path)    # TODO: remove_if_p
@@ -114,5 +100,4 @@ async def i_dpvo(Dir=DIR, **kwargs):
 
 
 if __name__ == '__main__':
-    i_config('../GVHMR')
-    # asyncio.run(i_gvhmr())
+    ...

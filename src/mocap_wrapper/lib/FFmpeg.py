@@ -5,7 +5,7 @@ import asyncio
 from ffmpeg import probe as ffprobe
 from fractions import Fraction
 from datetime import datetime, timedelta
-from .process import mkdir, symlink
+from .process import symlink
 from .logger import IS_DEBUG, getLogger
 from typing import Any, Literal
 Log = getLogger(__name__)
@@ -82,7 +82,7 @@ async def ffmpeg_or_link(from_file: str, to_dir: str, Range='', fps_times=5):
     filename = os.path.splitext(os.path.basename(from_file))[0]
     to_dir = os.path.join(to_dir, filename)   # output/xxx
     to_file = os.path.join(to_dir, filename + '.mp4')
-    mkdir(to_dir)
+    os.makedirs(to_dir, exist_ok=True)
 
     is_ffmpeg_to = os.path.exists(to_file)
     if is_ffmpeg_to:

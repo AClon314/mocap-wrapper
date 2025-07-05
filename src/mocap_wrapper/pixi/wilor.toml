@@ -11,10 +11,7 @@ cuda = "12.1"
 [feature.wilor.dependencies]
 # share with gvhmr
 python = "3.10.*"
-torch = {version = "==2.3.0", index = "https://download.pytorch.org/whl/cu121"}
-torchvision = {version = "==0.18.0", index = "https://download.pytorch.org/whl/cu121"}
 
-chumpy = {git = "https://github.com/mattloper/chumpy"}
 dill = "*"
 einops = "*"
 huggingface_hub = "*"
@@ -25,12 +22,7 @@ timm = "*"
 ultralytics = ">=8.1.34"
 
 [feature.wilor.pypi-dependencies]
+chumpy = {git = "https://github.com/mattloper/chumpy"}
+torch = {version = "==2.3.0", index = "https://download.pytorch.org/whl/cu121"}
+torchvision = {version = "==0.18.0", index = "https://download.pytorch.org/whl/cu121"}
 wilor_mini = {git = "https://github.com/warmshao/WiLoR-mini"}
-[feature.dev.pypi-dependencies]
-mirror_cn = {git = "https://github.com/AClon314/mirror-cn"}
-
-# [pypi-options]
-# extra-index-urls = [
-#   "https://pypi.tuna.tsinghua.edu.cn/simple",
-# ]
-# index-url = "https://mirrors.aliyun.com/pypi/simple"

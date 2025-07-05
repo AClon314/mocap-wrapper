@@ -3,6 +3,8 @@
 # this script will set git/pip mirrors, install mamba, mocap-wrapper.
 curl https://raw.githubusercontent.com/AClon314/mocap-wrapper/refs/heads/master/src/mocap_wrapper/install/mamba.py | python
 '''
+if __name__ != '__main__':
+    raise ImportError("This installation script must be run directly, not imported as a module.")
 import os
 import re
 import sys
@@ -312,8 +314,9 @@ def main():
     i_pixi()
     i_uv()
     i_mocap()
-    Log.info(f"✅ {msg}`")
     set_shell_init_venv_PATH()
+    Log.info(f"✅ {msg}`")
+    os.remove(MIRROR_CN_PY) if os.path.exists(MIRROR_CN_PY) else None
     SHELL = 'powershell' if is_win else os.getenv('SHELL', 'zsh' if is_mac else 'bash')
     os.execvp(SHELL, [SHELL]) if not IS_AUTO else None
 

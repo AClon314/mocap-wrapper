@@ -86,8 +86,6 @@ plotly = "*" # data_viewer.ipynb
 # diffusers = {version = ">=0.19.3", extras = ["torch"]}
 # transformers = ">=4.31.0"
 # open3d = "*"
-[feature.dev.pypi-dependencies]
-mirror_cn = {git = "https://github.com/AClon314/mirror-cn"}
 
 [feature.dpvo.dependencies]
 numba = "*"

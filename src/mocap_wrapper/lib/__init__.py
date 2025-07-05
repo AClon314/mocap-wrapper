@@ -15,6 +15,7 @@ __version__ = _version(PACKAGE)
 is_linux = platform == 'linux'
 is_win = platform == 'win32'
 is_mac = platform == 'darwin'
+TIMEOUT_SECONDS = 15      # seconds for next http request, to prevent being 403 blocked
 TIMEOUT_MINUTE = timedelta(minutes=2).seconds
 TIMEOUT_QUATER = timedelta(minutes=15).seconds
 QRCODE = """

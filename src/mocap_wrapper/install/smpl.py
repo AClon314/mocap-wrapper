@@ -2,7 +2,7 @@ import aria2p
 import asyncio
 from pathlib import Path
 from netscape_cookies import save_cookies_to_file
-from mocap_wrapper.lib import CONFIG, DIR, File, getLogger, symlink, unzip, download, is_complete, wait_slowest_dl
+from mocap_wrapper.lib import CONFIG, File, getLogger, symlink, unzip, download, is_complete, wait_slowest_dl
 from typing import Dict, TypedDict, Unpack
 Log = getLogger(__name__)
 HUG_SMPLX = 'https://{}/camenduru/SMPLer-X/resolve/main/'
@@ -29,7 +29,7 @@ class Kw_i_smpl(Kw_itmd):
 
 def download_tue_mpg(
     url='https://download.is.tue.mpg.de/download.php?domain=smpl&sfile=SMPL_python_v.1.1.0.zip',
-    path=Path(DIR, 'SMPL_python_v.1.1.0.zip'),
+    path=Path(CONFIG['search_dir'], 'SMPL_python_v.1.1.0.zip'),
     referer='https://smpl.is.tue.mpg.de/',
     PHPSESSID='26-digits_123456789_123456',
     user_agent='Transmission/2.77',
@@ -46,7 +46,7 @@ def download_tue_mpg(
     """
     cookies_txt = Path(path, 'cookies.txt')
     cookies = [{
-        'domain': DIR + referer.split('/')[2],  # MAYBE BUGGY
+        'domain': CONFIG['search_dir'] + referer.split('/')[2],  # MAYBE BUGGY
         'name': 'PHPSESSID',
         'value': PHPSESSID,
     }]
@@ -123,7 +123,7 @@ async def i_smplx_tue_mde(
     #     if not (v and isinstance(v, str)):
     #         Log.warning(f"🍪 cookies: PHPSESSID for {k}={v} could cause download failure")
 
-    Dir = kwargs.setdefault('Dir', DIR)
+    Dir = kwargs.setdefault('Dir', CONFIG['search_dir'])
     tasks = [
         dl_unzip_ln(
             **kwargs,   # type: ignore
@@ -150,7 +150,7 @@ async def i_smplx_tue_mde(
         ),
     ]
     # TODO: download 1by1 when in same domain
-    dls = await asyncio.gather(*tasks)
+    dls = await asyncio.gather(*tasks, return_exceptions=False)
     dls = [dl[0] for dl in dls if dl is not None]
 
     if not is_complete(dls):

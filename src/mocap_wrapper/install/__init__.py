@@ -1,13 +1,34 @@
 import shutil
-import signal
 import asyncio
-from ..lib import TYPE_RUNS, BINS, Aria, getLogger, i_pkgs, run_tail, try_aria_port, wait_all_dl
+import itertools
+from pathlib import Path
+from signal import SIGKILL
+from mirror_cn import replace_github_with_mirror
+from ..lib import TIMEOUT_QUATER, TYPE_RUNS, BINS, CONFIG, Aria_process, getLogger, i_pkgs, res_path, run_tail, wait_all_dl
 from typing import Sequence
 Log = getLogger(__name__)
 
 
+async def i_python_env(Dir: str | Path, pixi_toml='gvhmr.toml', use_mirror=True):
+    _toml = str(res_path(file=pixi_toml))
+    pixi_toml = Path(Dir, 'pixi.toml')
+    # if (txt := Path(Dir, 'requirements.txt')).exists():
+    #     shutil.move(txt, Path(Dir, 'requirements.txt.bak'))
+    timeout = 4 if CONFIG.is_mirror else TIMEOUT_QUATER  # fail quickly if CN use github.com
+    iter_github = [(_toml, 'github.com')]
+    iters = itertools.chain(iter_github, replace_github_with_mirror(file=str(_toml))) if use_mirror else iter_github
+    for file, _ in iters:
+        try:
+            shutil.copy(file, pixi_toml)
+        except shutil.SameFileError:
+            ...
+        p = await run_tail(['pixi', 'install', '-q', '--manifest-path', str(pixi_toml)]).Await(timeout)
+        if p.get_status() == 0:
+            return p
+        timeout = TIMEOUT_QUATER
+
+
 async def install(runs: Sequence[TYPE_RUNS], **kwargs):
-    global Aria
     tasks = []
 
     pkgs = {p: shutil.which(p) for p in BINS}
@@ -16,17 +37,6 @@ async def install(runs: Sequence[TYPE_RUNS], **kwargs):
     if any(pkgs):
         await i_pkgs()
 
-    p_aria = None
-    if Aria is None:
-        # try to start aria2c
-        p_aria = run_tail('aria2c --enable-rpc --rpc-listen-port=6800')
-        await asyncio.sleep(1.5)
-        Aria = try_aria_port()
-        if Aria is None:
-            raise Exception("Failed to connect rpc to aria2, is aria2c/Motrix running?")
-    Log.debug(Aria)
-
-    # Log.debug(f'{runs=}')
     if 'gvhmr' in runs:
         from .gvhmr import i_gvhmr
         tasks.append(i_gvhmr(**kwargs))
@@ -41,5 +51,5 @@ async def install(runs: Sequence[TYPE_RUNS], **kwargs):
     ret = done.pop().result()
     for task in pending:
         task.cancel()
-    p_aria.kill(signal.SIGKILL) if p_aria else None
+    Aria_process.kill(SIGKILL) if Aria_process else None
     return ret

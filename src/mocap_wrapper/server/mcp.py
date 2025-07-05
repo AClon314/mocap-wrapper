@@ -3,7 +3,7 @@ from functools import partial
 from fastapi import FastAPI
 from fastmcp import FastMCP, Context
 from mocap_wrapper import OUTPUT_DIR, SELF_DIR, mocap
-from mocap_wrapper.lib import DIR, RUNS, LOG_LEVEL, PACKAGE, TYPE_RUNS, __version__
+from mocap_wrapper.lib import RUNS, CONFIG, LOG_LEVEL, PACKAGE, TYPE_RUNS, __version__
 from typing import Callable, Sequence
 TITLE = f'{PACKAGE} {{}} backend server'
 HOST = '0.0.0.0'
@@ -41,7 +41,7 @@ async def root():
 
 
 @tool_post
-async def install(by: Sequence[TYPE_RUNS], at=DIR, ctx: Context | None = None):
+async def install(by: Sequence[TYPE_RUNS], at=CONFIG['search_dir'], ctx: Context | None = None):
     '''Install default runs with gvhmr, or specified runs if `by` is provided.'''
     if ctx:
         await ctx.info(f'Install {by} {at=}...')

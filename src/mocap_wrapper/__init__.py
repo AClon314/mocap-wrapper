@@ -15,10 +15,10 @@ import copy
 import asyncio
 import argparse
 from typing import Sequence
-from .lib import DIR, RUNS, CONFIG, PACKAGE, TYPE_RUNS, QRCODE, __version__
+from .lib import RUNS, CONFIG, PACKAGE, TYPE_RUNS, QRCODE, __version__
 from .install import install
 DEFAULT: Sequence[TYPE_RUNS] = ('wilor', 'gvhmr')
-OUTPUT_DIR = os.path.join(DIR, 'output')
+OUTPUT_DIR = os.path.join(CONFIG['search_dir'], 'output')
 def version(): return f'{PACKAGE} {__version__} 👻\tconfig: {CONFIG.path}\tcode: https://github.com/AClon314/mocap-wrapper'
 async def gather(*args, **kwargs): return await asyncio.gather(*args, **kwargs)
 _VERSION_ = version()
@@ -55,7 +55,7 @@ def argParse():
     arg.add_argument('-v', '--version', action='store_true')
     arg.add_argument('-I', '--install', action='store_true', help='force to re-install runs')
     arg.add_argument('-b', '--by', nargs='*', default=False, metavar=RUNS, help=f'install with/run by, default all installed, eg: `--by={",".join(DEFAULT)}`')
-    arg.add_argument('-@', '--at', metavar=DIR, help='search_dir of git repos, eg: `--at=".."` if GVHMR is current work dir')
+    arg.add_argument('-@', '--at', metavar=CONFIG['search_dir'], help='search_dir of git repos, eg: `--at=".."` if GVHMR is current work dir')
     arg.add_argument('-i', '--input', nargs='*', metavar='in.mp4')
     arg.add_argument('-o', '--outdir', metavar=OUTPUT_DIR, default=OUTPUT_DIR)
     arg.add_argument('-r', '--range', metavar='[a,b]or[a,duration]', default='', help='video time range, eg: `--range=0:0:1,0:2` is 1s~2s, `--range=10` is 0s~10s')
@@ -69,13 +69,12 @@ def argParse():
 
 async def mocap(
     inputs: list[str] = [], outdir=OUTPUT_DIR,
-    Range='', at=DIR, by: Sequence[TYPE_RUNS] = RUNS,
+    Range='', at=CONFIG['search_dir'], by: Sequence[TYPE_RUNS] = RUNS,
     args: list[str] = []
 ):
-    global DIR
     if at:
-        DIR = CONFIG['search_dir'] = at
-    os.makedirs(DIR, exist_ok=True)
+        CONFIG['search_dir'] = at
+    os.makedirs(CONFIG['search_dir'], exist_ok=True)
     os.makedirs(outdir, exist_ok=True)
 
     _by = list(copy.deepcopy(by))
