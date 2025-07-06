@@ -10,13 +10,17 @@ TYPE_CONFIG_KEYS = Union[Literal['search_dir', 'gvhmr', 'wilor'], str]  # I thin
 
 
 class Config(UserDict):
-    default = {
-        'search_dir': str(Path('.').absolute()),
-        'gvhmr': False,
-        'wilor': False,
-    }
     @cached_property
     def is_mirror(self): return is_need_mirror()
+
+    @property
+    def default(self):
+        SEARCH_DIR = self.data.get('search_dir', str(Path('.').absolute()))
+        return {
+            'search_dir': SEARCH_DIR,
+            'gvhmr': str(Path(SEARCH_DIR, 'GVHMR')),
+            'wilor': str(Path(SEARCH_DIR, 'WiLoR-mini')),
+        }
 
     def __init__(self, dic: dict = {}, file: Path | str = "config.toml"):
         """
@@ -32,6 +36,7 @@ class Config(UserDict):
             # except toml.TomlDecodeError as e:
             #     # TODO: auto recover from this exception
             #     Log.warning(f"Load failed {self.path}: {e}")
+        super().__init__(**dic)
         super().__init__(**{**self.default, **dic})
 
     def dump(self, file: Path | str = '') -> None:
@@ -48,6 +53,10 @@ class Config(UserDict):
         super().__setitem__(key, value)
         if key in self.default.keys():
             self.dump()
+
+    def __delitem__(self, key: Any):
+        super().__delitem__(key)
+        self.data[key] = self.default[key]
 
 
 CONFIG = Config()

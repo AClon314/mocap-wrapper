@@ -202,6 +202,7 @@ def i_pixi():
     os.environ['PATH'] = os.pathsep.join([PIXI_BIN, os.getenv('PATH', '')])
     if not os.path.exists(PIXI_BIN):
         raise Exception(f"Post check failed, {PIXI_BIN=} does not exist.")
+    system('pixi config set --global run-post-link-scripts insecure'.split())
     Log.info(f"✅ pixi installed in: {PIXI_BIN=}")
     return p
 

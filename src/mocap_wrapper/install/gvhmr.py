@@ -5,17 +5,16 @@ from . import i_python_env
 from .smpl import i_smplx
 from .Gdown import google_drive
 from ..lib import TIMEOUT_MINUTE, TIMEOUT_QUATER, CONFIG, getLogger, run_tail, symlink, res_path, File, download, is_complete, wait_slowest_dl, unzip
-DIR_GVHMR = Path(CONFIG['search_dir'], 'GVHMR')
 Log = getLogger(__name__)
 
 
-def i_config(Dir: str | Path = DIR_GVHMR, file='gvhmr.yaml'):
+def i_config(Dir: str | Path = CONFIG['gvhmr'], file='gvhmr.yaml'):
     src = res_path(module='install', file=file)
     dst = os.path.join(Dir, 'hmr4d', 'configs', file)
     symlink(str(src), dst)
 
 
-async def i_models(Dir: str | Path = DIR_GVHMR):
+async def i_models(Dir: str | Path = CONFIG['gvhmr']):
     Log.info("📦 Download GVHMR pretrained models (📝 By downloading, you agree to the GVHMR's corresponding licences)")
     DOMAIN = 'hf-mirror.com' if CONFIG.is_mirror else 'huggingface.co'
     HUG_GVHMR = f'https://{DOMAIN}/camenduru/GVHMR/resolve/main/'
@@ -44,11 +43,11 @@ async def i_models(Dir: str | Path = DIR_GVHMR):
     files: list[File] = []
     for out, dic in LFS.items():
         urls = [HUG_GVHMR + '/'.join(out)]
-        if not CONFIG.is_mirror:
-            try:
-                urls.append(google_drive(id=dic['GD_ID']))
-            except Exception as e:
-                Log.info(f'Skip Google drive for {out} from {dic["GD_ID"]}: {e}')
+        # if not CONFIG.is_mirror:
+        #     try:
+        #         urls.append(google_drive(id=dic['GD_ID']))
+        #     except Exception as e:
+        #         Log.warning(f'Skip Google drive for {out} from {dic["GD_ID"]}: {e}')
         files.append(File(*urls, path=Path(Dir, *out), md5=dic['md5']))
     dls = download(*files)
     await wait_slowest_dl(dls)
@@ -59,8 +58,8 @@ async def i_models(Dir: str | Path = DIR_GVHMR):
     return dls
 
 
-async def i_gvhmr(Dir: str | Path = DIR_GVHMR, **kwargs):
-    Log.info(f"📦 Install GVHMR at {DIR_GVHMR}")
+async def i_gvhmr(Dir: str | Path = CONFIG['gvhmr'], **kwargs):
+    Log.info(f"📦 Install GVHMR at {CONFIG['gvhmr']}")
     os.makedirs(Dir, exist_ok=True)
     p = await run_tail(f'git clone https://github.com/zju3dv/GVHMR {Dir}', **kwargs).Await(TIMEOUT_MINUTE)
     dir_checkpoints = str(Path(Dir, 'inputs', 'checkpoints'))
@@ -80,7 +79,6 @@ async def i_gvhmr(Dir: str | Path = DIR_GVHMR, **kwargs):
         [Log.exception(e, exc_info=e) for e in exceptions]
     else:
         Log.info("✔ Installed GVHMR")
-        CONFIG['gvhmr'] = True
     return results
 
 

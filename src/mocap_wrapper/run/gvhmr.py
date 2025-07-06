@@ -21,7 +21,7 @@ For commercial uses of this software, please send email to xwzhou@zju.edu.cn
 """
 from typing import Sequence, Set
 from pathlib import Path
-from lib import Rodrigues, RotMat_to_quat, savez, chdir_gitRepo, continuous, euler, free_ram as _free_ram
+from lib import Rodrigues, RotMat_to_quat, savez, chdir_gitRepo, continuous, euler, free_ram as _free_ram  # type: ignore
 chdir_gitRepo('gvhmr')
 import argparse
 from os import symlink

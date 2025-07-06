@@ -9,21 +9,21 @@ sincerelly thanks to gvhmr/wilor/wilor-mini developers and others that help each
 ## WIP 进展
 
 > [!CAUTION]
-> Code refactoring....
-> TODO code refactor in v0.2.1:
-> - MCP standard support: json-rpc
+> TODO in v0.2.1:
+> - support MCP/fastAPI
+> - support Dyn-HaMR
 > - wilor continuous predict.
-pixi config set --local run-post-link-scripts insecure
 
 | Feature 功能      |                |
 | ----------------- | -------------- |
-| ✅ Done            | GVHMR, WiLoR   |
-| 🚀 国内镜像加速    | 🚧              |
+| 🖥Models           | GVHMR, WiLoR   |
 | 🐧Linux            | 🚧 Implementing |
 | 🪟Windows          | ❓ Need tested  |
-| 🍎 OSX             | ❓              |
+| 🍎OSX              | ❓              |
 | 📔Jupyter Notebook | ❓              |
-| 🤖 MCP             | 🕒 TODO         |
+| 🤖MCP              | 🚧              |
+| 🚀国内镜像加速     | ✅              |
+
 
 
 

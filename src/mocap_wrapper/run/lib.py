@@ -2,19 +2,16 @@ import os
 import gc
 import sys
 import toml
-import argparse
 import inspect
+import logging
+import argparse
 import numpy as np
 from pathlib import Path
 from platformdirs import user_config_path
 from types import ModuleType
 from typing import Any, Literal, Sequence, TypeVar
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))  # relative import
-try:
-    from ..lib.logger import getLogger
-except ImportError:
-    from mocap_wrapper.lib.logger import getLogger  # TODO # type: ignore
-Log = getLogger(__name__)
+Log = logging.getLogger(__name__)
 VIDEO_EXT = "webm,mkv,flv,flv,vob,vob,ogv,ogg,drc,gifv,webm,gifv,mng,avi,mov,qt,wmv,yuv,rm,rmvb,viv,asf,amv,mp4,m4p,m4v,mpg,mp2,mpeg,mpe,mpv,mpg,mpeg,m2v,m4v,svi,3gp,3g2,mxf,roq,nsv,flv,f4v,f4p,f4a,f4b".split(',')
 MAPPING = {
     'gvhmr': 'GVHMR',

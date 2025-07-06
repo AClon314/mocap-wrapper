@@ -1,3 +1,4 @@
+import os
 import shutil
 import asyncio
 import itertools
@@ -14,15 +15,16 @@ async def i_python_env(Dir: str | Path, pixi_toml='gvhmr.toml', use_mirror=True)
     pixi_toml = Path(Dir, 'pixi.toml')
     # if (txt := Path(Dir, 'requirements.txt')).exists():
     #     shutil.move(txt, Path(Dir, 'requirements.txt.bak'))
-    timeout = 4 if CONFIG.is_mirror else TIMEOUT_QUATER  # fail quickly if CN use github.com
+    timeout = 4 if CONFIG.is_mirror and use_mirror else TIMEOUT_QUATER  # fail quickly if CN use github.com
     iter_github = [(_toml, 'github.com')]
     iters = itertools.chain(iter_github, replace_github_with_mirror(file=str(_toml))) if use_mirror else iter_github
     for file, _ in iters:
-        try:
-            shutil.copy(file, pixi_toml)
-        except shutil.SameFileError:
-            ...
-        p = await run_tail(['pixi', 'install', '-q', '--manifest-path', str(pixi_toml)]).Await(timeout)
+        if pixi_toml.exists():
+            os.remove(pixi_toml)
+        shutil.copy(file, pixi_toml)
+        cmd = ['pixi', 'install', '-q', '--manifest-path', str(pixi_toml)]
+        Log.info(f'🐍 {" ".join(cmd)}')
+        p = await run_tail(cmd).Await(timeout)
         if p.get_status() == 0:
             return p
         timeout = TIMEOUT_QUATER
@@ -41,7 +43,7 @@ async def install(runs: Sequence[TYPE_RUNS], **kwargs):
         from .gvhmr import i_gvhmr
         tasks.append(i_gvhmr(**kwargs))
     if 'wilor' in runs:
-        from .wilor_mini import i_wilor_mini
+        from .wilor import i_wilor_mini
         tasks.append(i_wilor_mini(**kwargs))
 
     done, pending = await asyncio.wait(

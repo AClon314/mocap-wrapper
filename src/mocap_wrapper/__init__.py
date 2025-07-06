@@ -15,22 +15,22 @@ import copy
 import asyncio
 import argparse
 from typing import Sequence
-from .lib import RUNS, CONFIG, PACKAGE, TYPE_RUNS, QRCODE, __version__
+from .lib import RUNS, CONFIG, PACKAGE, TYPE_RUNS, QRCODE, __version__, getLogger
 from .install import install
 DEFAULT: Sequence[TYPE_RUNS] = ('wilor', 'gvhmr')
 OUTPUT_DIR = os.path.join(CONFIG['search_dir'], 'output')
 def version(): return f'{PACKAGE} {__version__} 👻\tconfig: {CONFIG.path}\tcode: https://github.com/AClon314/mocap-wrapper'
 async def gather(*args, **kwargs): return await asyncio.gather(*args, **kwargs)
 _VERSION_ = version()
+Log = getLogger(__name__)
 
 
 async def Python(run: TYPE_RUNS, *args: str):
     # TODO: run at same time if vram > 6gb, or 1 by 1 based if vram < 4gb
-    _arg = ' '.join(args)
-    if run == 'wilor':
-        run = 'wilorMini'   # type: ignore
-    py = res_path(module='run', file=f'{run}.py')
-    cmd = f'python {py} {_arg}'
+    py = str(res_path(module='run', file=f'{run}.py'))
+    cmd = ['pixi', 'run', '-q', '--manifest-path', CONFIG[run], '--', 'python', py, *args]
+    if '--help' in args or '-h' in args:
+        return os.system(' '.join(cmd))
     return await run_tail(cmd, output_prefix='', output_func=print).Await()
 
 
@@ -79,7 +79,7 @@ async def mocap(
 
     _by = list(copy.deepcopy(by))
     for i in by:
-        if CONFIG[i] == True:   # TODO os.path.exists(CONFIG[i])
+        if getattr(CONFIG, i, True) and os.path.exists(os.path.join(CONFIG[i], 'pixi.toml')):
             _by.remove(i)
     await install(runs=_by)
     if inputs:
@@ -103,7 +103,8 @@ def script_entry():
 
     if args.install:
         for r in by:
-            CONFIG[r] = False
+            del CONFIG[r]
+            setattr(CONFIG, r, None)
 
     asyncio.run(mocap(
         inputs=args.input,

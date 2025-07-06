@@ -20,7 +20,7 @@ import os
 import argparse
 import numpy as np
 from typing import Literal, Sequence, get_args
-from lib import quat_rotAxis, savez, squeeze, VIDEO_EXT
+from lib import quat_rotAxis, savez, squeeze, VIDEO_EXT  # type: ignore
 # from rich.progress import (
 #     Progress, TextColumn, BarColumn, TaskProgressColumn, MofNCompleteColumn, TimeElapsedColumn, TimeRemainingColumn)
 from sys import platform
