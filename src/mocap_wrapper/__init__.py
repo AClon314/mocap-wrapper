@@ -101,7 +101,7 @@ def script_entry():
     else:
         by = DEFAULT
 
-    if args.install:
+    if args.install and by:  # fix mocap -I -b ''
         for r in by:
             del CONFIG[r]
             setattr(CONFIG, r, None)
