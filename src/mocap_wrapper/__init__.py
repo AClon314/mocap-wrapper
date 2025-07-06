@@ -79,7 +79,7 @@ async def mocap(
 
     _by = list(copy.deepcopy(by))
     for i in by:
-        if getattr(CONFIG, i, True) and os.path.exists(os.path.join(CONFIG[i], 'pixi.toml')):
+        if i and getattr(CONFIG, i, True) and os.path.exists(os.path.join(CONFIG[i], 'pixi.toml')):
             _by.remove(i)
     await install(runs=_by)
     if inputs:
@@ -101,7 +101,7 @@ def script_entry():
     else:
         by = DEFAULT
 
-    if args.install and by:  # fix mocap -I -b ''
+    if args.install and by and by[0]:  # fix mocap -I -b ''
         for r in by:
             del CONFIG[r]
             setattr(CONFIG, r, None)
