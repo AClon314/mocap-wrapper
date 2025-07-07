@@ -7,8 +7,13 @@ from importlib.resources import path as _res_path
 from typing import Literal, ParamSpec, TypeVar, Callable, Any, cast, get_args
 _PS = ParamSpec("_PS")
 _TV = TypeVar("_TV")
-TYPE_RUNS = Literal['wilor', 'gvhmr']
+TYPE_RUNS = Literal['wilor', 'gvhmr', 'dynhamr']
 RUNS = get_args(TYPE_RUNS)
+RUNS_REMAP = {
+    'gvhmr': 'GVHMR',
+    'wilor': 'WiLoR-mini',
+    'dynhamr': 'Dyn-HaMR',
+}
 DIR_SELF = os.path.dirname(os.path.abspath(__file__))
 PACKAGE = __package__.split('.')[0] if __package__ else os.path.basename(DIR_SELF)
 __version__ = _version(PACKAGE)
@@ -45,7 +50,7 @@ def copy_args(
 
 def res_path(pkg=__package__, module='pixi', file='pixi.toml'):
     if pkg is None:
-        return Path(DIR_SELF, '..', module, file).resolve().absolute()
+        return Path(DIR_SELF, '..', module, file).resolve()
     else:
         pkg = pkg.split('.')[0]
         with _res_path(f'{pkg}.{module}', file) as P:
@@ -61,8 +66,11 @@ def get_cmds(doc: str | None):
 
 from .logger import *
 from .config import *
-from .process import *
-from .aria import *
-from .pkg_mgr import *
-from .FFmpeg import *
-from .data_viewer import *
+try:
+    from .process import *
+    from .aria import *
+    from .pkg_mgr import *
+    from .FFmpeg import *
+    from .data_viewer import *
+except ImportError:
+    ...

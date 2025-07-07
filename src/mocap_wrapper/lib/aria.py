@@ -62,7 +62,7 @@ class File():
     ~~`header`~~: not implemented due to aria2p only accept `str` for 1 header
     '''
     @classmethod
-    def abs(cls, *path): return Path(*path).resolve().absolute()
+    def abs(cls, *path): return Path(*path).resolve()
     @property
     def md5(self): return calc_hash(self.path, 'md5')
     @md5.setter

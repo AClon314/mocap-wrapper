@@ -3,10 +3,13 @@ from pathlib import Path
 from collections import UserDict
 from functools import cached_property
 from platformdirs import user_config_path
-from . import PACKAGE
-from mirror_cn import is_need_mirror
+from . import PACKAGE, RUNS_REMAP, TYPE_RUNS
+try:
+    from mirror_cn import is_need_mirror
+except ImportError:
+    def is_need_mirror(): return False
 from typing import Any, Literal, Union
-TYPE_CONFIG_KEYS = Union[Literal['search_dir', 'gvhmr', 'wilor'], str]  # I think python type system is not mature enough to handle this
+TYPE_CONFIG_KEYS = Union[Literal['search_dir'], TYPE_RUNS, str]  # I think python type system is not mature enough to handle this
 
 
 class Config(UserDict):
@@ -18,8 +21,8 @@ class Config(UserDict):
         SEARCH_DIR = self.data.get('search_dir', str(Path('.').absolute()))
         return {
             'search_dir': SEARCH_DIR,
-            'gvhmr': str(Path(SEARCH_DIR, 'GVHMR')),
-            'wilor': str(Path(SEARCH_DIR, 'WiLoR-mini')),
+            'gvhmr': str(Path(SEARCH_DIR, RUNS_REMAP['gvhmr'])),
+            'wilor': str(Path(SEARCH_DIR, RUNS_REMAP['wilor'])),
         }
 
     def __init__(self, dic: dict = {}, file: Path | str = "config.toml"):

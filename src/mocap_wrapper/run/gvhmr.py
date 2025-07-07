@@ -206,7 +206,7 @@ def get_one_track_patch(self, video_path, cfg):
     return bbx_xyxy_one_track
 
 
-Tracker.get_one_track = get_one_track_patch  # patched
+Tracker.get_one_track = get_one_track_patch  # type: ignore
 
 
 if __name__ == "__main__":

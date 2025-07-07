@@ -10,16 +10,17 @@ from pathlib import Path
 from platformdirs import user_config_path
 from types import ModuleType
 from typing import Any, Literal, Sequence, TypeVar
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))  # relative import
 Log = logging.getLogger(__name__)
 VIDEO_EXT = "webm,mkv,flv,flv,vob,vob,ogv,ogg,drc,gifv,webm,gifv,mng,avi,mov,qt,wmv,yuv,rm,rmvb,viv,asf,amv,mp4,m4p,m4v,mpg,mp2,mpeg,mpe,mpv,mpg,mpeg,m2v,m4v,svi,3gp,3g2,mxf,roq,nsv,flv,f4v,f4p,f4a,f4b".split(',')
-MAPPING = {
-    'gvhmr': 'GVHMR',
-}
 TYPE_RANGE = tuple[int, int]
 T = TypeVar('T')
 TN = TypeVar('NT', 'np.ndarray', 'torch.Tensor')    # type: ignore
 def vram_gb(torch): return torch.cuda.memory_allocated() / 1024 ** 3
+
+
+_PATH = Path(__file__, '..', '..', '..').resolve()
+sys.path.append(str(_PATH))  # relative import
+from mocap_wrapper.lib import RUNS_REMAP, TYPE_RUNS, CONFIG, tqdm
 
 
 def savez(npz: 'str|Path', new_data: dict[str, Any], mode: Literal['w', 'a'] = 'a'):
@@ -48,11 +49,13 @@ def free_ram(torch):
         # Log.warning(f'(DEBUG: Need removed) {msg}')
 
 
-def chdir_gitRepo(mod: Literal['gvhmr']):
+def chdir_gitRepo(mod: TYPE_RUNS):
     config_path = user_config_path(appname='mocap_wrapper', ensure_exists=True).joinpath('config.toml')
     if os.path.exists(config_path):
         config = toml.load(config_path)
-        dst = os.path.join(config['search_dir'], MAPPING[mod])
+        dst = CONFIG[mod]
+        if not os.path.exists(dst):
+            dst = os.path.join(config['search_dir'], RUNS_REMAP[mod])
         sys.path.append(dst)
         os.chdir(dst)
     else:

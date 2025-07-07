@@ -124,16 +124,19 @@ async def i_pkgs(**kwargs):
     return True
 
 
-async def git_pull(**kwargs):
+async def git_pull(Dir: str | Path = '', **kwargs):
     """
 git fetch --all  
 git pull  
 git submodule update --init --recursive
     """
+    _dir = os.getcwd()
+    os.chdir(Dir) if Dir else None
     timeout = kwargs.pop('timeout', TIMEOUT_QUATER)
     cmds = get_cmds(git_pull.__doc__)
     for cmd in cmds:
         await run_tail(cmd, timeout=timeout, **kwargs).Await(timeout=timeout)
+    os.chdir(_dir) if Dir else None
 
 
 def clean(**kwargs):

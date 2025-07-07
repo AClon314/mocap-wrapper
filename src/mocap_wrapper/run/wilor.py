@@ -7,12 +7,6 @@
 """
 https://github.com/warmshao/WiLoR-mini/blob/main/tests/test_pipelines.py
 """
-
-"""
-you need to install trimesh and pyrender if you want to render mesh
-pip install trimesh
-pip install pyrender
-"""
 IS_RENDER = IS_RAW = IS_EXPORT_OBJ = False
 OUTDIR = 'output'
 LIGHT_PURPLE = (0.25098039, 0.274117647, 0.65882353)
@@ -20,9 +14,7 @@ import os
 import argparse
 import numpy as np
 from typing import Literal, Sequence, get_args
-from lib import quat_rotAxis, savez, squeeze, VIDEO_EXT  # type: ignore
-# from rich.progress import (
-#     Progress, TextColumn, BarColumn, TaskProgressColumn, MofNCompleteColumn, TimeElapsedColumn, TimeRemainingColumn)
+from lib import quat_rotAxis, savez, squeeze, VIDEO_EXT, tqdm  # type: ignore
 from sys import platform
 is_win = platform == "win32"
 is_linux = platform == "linux"
@@ -506,7 +498,7 @@ def export_obj(renderer, verts, cam_t, is_right, out='{filename}_hand{idx:02d}.o
     tmesh.export(out)
 
 
-def video_wilor(input='video.mp4', out_dir=OUTDIR, progress: None = None):
+def video_wilor(input='video.mp4', out_dir=OUTDIR):
     WiLorHandPose3dEstimationPipeline = Import()
     device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
     dtype = torch.float16
@@ -525,8 +517,7 @@ def video_wilor(input='video.mp4', out_dir=OUTDIR, progress: None = None):
     total = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
     filename = no_ext_filename(input)
     file = filename + '.mp4'
-    task = progress.add_task(
-        f"👋←📹 {file}", total=total) if progress else None
+    progress = tqdm(total=total, desc=f"👋←📹 {file}", unit="frame")
 
     # Create VideoWriter object
     output_path = os.path.join(out_dir, _PREFIX + file)  # tmp
@@ -590,9 +581,10 @@ def video_wilor(input='video.mp4', out_dir=OUTDIR, progress: None = None):
             vout.write(render_image)
 
         frame_count += 1
-        progress.update(task, completed=frame_count) if progress and not task is None else None
+        progress.n = frame_count
 
     # Release everything
+    progress.close()
     cap.release()
     vout.release() if vout else None
     cv2.destroyAllWindows()
@@ -626,18 +618,10 @@ def argParse():
 def wilor(args: argparse.Namespace, arg: argparse.ArgumentParser):
     if args.input:
         outdir = os.path.join(args.outdir, no_ext_filename(args.input))
-        with Progress(
-            TextColumn("[bold red]{task.description}"),
-            BarColumn(),
-            TaskProgressColumn(show_speed=True),
-            MofNCompleteColumn(),
-            TimeElapsedColumn(),
-            TimeRemainingColumn(),
-        ) as p:
-            if args.input.split('.')[-1].lower() not in VIDEO_EXT:
-                image_wilor(input=args.input, out_dir=outdir)
-            else:
-                video_wilor(input=args.input, out_dir=outdir, progress=p)
+        if args.input.split('.')[-1].lower() not in VIDEO_EXT:
+            image_wilor(input=args.input, out_dir=outdir)
+        else:
+            video_wilor(input=args.input, out_dir=outdir)
     else:
         arg.print_help()
 

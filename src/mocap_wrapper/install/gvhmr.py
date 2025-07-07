@@ -3,9 +3,10 @@ import asyncio
 from pathlib import Path
 from . import i_python_env
 from .smpl import i_smplx
-from .Gdown import google_drive
-from ..lib import TIMEOUT_MINUTE, TIMEOUT_QUATER, CONFIG, getLogger, run_tail, symlink, res_path, File, download, is_complete, wait_slowest_dl, unzip
+# from .Gdown import google_drive
+from ..lib import RUNS_REMAP, TIMEOUT_MINUTE, TIMEOUT_QUATER, CONFIG, getLogger, run_tail, symlink, res_path, File, download, is_complete, wait_slowest_dl, unzip
 Log = getLogger(__name__)
+name = RUNS_REMAP['gvhmr']
 
 
 def i_config(Dir: str | Path = CONFIG['gvhmr'], file='gvhmr.yaml'):
@@ -15,9 +16,9 @@ def i_config(Dir: str | Path = CONFIG['gvhmr'], file='gvhmr.yaml'):
 
 
 async def i_models(Dir: str | Path = CONFIG['gvhmr']):
-    Log.info("📦 Download GVHMR pretrained models (📝 By downloading, you agree to the GVHMR's corresponding licences)")
+    Log.info(f"📦 Download {name} pretrained models (📝 By downloading, you agree to the {name}'s corresponding licences)")
     DOMAIN = 'hf-mirror.com' if CONFIG.is_mirror else 'huggingface.co'
-    HUG_GVHMR = f'https://{DOMAIN}/camenduru/GVHMR/resolve/main/'
+    HUG_GVHMR = f'https://{DOMAIN}/camenduru/{name}/resolve/main/'
     LFS = {
         ('dpvo', 'dpvo.pth'): {
             'GD_ID': '1DE5GVftRCfZOTMp8YWF0xkGudDxK0nr0',   # Google Drive ID
@@ -52,16 +53,16 @@ async def i_models(Dir: str | Path = CONFIG['gvhmr']):
     dls = download(*files)
     await wait_slowest_dl(dls)
     if is_complete(dls):
-        Log.info("✔ Download GVHMR models")
+        Log.info(f"✔ Download {name} models")
     else:
-        Log.error(f"Please download GVHMR models at {HUG_GVHMR} or https://drive.google.com/drive/folders/1eebJ13FUEXrKBawHpJroW0sNSxLjh9xD?usp=drive_link")
+        Log.error(f"Please download {name} models at {HUG_GVHMR} or https://drive.google.com/drive/folders/1eebJ13FUEXrKBawHpJroW0sNSxLjh9xD?usp=drive_link")
     return dls
 
 
 async def i_gvhmr(Dir: str | Path = CONFIG['gvhmr'], **kwargs):
-    Log.info(f"📦 Install GVHMR at {CONFIG['gvhmr']}")
+    Log.info(f"📦 Install {name} at {CONFIG['gvhmr']}")
     os.makedirs(Dir, exist_ok=True)
-    p = await run_tail(f'git clone https://github.com/zju3dv/GVHMR {Dir}', **kwargs).Await(TIMEOUT_MINUTE)
+    p = await run_tail(f'git clone https://github.com/zju3dv/{name} {Dir}', **kwargs).Await(TIMEOUT_MINUTE)
     dir_checkpoints = str(Path(Dir, 'inputs', 'checkpoints'))
     os.makedirs(Path(dir_checkpoints, 'body_models'), exist_ok=True)
     i_config(Dir)
@@ -70,7 +71,7 @@ async def i_gvhmr(Dir: str | Path = CONFIG['gvhmr'], **kwargs):
         i_python_env(Dir=Dir, pixi_toml='gvhmr.toml'),
         i_smplx(Dir=dir_checkpoints, **kwargs),
         i_models(Dir=dir_checkpoints),
-        # git_pull(),
+        # git_pull(Dir=Dir),
         # i_dpvo(Dir=Path(Dir, 'third-party/DPVO')),
     ]
     results = await asyncio.gather(*tasks, return_exceptions=True)
@@ -78,7 +79,7 @@ async def i_gvhmr(Dir: str | Path = CONFIG['gvhmr'], **kwargs):
     if exceptions:
         [Log.exception(e, exc_info=e) for e in exceptions]
     else:
-        Log.info("✔ Installed GVHMR")
+        Log.info(f"✔ Installed {name}")
     return results
 
 

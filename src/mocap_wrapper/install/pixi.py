@@ -37,7 +37,7 @@ MIRROR_CN_PY = 'https://gitee.com/aclon314/mirror-cn/raw/main/src/mirror_cn/mirr
 _HOME = os.path.expanduser('~')
 PIXI_BIN = os.getenv('PIXI_BIN', None) or os.path.join(_HOME, '.pixi', 'bin')
 VENV = os.path.join(_HOME, '.venv')
-os.environ['PATH'] = os.pathsep.join([os.getenv('PATH', ''), PIXI_BIN, os.path.join(VENV, 'bin')])
+[sys.path.append(p) for p in [PIXI_BIN, os.path.join(VENV, 'bin')]]
 _BIN_PYTHON = os.sep.join(sys.executable.split(os.sep)[-2:])
 _RE = {
     'python': r'Python (\d+).(\d+)',
@@ -199,7 +199,7 @@ def i_pixi():
     pixi_bin = re.search(r"is installed into '(.*?)'", p.stdout)
     pixi_bin = pixi_bin.group(1) if pixi_bin else None
     PIXI_BIN = pixi_bin or PIXI_BIN  # pixi_bin if pixi_bin else PIXI_BIN
-    os.environ['PATH'] = os.pathsep.join([PIXI_BIN, os.getenv('PATH', '')])
+    sys.path.append(PIXI_BIN)
     if not os.path.exists(PIXI_BIN):
         raise Exception(f"Post check failed, {PIXI_BIN=} does not exist.")
     system('pixi config set --global run-post-link-scripts insecure'.split())
