@@ -20,6 +20,7 @@ dependencies = [
   "aexpect @ git+https://github.com/avocado-framework/aexpect.git", # TODO: don't use git when v1.7.1 released
   "platformdirs",
   "prompt_toolkit",
+  "huggingface_hub",
   "typed-ffmpeg", ## mamba failed:
   "netscape-cookies",
 ]
