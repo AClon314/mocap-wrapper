@@ -1,6 +1,5 @@
-"""```python
-from .logger import IS_DEBUG, LOG_LEVEL, getLogger
-```
+"""
+Use env var `IS_JSON=1`/`LOG=d` to enable features.  
 Log to stderr, Progress to stdout
 """
 import os
@@ -19,7 +18,7 @@ LOG_LEVEL = _LOGLVLS.get(_LOGLEVEL[0], 'info')
 LOG_LEVEL_INT = getattr(logging, LOG_LEVEL.upper(), logging.INFO)
 IS_DEBUG = LOG_LEVEL == 'debug'
 IS_JSON = os.environ.get('IS_JSON', None)
-FMT = "{'log':'%(levelname)s','time':'%(asctime)s','msg':%(message)s}" if IS_JSON else '%(levelname)s %(asctime)s %(filename)s:%(lineno)d\t%(message)s'
+_FMT = "{'log':'%(levelname)s','time':'%(asctime)s','msg':%(message)s}" if IS_JSON else '%(levelname)s %(asctime)s %(name)s:%(lineno)d\t%(message)s'
 _DATEFMT = '%H:%M:%S'
 _LEVEL_PREFIX = {
     logging.DEBUG: '🔍DEBUG',
@@ -88,10 +87,12 @@ class TqdmStream(logging.StreamHandler):
 
 
 _HANDLER = TqdmStream()
-_HANDLER.setFormatter(CustomFormatter(FMT, datefmt=_DATEFMT))
+_HANDLER.setFormatter(CustomFormatter(_FMT, datefmt=_DATEFMT))
 
 
 def getLogger(name=__name__):
+    if '❯' not in name:
+        name = name.replace('.', '/') + '.py'
     Log = logging.getLogger(name)
     Log.setLevel(LOG_LEVEL.upper())
     Log.addHandler(_HANDLER)

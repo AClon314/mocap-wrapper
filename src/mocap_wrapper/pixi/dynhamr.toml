@@ -44,7 +44,7 @@ imageio-ffmpeg = "*"
 smplx = "*"
 torchgeometry = "0.1.2"
 
-# dyn_hamr = {path = ".", editable = true}
+dyn_hamr = {path = "./dyn-hamr", editable = true}
 [feature.gpu.pypi-dependencies]
 torch = {version = "==2.3.0", index = "https://download.pytorch.org/whl/cu121"}
 torch-scatter = {version = "==2.1.0", index = "https://pytorch-geometric.com/whl/torch-2.3.0+cu121.html"}

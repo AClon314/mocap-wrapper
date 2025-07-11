@@ -54,23 +54,3 @@ Homepage = "http://github.com/AClon314/mocap-wrapper"
 
 [project.scripts]
 mocap = "mocap_wrapper.app:script_entry"
-
-[tool.pixi.workspace]
-channels = ["conda-forge"]
-platforms = ["linux-64"] # "osx-arm64", "osx-64"
-
-[tool.pixi.pypi-dependencies]
-mocap-wrapper = {path = ".", editable = true}
-
-[tool.pixi.environments]
-default = {features = [], solve-group = "default"}
-dev = {features = ["dev"], solve-group = "default"}
-
-[tool.pixi.tasks]
-
-# due to conda-forge don't have aria2, p7zip in windows
-# [tool.pixi.feature.dep.dependencies]
-# aria2 = "*"
-# ffmpeg = "*"
-# git = "*"
-# p7zip = "*"

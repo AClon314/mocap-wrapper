@@ -20,7 +20,7 @@ def vram_gb(torch): return torch.cuda.memory_allocated() / 1024 ** 3
 
 _PATH = Path(__file__, '..', '..', '..').resolve()
 sys.path.append(str(_PATH))  # relative import
-from mocap_wrapper.lib import RUNS_REMAP, TYPE_RUNS, CONFIG, tqdm
+from mocap_wrapper.lib import TYPE_RUNS, RUNS_REPO, CONFIG, tqdm
 
 
 def savez(npz: 'str|Path', new_data: dict[str, Any], mode: Literal['w', 'a'] = 'a'):
@@ -55,7 +55,7 @@ def chdir_gitRepo(mod: TYPE_RUNS):
         config = toml.load(config_path)
         dst = CONFIG[mod]
         if not os.path.exists(dst):
-            dst = os.path.join(config['search_dir'], RUNS_REMAP[mod])
+            dst = os.path.join(config['search_dir'], RUNS_REPO[mod])
         sys.path.append(dst)
         os.chdir(dst)
     else:

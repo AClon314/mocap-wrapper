@@ -6,6 +6,7 @@
 - Spawn: manually controll details of the process
 """
 import os
+import re
 import shlex
 import aexpect
 import asyncio
@@ -13,13 +14,14 @@ from math import inf
 from pathlib import Path
 from typing import Coroutine, Literal, Sequence
 from .logger import Log, getLogger
-from . import copy_args, TIMEOUT_MINUTE, CONFIG
+from .static import copy_args, TIMEOUT_MINUTE
+from .config import CONFIG
 Log = getLogger(__name__)
 _RUN_ID = 0
 _INTERVAL = 0.1
+_RE_CTRL_ASCII = re.compile(r'\x1b\[[0-9;]*m')
 def run_async(func: Coroutine, timeout=TIMEOUT_MINUTE, loop: asyncio.AbstractEventLoop | None = None): return asyncio.run_coroutine_threadsafe(func, loop=loop if loop else asyncio.get_event_loop()).result(timeout)
 def shlex_quote(args: Sequence[str]): return ' '.join(shlex.quote(str(arg)) for arg in args)
-def _Log_info(msg: str, *args, **kwargs): Log.info(msg, *args, **kwargs) if msg.rstrip() else None
 
 
 def is_main_thread():
@@ -95,11 +97,12 @@ def _aexpect(prefix: str, func):
         cmd = commands if isinstance(commands, str) else shlex_quote(commands)
         cmd0 = commands.split()[0] if isinstance(commands, str) else commands[0]
 
-        kwargs.setdefault('output_func', _Log_info)
-        kwargs.setdefault('output_prefix', f'{prefix}{_RUN_ID}❯{cmd0}:\t')
         kwargs.setdefault('timeout', _INTERVAL)
-
-        Log.info(f'{prefix}{_RUN_ID}🐣:\t{cmd}')
+        Log.info(f'{prefix}{_RUN_ID}🐣❯ {cmd}')
+        if kwargs.get('output_func', None) is None:
+            _Log = getLogger(f'{prefix}{_RUN_ID}❯{cmd0}')
+            def _Log_info(msg: str, *args, **kwargs): _Log.info(msg, *args, **kwargs) if _RE_CTRL_ASCII.sub('', msg).strip() else None
+            kwargs.setdefault('output_func', _Log_info)
         ret = func(command=cmd, *args, **kwargs)
         _RUN_ID += 1
         return ret

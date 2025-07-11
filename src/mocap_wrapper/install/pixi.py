@@ -2,6 +2,7 @@
 '''
 # this script will set git/pip mirrors, install mamba, mocap-wrapper.
 curl https://raw.githubusercontent.com/AClon314/mocap-wrapper/refs/heads/master/src/mocap_wrapper/install/mamba.py | python
+# TODO: because `pixi global install` does NOT support install as **editable** pypi package, so we have to use `uv pip install -e .`
 '''
 if __name__ != '__main__':
     raise ImportError("This installation script must be run directly, not imported as a module.")
@@ -187,12 +188,13 @@ def i_pixi():
     url = f'https://pixi.sh/{_file}'
     file, _ = download(url, to_path=_file)
     Log.info(f'{file=}')
-    try:
-        tag = get_latest_release_tag('prefix-dev/pixi')
-    except Exception as e:
-        tag = 'v0.49.0'  # TODO: 2025/07/02
-        Log.warning(f'Fallback to {tag=}, {e}')
-    os.environ['PIXI_VERSION'] = tag
+    if os.environ.get('PIXI_VERSION', None) is None:
+        try:
+            tag = get_latest_release_tag('prefix-dev/pixi')
+        except Exception as e:
+            tag = 'v0.49.0'  # https://github.com/prefix-dev/pixi/releases: 2025/07/02
+            Log.warning(f'Fallback to {tag=}, {e}')
+        os.environ['PIXI_VERSION'] = tag
     for p in try_script(os.path.join('.', file)):
         if p.returncode == 0:
             break

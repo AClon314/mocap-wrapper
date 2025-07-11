@@ -8,10 +8,10 @@ import hashlib
 from pathlib import Path
 from datetime import timedelta
 from typing import Callable, Literal, Sequence, TypedDict, Unpack, get_args
-from . import TIMEOUT_SECONDS
+from .static import TIMEOUT_SECONDS, CONCURRENT
 from .logger import IS_DEBUG, getLogger
+from .pkg_mgr import i_pkgs
 Log = getLogger(__name__)
-_ARIA_PORTS = [6800, 16800]
 _INTERVAL = 0.5
 TYPE_HASH = Literal['md5', 'sha1', 'sha256', 'sha512', 'shake_128', 'shake_256']
 HASH = get_args(TYPE_HASH)
@@ -19,14 +19,16 @@ _OPT = {
     'continue': 'true',
     'split': 5,
     'max-connection-per-server': 5,
-    'max-concurrent-downloads': 2,
+    'max-concurrent-downloads': CONCURRENT,
     'min-split-size': '20M',  # don't split if file size < 40M
     'retry-wait': TIMEOUT_SECONDS,
     'max-tries': 3,
 }
 _OPT = {k: str(v) for k, v in _OPT.items()}
+_ARIA_PORTS = [6800, 16800]
+_ARIA_CMD = f'aria2c --enable-rpc --rpc-listen-port=6800 {" ".join([f"--{k}={v}" for k, v in _OPT.items()])}'
 DOWNLOADS = []
-def is_complete(dls: Sequence['aria2p.Download|None']): return not dls or all([dl.is_complete for dl in dls if dl])
+def get_uncomplete(dls: Sequence['aria2p.Download|None']): return [dl for dl in dls if dl and not dl.is_complete]
 def refresh_downloads(dls: Sequence['aria2p.Download'] = DOWNLOADS): return Aria.get_downloads([dl.gid for dl in dls]) if dls else []
 
 
@@ -41,11 +43,16 @@ class Kw_download(TypedDict, total=False):
     header: str
 
 
-def calc_hash(file_path: str | Path, algorithm: TYPE_HASH | str = 'md5') -> str:
-    # TODO: multi process/thread
+def calc_hash_(file_path: str | Path, algorithm: TYPE_HASH | str = 'sha256'):
     Log.debug(f"🖩 Calc {algorithm}: {file_path}")
+    h = getattr(hashlib, algorithm)()
     with open(file_path, 'rb') as f:
-        return getattr(hashlib, algorithm)(f.read()).hexdigest()
+        for chunk in iter(lambda: f.read(1024 * 1024 * 1024), b''):  # 1GB mem read per each
+            h.update(chunk)
+    return h.hexdigest()
+
+
+async def calc_hash(file_path: str | Path, algorithm: TYPE_HASH | str = 'sha256') -> str: return await asyncio.to_thread(calc_hash_, file_path, algorithm)
 
 
 class File():
@@ -67,14 +74,18 @@ class File():
     def md5(self): return calc_hash(self.path, 'md5')
     @md5.setter
     def md5(self, value: str): self.expect_md5 = value
+    @property
+    def sha256(self): return calc_hash(self.path, 'sha256')
+    @sha256.setter
+    def sha256(self, value: str): self.expect_sha256 = value
 
     def __init__(
             self, *urls: str, path: Sequence[str] | str | Path,
             md5: str | None = None, sha256: str | None = None, **options):
         self.urls = list(urls)
         self.path = File.abs(path) if isinstance(path, (str, Path)) else File.abs(*path)
-        self.expect_md5 = md5
         self.expect_sha256 = sha256
+        self.expect_md5 = md5
         for k, v in options.items():
             setattr(self, k, v)
 
@@ -87,7 +98,7 @@ class File():
         '''raise ValueError if no hash is set, return True if hash matches'''
         _hash = calc_hash(self.path, algorithm)
         if not hash:
-            hash = next((h for h in (self.expect_md5, self.expect_sha256) if h), None)
+            hash = next((h for h in (self.expect_sha256, self.expect_md5) if h), None)
         if not hash:
             raise ValueError(f"unset `md5` or `sha256`: {self}")
         is_hash = _hash == hash
@@ -184,17 +195,17 @@ async def get_aria():
     try:
         Aria = try_aria_port()
     except ConnectionError:
+        import shutil
+        if shutil.which('aria2c') is None:
+            await i_pkgs('aria2c')
         from .process import run_tail
-        process = run_tail('aria2c --enable-rpc --rpc-listen-port=6800')
+        process = run_tail(_ARIA_CMD)
         await asyncio.sleep(1.5)
         Aria = try_aria_port()
     Log.debug(Aria)
     return Aria, process
-
-
 Aria, Aria_process = asyncio.run(get_aria())
 
-
 if __name__ == '__main__':
-    ...
-    # run_tail('python -c "from tqdm import tqdm; import time; import sys; [time.sleep(0.02) for _ in tqdm(range(100),file=sys.stdout)]"')
+    from .process import run_tail
+    process = run_tail(_ARIA_CMD)

@@ -3,14 +3,14 @@ from functools import partial
 from fastapi import FastAPI
 from fastmcp import FastMCP, Context
 from mocap_wrapper import OUTPUT_DIR, SELF_DIR, mocap
-from mocap_wrapper.lib import RUNS, CONFIG, LOG_LEVEL, PACKAGE, TYPE_RUNS, __version__
+from mocap_wrapper.lib import RUNS, CONFIG, LOG_LEVEL, PACKAGE, TYPE_RUNS, VERSION
 from typing import Callable, Sequence
 TITLE = f'{PACKAGE} {{}} backend server'
 HOST = '0.0.0.0'
 PORT = 23333
-MCP = FastMCP(TITLE.format('MCP'), version=__version__)
+MCP = FastMCP(TITLE.format('MCP'), version=VERSION)
 APP_MCP = MCP.http_app(path='/mcp')
-APP = FastAPI(lifespan=APP_MCP.lifespan, title=TITLE.format('fastapi'), version=__version__)
+APP = FastAPI(lifespan=APP_MCP.lifespan, title=TITLE.format('fastapi'), version=VERSION)
 
 
 def tool_post(func: Callable | None = None, **kwargs):
@@ -37,7 +37,7 @@ def tool_post(func: Callable | None = None, **kwargs):
 async def root():
     return {
         'message': RUNS,
-        'version': __version__}
+        'version': VERSION}
 
 
 @tool_post
