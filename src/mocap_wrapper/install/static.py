@@ -5,12 +5,33 @@ import itertools
 from pathlib import Path
 from signal import SIGTERM
 from ..lib import getLogger, run_tail, res_path, get_cmds, wait_all_dl, i_pkgs, Aria_process, TIMEOUT_QUATER, TYPE_RUNS, Global
-from typing import Generator, Sequence, Any
+from typing import Coroutine, Generator, Sequence, Any
 Log = getLogger(__name__)
 try:
     from mirror_cn import replace_github_with_mirror
 except ImportError:
     def replace_github_with_mirror(file: str) -> Generator[tuple[str, str], Any, None]: yield ((file, 'github.com'))
+
+
+async def install(runs: Sequence[TYPE_RUNS], **kwargs):
+    tasks = []
+    tasks.append(i_pkgs())
+    if 'gvhmr' in runs:
+        from .gvhmr import i_gvhmr
+        tasks.append(i_gvhmr(**kwargs))
+    if 'wilor' in runs:
+        from .wilor import i_wilor_mini
+        tasks.append(i_wilor_mini(**kwargs))
+
+    done, pending = await asyncio.wait(
+        [asyncio.gather(*tasks), asyncio.create_task(wait_all_dl())],
+        return_when=asyncio.FIRST_COMPLETED
+    )
+    ret = done.pop().result()
+    for task in pending:
+        task.cancel()
+    Aria_process.kill(SIGTERM) if Aria_process else None
+    return ret
 
 
 async def i_python_env(Dir: str | Path, pixi_toml='gvhmr.toml', use_mirror=True):
@@ -48,22 +69,12 @@ git submodule update --init --recursive
     os.chdir(_dir) if Dir else None
 
 
-async def install(runs: Sequence[TYPE_RUNS], **kwargs):
-    tasks = []
-    tasks.append(i_pkgs())
-    if 'gvhmr' in runs:
-        from .gvhmr import i_gvhmr
-        tasks.append(i_gvhmr(**kwargs))
-    if 'wilor' in runs:
-        from .wilor import i_wilor_mini
-        tasks.append(i_wilor_mini(**kwargs))
-
-    done, pending = await asyncio.wait(
-        [asyncio.gather(*tasks), asyncio.create_task(wait_all_dl())],
-        return_when=asyncio.FIRST_COMPLETED
-    )
-    ret = done.pop().result()
-    for task in pending:
-        task.cancel()
-    Aria_process.kill(SIGTERM) if Aria_process else None
-    return ret
+async def gather_notify(coros: list[Coroutine], success_msg=''):
+    _results = await asyncio.gather(*coros, return_exceptions=True)
+    exceptions = [r for r in _results if isinstance(r, BaseException)]
+    results = [r for r in _results if not isinstance(r, BaseException)]
+    if exceptions:
+        [Log.exception(e, exc_info=e) for e in exceptions]
+    else:
+        Log.info(f"✔ {success_msg}")
+    return results, exceptions

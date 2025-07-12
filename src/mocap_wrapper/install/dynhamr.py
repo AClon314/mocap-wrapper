@@ -1,19 +1,18 @@
-from .static import i_python_env, git_pull
+from .static import gather_notify, i_python_env, git_pull
+from .huggingface import i_hugging_face
 from ..lib import *
 Log = getLogger(__name__)
-_name_ = RUNS_REPO['dynhamr']
+_STEM = 'dynhamr'
+_name_ = RUNS_REPO[_STEM]
 
 
-async def i_dyn_hamr(Dir: str | Path = CONFIG['dynhamr'], **kwargs):
+async def i_dyn_hamr(Dir: str | Path = CONFIG[_STEM]):
     Log.info(f"📦 Install {_name_}")
     os.makedirs(Dir, exist_ok=True)
-    p = await run_tail(f'git clone https://github.com/ZhengdiYu/Dyn-HaMR {Dir}', **kwargs).Await(TIMEOUT_MINUTE)
+    p = await run_tail(f'git clone https://github.com/ZhengdiYu/Dyn-HaMR {Dir}').Await(TIMEOUT_MINUTE)
     tasks = [
         git_pull(Dir=Dir),
-        i_python_env(Dir=Dir, pixi_toml='dynhamr.toml')
+        i_python_env(Dir=Dir, pixi_toml=f'{_STEM}.toml'),
+        i_hugging_face(_STEM),
     ]
-
-    # TODO: mano symlink
-    if p and p.get_status() == 0:
-        Log.info(f"✔ Installed {_name_}")
-    return p
+    return await gather_notify(tasks, success_msg=f'Installed {_name_}')

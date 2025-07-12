@@ -16,7 +16,7 @@ except ImportError:
     def is_need_mirror() -> bool: return bool(os.environ.get('IS_MIRROR', ''))
 _PS = ParamSpec("_PS")
 _TV = TypeVar("_TV")
-TYPE_RUNS = Literal['wilor', 'gvhmr', 'dynhamr']
+TYPE_RUNS = Literal['wilor', 'gvhmr', 'dynhamr', 'hamer']
 RUNS: Sequence[TYPE_RUNS] = get_args(TYPE_RUNS)
 RUNS_REPO: dict[TYPE_RUNS, str] = {
     'wilor': 'WiLoR-mini',

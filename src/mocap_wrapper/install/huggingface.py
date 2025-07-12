@@ -4,7 +4,7 @@ import asyncio
 from pathlib import Path
 from huggingface_hub import HfApi
 from typing import Literal, Sequence
-from .static import TYPE_RUNS
+from .static import TYPE_RUNS, gather_notify
 from ..lib import Global, CONFIG, RUNS, IS_DEBUG, copy_args, getLogger
 Log = getLogger(__name__)
 TYPE_HUGFACE = TYPE_RUNS | Literal['smplx']
@@ -19,6 +19,7 @@ OWNER_REPO: dict[TYPE_HUGFACE, str] = {
     'gvhmr': 'camenduru/gvhmr',
     'wilor': 'warmshao/WiLoR-mini',
     'dynhamr': 'Zhengdi/Dyn-HaMR',
+    'hamer': 'ZhengdiYu/HameR',
 }
 FILTERS: dict[TYPE_HUGFACE, str | TYPE_FILE_RUN_DIR] = {
     'smplx': {
@@ -43,7 +44,7 @@ FILTERS: dict[TYPE_HUGFACE, str | TYPE_FILE_RUN_DIR] = {
     },
     'gvhmr': r'^(?!preproc_data|\.).*',
 }
-REPO_TO_PREFIX: dict[TYPE_RUNS, str] = {
+REPO_TO_LOCAL_PATH_PREFIX: dict[TYPE_RUNS, str] = {
     'gvhmr': 'inputs/checkpoints',
     'wilor': 'wilor_mini/pretrained_models',
     'dynhamr': '_DATA',
@@ -51,6 +52,7 @@ REPO_TO_PREFIX: dict[TYPE_RUNS, str] = {
 
 
 async def i_hugging_face(*run: TYPE_RUNS, concurrent=2):
+    '''Download models from Hugging Face. `Dir` depends on `CONFIG`'''
     Log.info(f"📦 Download {run} models (📝 By downloading, you agree to the corresponding licences)")
     repos: list[TYPE_HUGFACE] = list(run)
     for k in run:
@@ -73,7 +75,7 @@ async def i_hugging_face(*run: TYPE_RUNS, concurrent=2):
                     continue
                 rl_paths[Rpath] = [Path(
                     CONFIG.get(repo, ''),
-                    REPO_TO_PREFIX.get(repo, ''),
+                    REPO_TO_LOCAL_PATH_PREFIX.get(repo, ''),
                     Rpath.parent
                 )]
             else:
@@ -86,7 +88,7 @@ async def i_hugging_face(*run: TYPE_RUNS, concurrent=2):
                     continue
                 rl_paths[Rpath] = [Path(
                     CONFIG.get(_run, ''),
-                    REPO_TO_PREFIX.get(_run, ''),   # type: ignore
+                    REPO_TO_LOCAL_PATH_PREFIX.get(_run, ''),   # type: ignore
                     dir
                 ) for _run, dir in run_dir.items() if _run in RUNS]
         repo_to_rl[repo] = rl_paths
@@ -117,15 +119,10 @@ async def i_hugging_face(*run: TYPE_RUNS, concurrent=2):
                 tasks.append(dl(
                     Global.HF, repo_id=repo_id, filename=remote.name,
                     subfolder='/'.join(remote.parent.parts), dsts=dsts))    # type: ignore
-    files_e = await asyncio.gather(*tasks, return_exceptions=True)
-
-    exceptions = [e for e in files_e if isinstance(e, Exception)]
+    files, exceptions = await gather_notify(tasks, f'Download models {run}')
     if exceptions:
-        [Log.exception(e, exc_info=e) for e in exceptions]
         [Log.error(f"You can download from https://huggingface.co/{OWNER_REPO[k]}/tree/main") for k in run]
-    else:
-        Log.info(f"✔ Installed {run}")
-    return [ft for ft in repo_to_rl if isinstance(ft, str)]
+    return files, exceptions
 
 
 def os_link(src: Path | str, dsts: Sequence[Path | str]):
