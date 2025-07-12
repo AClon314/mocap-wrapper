@@ -8,4 +8,4 @@ try:
     from .FFmpeg import *
     from .data_viewer import *
 except ImportError as e:
-    Log.exception(f'Skip', exc_info=e) if IS_DEBUG else None
+    Log.exception('Skip', exc_info=e) if IS_DEBUG else None

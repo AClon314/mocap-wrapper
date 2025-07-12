@@ -33,7 +33,7 @@ def link_config(Dir: Path | str = CONFIG[_STEM], file='gvhmr.yaml'):
     try:
         os.link(src, dst)
     except Exception as e:
-        Log.exception(e, exc_info=e) if IS_DEBUG else None
+        Log.exception('', exc_info=e) if IS_DEBUG else None
         Log.warning(f"🔗 Skip link, you can delete {dst.name}: {e}")
 
 

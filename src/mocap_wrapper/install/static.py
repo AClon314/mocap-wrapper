@@ -74,7 +74,7 @@ async def gather_notify(coros: list[Coroutine], success_msg=''):
     exceptions = [r for r in _results if isinstance(r, BaseException)]
     results = [r for r in _results if not isinstance(r, BaseException)]
     if exceptions:
-        [Log.exception(e, exc_info=e) for e in exceptions]
+        [Log.exception('', exc_info=e) for e in exceptions]
     else:
         Log.info(f"✔ {success_msg}")
     return results, exceptions

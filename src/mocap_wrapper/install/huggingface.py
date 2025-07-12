@@ -2,53 +2,57 @@ import os
 import re
 import asyncio
 from pathlib import Path
+from dataclasses import dataclass, field
 from huggingface_hub import HfApi
 from typing import Literal, Sequence
 from .static import TYPE_RUNS, gather_notify
-from ..lib import Global, CONFIG, RUNS, IS_DEBUG, copy_args, getLogger
+from ..lib import Global, CONFIG, IS_DEBUG, copy_args, getLogger
 Log = getLogger(__name__)
-TYPE_HUGFACE = TYPE_RUNS | Literal['smplx']
-TYPE_REMOTE_LOCAL = dict[Path, list[Path]]
+HF_MAIN = 'https://huggingface.co/{}/tree/main'
+TYPE_HUGFACE = TYPE_RUNS | Literal['smplx', 'hamer']
 TYPE_FILE_RUN_DIR = dict[str, dict[TYPE_HUGFACE, str]]
 RUN_TO_REPOS: dict[TYPE_RUNS, list[TYPE_HUGFACE]] = {
     'gvhmr': ['smplx'],
-    'dynhamr': ['wilor'],
+    'dynhamr': ['hamer'],
 }
 OWNER_REPO: dict[TYPE_HUGFACE, str] = {
     'smplx': 'camenduru/SMPLer-X',
     'gvhmr': 'camenduru/gvhmr',
     'wilor': 'warmshao/WiLoR-mini',
     'dynhamr': 'Zhengdi/Dyn-HaMR',
-    'hamer': 'ZhengdiYu/HameR',
+    'hamer': 'spaces/geopavlakos/HaMeR',
 }
-FILTERS: dict[TYPE_HUGFACE, str | TYPE_FILE_RUN_DIR] = {
-    'smplx': {
-        'SMPL_NEUTRAL.pkl': {
-            'gvhmr': 'body_models/smpl',
-        },
-        'SMPLX_NEUTRAL.npz': {
-            'gvhmr': 'body_models/smplx',
-        },
-    },
-    'wilor': {
-        'MANO_RIGHT.pkl': {
-            'dynhamr': 'data/mano',
-            'wilor': '',
-        },
-        'mano_mean_params.npz': {
-            'dynhamr': 'data',
-            'wilor': '',
-        },
-        'wilor_final.ckpt': {'wilor': ''},
-        'detector.pt': {'wilor': ''},
-    },
+REGEX: dict[TYPE_HUGFACE, str] = {
+    'smplx': r'SMPL_NEUTRAL\.pkl|SMPLX_NEUTRAL\.npz',
     'gvhmr': r'^(?!preproc_data|\.).*',
+    'wilor': r'^(?!.*wilor_vit\.onnx).*',
 }
-REPO_TO_LOCAL_PATH_PREFIX: dict[TYPE_RUNS, str] = {
+LOCAL_REMAP: TYPE_FILE_RUN_DIR = {
+    'SMPL_NEUTRAL.pkl': {
+        'gvhmr': 'body_models/smpl',
+    },
+    'SMPLX_NEUTRAL.npz': {
+        'gvhmr': 'body_models/smplx',
+    },
+    'MANO_RIGHT.pkl': {
+        'dynhamr': 'data/mano',
+    },
+    'mano_mean_params.npz': {
+        'dynhamr': 'data',
+    },
+}
+REPO_TO_LOCAL_PREFIX: dict[TYPE_RUNS, str] = {
     'gvhmr': 'inputs/checkpoints',
-    'wilor': 'wilor_mini/pretrained_models',
+    'wilor': 'wilor_mini',
     'dynhamr': '_DATA',
 }
+
+
+@dataclass
+class _File:
+    # name: str
+    remotes: dict[TYPE_HUGFACE, list[Path]] = field(default_factory=dict)
+    locals: list[Path] = field(default_factory=list)
 
 
 async def i_hugging_face(*run: TYPE_RUNS, concurrent=2):
@@ -58,41 +62,51 @@ async def i_hugging_face(*run: TYPE_RUNS, concurrent=2):
     for k in run:
         repos.extend(RUN_TO_REPOS.get(k, []))
     repos = list(set(repos))  # 去重
-    repo_to_rl: dict[TYPE_HUGFACE, TYPE_REMOTE_LOCAL] = {}
+    _files: dict[str, _File] = {}
     for repo in repos:
         repo_id: str = OWNER_REPO[repo]
-        remote_paths = await asyncio.to_thread(Global.HF.list_repo_files, repo_id=repo_id)  # request 1 by 1
+        repo_type = repo_id.split('/')[0].rstrip('s')
+        if repo_type in ['space', 'dataset']:
+            repo_id = '/'.join(repo_id.split('/')[1:])  # get owner/repo_name
+        else:
+            repo_type = None
+        remote_paths = await asyncio.to_thread(Global.HF.list_repo_files, repo_id=repo_id, repo_type=repo_type)  # request 1 by 1
         remote_paths = [f for f in remote_paths if not (f.startswith('.') or f.startswith('README'))]  # 排除隐藏文件
-        Filters = FILTERS.get(repo, '.*')
-        rl_paths: TYPE_REMOTE_LOCAL = {}
+        regex = re.compile(REGEX.get(repo, '.*'))
         for str_path in remote_paths:
+            Match = regex.match(str_path)
+            if not Match:
+                continue
             Rpath = Path(str_path)
-
-            if isinstance(Filters, str):
-                if repo not in run:
-                    break
-                if not re.match(Filters, str_path):
-                    continue
-                rl_paths[Rpath] = [Path(
-                    CONFIG.get(repo, ''),
-                    REPO_TO_LOCAL_PATH_PREFIX.get(repo, ''),
-                    Rpath.parent
-                )]
-            else:
-                is_pick = False
-                for filename, run_dir in Filters.items():
-                    if Rpath.name == filename:
-                        is_pick = True
-                        break
-                if is_pick == False:
-                    continue
-                rl_paths[Rpath] = [Path(
+            run_dir = LOCAL_REMAP.get(Rpath.name, {})
+            _locals: list[Path] = []
+            if (is_run_dir := set(run).intersection(set(run_dir.keys()))):
+                # 当 gvhmr 需要 smplx 仓库时
+                _locals += [Path(
                     CONFIG.get(_run, ''),
-                    REPO_TO_LOCAL_PATH_PREFIX.get(_run, ''),   # type: ignore
-                    dir
-                ) for _run, dir in run_dir.items() if _run in RUNS]
-        repo_to_rl[repo] = rl_paths
-    Log.debug(f'{repo_to_rl=}')
+                    REPO_TO_LOCAL_PREFIX.get(_run, ''),  # type: ignore
+                    dir, Rpath.name
+                ) for _run, dir in run_dir.items()]
+            if (is_run := repo in run):
+                # 当 gvhmr 仅需要 gvhmr 仓库时
+                _locals += [Path(
+                    CONFIG.get(repo, ''),
+                    REPO_TO_LOCAL_PREFIX.get(repo, ''),
+                    Rpath
+                )]
+            if not (is_run_dir or is_run):
+                continue
+            Log.debug(f'{repo=}\t{_locals=}')
+            _file = _files.setdefault(Rpath.name, _File())
+            _file.remotes.setdefault(repo, []).append(Rpath)
+            _file.locals.extend(_locals)
+
+    for fname, _file in _files.items():
+        _file.locals = list(set(_file.locals))  # 去重
+
+    if IS_DEBUG:
+        import pprint
+        Log.debug(f'_files={len(_files.keys())}\n' + pprint.pformat(_files, indent=2))
     semaphore = asyncio.Semaphore(concurrent)  # 最多2个并发
 
     @copy_args(HfApi.hf_hub_download)
@@ -100,44 +114,47 @@ async def i_hugging_face(*run: TYPE_RUNS, concurrent=2):
         if IS_DEBUG:
             print('⬇️', kwargs, f'{dsts=}')
             return
+        if not dsts:
+            Log.error(f"No destination paths provided for {kwargs=}{args=}")
+            return
+        _dst = dsts[0]
+        _dir = _dst if _dst.is_dir() else _dst.parent
+        kwargs.setdefault('local_dir', _dir)
         async with semaphore:
-            kwargs.setdefault('local_dir', dsts[0].parent)
             p = await asyncio.to_thread(self.hf_hub_download, *args, **kwargs)
             os_link(p, dsts[1:])
             return p
 
     tasks = []
-    for repo, rl_paths in repo_to_rl.items():
+    exceptions = []
+    for fname, _file in _files.items():
+        repo = list(_file.remotes.keys())[0]
+        rpath = _file.remotes[repo][0]
         repo_id = OWNER_REPO[repo]
-        for remote, locals in rl_paths.items():
-            srcs = [Path(local, remote.name) for local in locals]
-            srcs, dsts = _get_exists_andNot(srcs)
-            if srcs:
-                # TODO: check srcs[0] sha256
+        srcs, dsts = _get_exists_andNot(_file.locals)
+        if srcs:
+            try:
                 os_link(srcs[0], dsts)
-            else:
-                tasks.append(dl(
-                    Global.HF, repo_id=repo_id, filename=remote.name,
-                    subfolder='/'.join(remote.parent.parts), dsts=dsts))    # type: ignore
-    files, exceptions = await gather_notify(tasks, f'Download models {run}')
+            except Exception as e:
+                Log.exception('', exc_info=e)
+                exceptions.append(e)
+        else:
+            tasks.append(dl(
+                Global.HF, repo_id=repo_id, filename=fname,
+                subfolder='/'.join(rpath.parent.parts), dsts=dsts))    # type: ignore
+    files, _e = await gather_notify(tasks, f'Download models {run}')
+    exceptions.extend(_e)
     if exceptions:
-        [Log.error(f"You can download from https://huggingface.co/{OWNER_REPO[k]}/tree/main") for k in run]
+        Log.error(f"Try download from {[HF_MAIN.format(OWNER_REPO[k]) for k in repos]}")
     return files, exceptions
 
 
 def os_link(src: Path | str, dsts: Sequence[Path | str]):
-    '''1 src to N dsts, use Log instead of raise'''
-    success: Sequence[Path | str] = []
-    fail: Sequence[Path | str] = []
+    '''1 src to N dsts, can raise'''
     for dst in dsts:
-        try:
+        dst = Path(dst)
+        if not (dst.exists() and dst.readlink() == src):
             os.link(src, dst)
-            success.append(dst)
-        except Exception as e:
-            Log.exception(e, exc_info=e)
-            fail.append(dst)
-    Log.debug(f"✔ {src} →{success}, ❌ {fail}") if dsts else None
-    return success, fail
 
 
 def _get_exists_andNot(paths: Sequence[Path]):
@@ -165,4 +182,4 @@ def _get_exists_andNot(paths: Sequence[Path]):
 #         Log.info(f"✔ Download {key} models")
 
 if __name__ == '__main__':
-    asyncio.run(i_hugging_face('dynhamr'))
+    asyncio.run(i_hugging_face('dynhamr', 'gvhmr', 'wilor'))
