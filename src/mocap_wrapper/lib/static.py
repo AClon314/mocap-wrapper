@@ -5,10 +5,11 @@ import os
 from sys import platform
 from pathlib import Path
 from datetime import timedelta
-from functools import cached_property
+from functools import cache, cached_property
 from importlib.metadata import version as _version
 from importlib.resources import path as _res_path
-from typing import ParamSpec, Sequence, TypeVar, Callable, Literal, Any, get_args, cast
+from types import ModuleType
+from typing import ParamSpec, TypeVar, Callable, Literal, Any, get_args, cast
 from huggingface_hub import HfApi
 try:
     from mirror_cn import is_need_mirror
@@ -79,7 +80,7 @@ def get_cmds(doc: str | None):
     return cmds
 
 
-class _Global:
+class _Env:
     '''Global variables and properties for the package.'''
     # HUGFACE = 'https://{domain}/{owner_repo}/resolve/main/'
     @cached_property
@@ -93,5 +94,17 @@ class _Global:
         DOMAIN_HF = 'https://' + DOMAIN_HF
         return DOMAIN_HF
 
+    @cache
+    def mod(cls, Dir: Literal['install', 'lib', 'runs']):
+        '''lru_cache! Example: `Env.mod('install')['gvhmr']()`'''
+        import importlib
+        files = os.listdir(Path(__file__, '..', '..', Dir).resolve())
+        pys = [f[:-3] for f in files if f.endswith('.py')]
+        mods: dict[str, Callable[..., ModuleType]] = {}
+        for p in pys:
+            def _mod(): return importlib.import_module(f'.{Dir}.{p}', package=__package__)
+            mods[p] = _mod
+        return mods
 
-Global = _Global()
+
+Env = _Env()

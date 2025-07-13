@@ -6,7 +6,8 @@ _STEM = 'wilor'
 _name_ = RUNS_REPO[_STEM]
 
 
-async def i_wilor_mini(Dir: str | Path = CONFIG[_STEM]):
+async def i_wilor(Dir: str | Path = CONFIG[_STEM]):
+    '''install wilor-mini'''
     Log.info(f"📦 Install {_name_}")
     os.makedirs(Dir, exist_ok=True)
     p = await run_tail(f'git clone https://github.com/warmshao/WiLoR-mini {Dir}').Await(TIMEOUT_MINUTE)

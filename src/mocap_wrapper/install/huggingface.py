@@ -6,14 +6,14 @@ from dataclasses import dataclass, field
 from huggingface_hub import HfApi
 from typing import Literal, Sequence
 from .static import TYPE_RUNS, gather_notify
-from ..lib import Global, CONFIG, IS_DEBUG, copy_args, getLogger
+from ..lib import Env, CONFIG, IS_DEBUG, copy_args, getLogger
 Log = getLogger(__name__)
 HF_MAIN = 'https://huggingface.co/{}/tree/main'
-TYPE_HUGFACE = TYPE_RUNS | Literal['smplx', 'hamer']
+TYPE_HUGFACE = TYPE_RUNS | Literal['smplx', 'hamer', 'hawor']   # TODO: remove hamer/hawor if supported in run
 TYPE_FILE_RUN_DIR = dict[str, dict[TYPE_HUGFACE, str]]
 RUN_TO_REPOS: dict[TYPE_RUNS, list[TYPE_HUGFACE]] = {
     'gvhmr': ['smplx'],
-    'dynhamr': ['hamer'],
+    'dynhamr': ['hamer', 'hawor'],
 }
 OWNER_REPO: dict[TYPE_HUGFACE, str] = {
     'smplx': 'camenduru/SMPLer-X',
@@ -21,11 +21,13 @@ OWNER_REPO: dict[TYPE_HUGFACE, str] = {
     'wilor': 'warmshao/WiLoR-mini',
     'dynhamr': 'Zhengdi/Dyn-HaMR',
     'hamer': 'spaces/geopavlakos/HaMeR',
+    'hawor': 'ThunderVVV/HaWoR',
 }
 REGEX: dict[TYPE_HUGFACE, str] = {
     'smplx': r'SMPL_NEUTRAL\.pkl|SMPLX_NEUTRAL\.npz',
     'gvhmr': r'^(?!preproc_data|\.).*',
     'wilor': r'^(?!.*wilor_vit\.onnx).*',
+    'hamer': r'_DATA',
 }
 LOCAL_REMAP: TYPE_FILE_RUN_DIR = {
     'SMPL_NEUTRAL.pkl': {
@@ -40,6 +42,13 @@ LOCAL_REMAP: TYPE_FILE_RUN_DIR = {
     'mano_mean_params.npz': {
         'dynhamr': 'data',
     },
+    'dataset_config.yaml': {'dynhamr': 'hamer_ckpts'},
+    'model_config.yaml': {'dynhamr': 'hamer_ckpts'},
+    'hamer.ckpt': {'dynhamr': 'hamer_ckpts/checkpoints'},
+    'wholebody.pth': {'dynhamr': 'vitpose_ckpts/vitpose+_huge'},
+    'droid.pth': {'dynhamr': ''},
+    # TODO: hmp_model/...
+
 }
 REPO_TO_LOCAL_PREFIX: dict[TYPE_RUNS, str] = {
     'gvhmr': 'inputs/checkpoints',
@@ -70,7 +79,7 @@ async def i_hugging_face(*run: TYPE_RUNS, concurrent=2):
             repo_id = '/'.join(repo_id.split('/')[1:])  # get owner/repo_name
         else:
             repo_type = None
-        remote_paths = await asyncio.to_thread(Global.HF.list_repo_files, repo_id=repo_id, repo_type=repo_type)  # request 1 by 1
+        remote_paths = await asyncio.to_thread(Env.HF.list_repo_files, repo_id=repo_id, repo_type=repo_type)  # request 1 by 1
         remote_paths = [f for f in remote_paths if not (f.startswith('.') or f.startswith('README'))]  # 排除隐藏文件
         regex = re.compile(REGEX.get(repo, '.*'))
         for str_path in remote_paths:
@@ -107,10 +116,10 @@ async def i_hugging_face(*run: TYPE_RUNS, concurrent=2):
     if IS_DEBUG:
         import pprint
         Log.debug(f'_files={len(_files.keys())}\n' + pprint.pformat(_files, indent=2))
-    semaphore = asyncio.Semaphore(concurrent)  # 最多2个并发
+    semaphore = asyncio.Semaphore(concurrent)  # 最多n个并发
 
     @copy_args(HfApi.hf_hub_download)
-    async def dl(self=Global.HF, *args, dsts: list[Path], **kwargs):
+    async def dl(self=Env.HF, *args, dsts: list[Path], **kwargs):
         if IS_DEBUG:
             print('⬇️', kwargs, f'{dsts=}')
             return
@@ -140,7 +149,7 @@ async def i_hugging_face(*run: TYPE_RUNS, concurrent=2):
                 exceptions.append(e)
         else:
             tasks.append(dl(
-                Global.HF, repo_id=repo_id, filename=fname,
+                Env.HF, repo_id=repo_id, filename=fname,
                 subfolder='/'.join(rpath.parent.parts), dsts=dsts))    # type: ignore
     files, _e = await gather_notify(tasks, f'Download models {run}')
     exceptions.extend(_e)

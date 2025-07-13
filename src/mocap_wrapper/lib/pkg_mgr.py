@@ -2,7 +2,7 @@
 use pixi as user space package manager
 """
 import shutil
-from .static import TIMEOUT_MINUTE, TIMEOUT_QUATER, Global, get_cmds, is_win
+from .static import TIMEOUT_MINUTE, TIMEOUT_QUATER, Env, get_cmds, is_win
 from .logger import getLogger
 from .process import run_tail
 from typing import Literal, get_args
@@ -28,7 +28,7 @@ async def i_pkgs(*bin: TYPE_BINS):
     if is_win and 'aria2' in pkgs:
         pkgs.pop(0)
         cmd_install = 'winget install --accept-package-agreements aria2.aria2'
-        if Global.is_mirror:
+        if Env.is_mirror:
             cmds = [
                 'winget source remove winget',
                 'winget source add winget https://mirrors.ustc.edu.cn/winget-source --trust-level trusted',

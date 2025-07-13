@@ -4,7 +4,9 @@ import asyncio
 import itertools
 from pathlib import Path
 from signal import SIGTERM
-from ..lib import getLogger, run_tail, res_path, get_cmds, wait_all_dl, i_pkgs, Aria_process, TIMEOUT_QUATER, TYPE_RUNS, Global
+
+from mocap_wrapper import IS_DEBUG
+from ..lib import getLogger, run_tail, res_path, get_cmds, wait_all_dl, i_pkgs, Aria_process, TIMEOUT_QUATER, TYPE_RUNS, RUNS, Env
 from typing import Coroutine, Generator, Sequence, Any
 Log = getLogger(__name__)
 try:
@@ -16,12 +18,16 @@ except ImportError:
 async def install(runs: Sequence[TYPE_RUNS], **kwargs):
     tasks = []
     tasks.append(i_pkgs())
+
+    if 'dynhamr' in runs:
+        from .dynhamr import i_dynhamr
+        tasks.append(i_dynhamr(**kwargs))
     if 'gvhmr' in runs:
         from .gvhmr import i_gvhmr
         tasks.append(i_gvhmr(**kwargs))
     if 'wilor' in runs:
-        from .wilor import i_wilor_mini
-        tasks.append(i_wilor_mini(**kwargs))
+        from .wilor import i_wilor
+        tasks.append(i_wilor(**kwargs))
 
     done, pending = await asyncio.wait(
         [asyncio.gather(*tasks), asyncio.create_task(wait_all_dl())],
@@ -34,12 +40,14 @@ async def install(runs: Sequence[TYPE_RUNS], **kwargs):
     return ret
 
 
-async def i_python_env(Dir: str | Path, pixi_toml='gvhmr.toml', use_mirror=True):
+async def i_python_env(Dir: str | Path, pixi_toml='gvhmr.toml', use_mirror: bool | None = None):
+    '''when `use_mirror` is None, use `Env.is_mirror`'''
     _toml = str(res_path(file=pixi_toml))
     pixi_toml = Path(Dir, 'pixi.toml')
     # if (txt := Path(Dir, 'requirements.txt')).exists():
     #     shutil.move(txt, Path(Dir, 'requirements.txt.bak'))
-    timeout = 4 if Global.is_mirror and use_mirror else TIMEOUT_QUATER  # fail quickly if CN use github.com
+    use_mirror = Env.is_mirror if use_mirror is None else use_mirror
+    timeout = 4 if Env.is_mirror and use_mirror else TIMEOUT_QUATER  # fail quickly if CN use github.com
     iter_github = [(_toml, 'github.com')]
     iters = itertools.chain(iter_github, replace_github_with_mirror(file=str(_toml))) if use_mirror else iter_github
     for file, _ in iters:
@@ -69,12 +77,12 @@ git submodule update --init --recursive
     os.chdir(_dir) if Dir else None
 
 
-async def gather_notify(coros: list[Coroutine], success_msg=''):
+async def gather_notify(coros: Sequence[Coroutine], success_msg=''):
     _results = await asyncio.gather(*coros, return_exceptions=True)
-    exceptions = [r for r in _results if isinstance(r, BaseException)]
+    exceptions = [r for r in _results if isinstance(r, Exception)]
     results = [r for r in _results if not isinstance(r, BaseException)]
     if exceptions:
         [Log.exception('', exc_info=e) for e in exceptions]
     else:
-        Log.info(f"✔ {success_msg}")
+        Log.info(f"✔ {success_msg}") if success_msg else None
     return results, exceptions
