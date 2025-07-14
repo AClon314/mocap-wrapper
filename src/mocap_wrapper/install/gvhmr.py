@@ -1,6 +1,6 @@
 import os
 from pathlib import Path
-from .static import gather_notify, i_python_env
+from .static import gather_notify, i_python_env, Git
 from .huggingface import i_hugging_face
 from ..lib import TIMEOUT_MINUTE, TIMEOUT_QUATER, RUNS_REPO, CONFIG, IS_DEBUG, getLogger, get_uncomplete, run_tail, res_path, File, download, unzip
 Log = getLogger(__name__)
@@ -11,7 +11,7 @@ _name_ = RUNS_REPO[_STEM]
 async def i_gvhmr(Dir: str | Path = CONFIG[_STEM]):
     Log.info(f"📦 Install {_name_} at {CONFIG[_STEM]}")
     os.makedirs(Dir, exist_ok=True)
-    p = await run_tail(f'git clone https://github.com/zju3dv/{_name_} {Dir}').Await(TIMEOUT_MINUTE)
+    p = await Git(['clone', 'https://github.com/zju3dv/GVHMR', str(Dir)])
     link_config(Dir)
     # dir_checkpoints = str(Path(Dir, 'inputs', 'checkpoints'))
     # os.makedirs(Path(dir_checkpoints, 'body_models'), exist_ok=True)

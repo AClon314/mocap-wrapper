@@ -3,7 +3,7 @@ channels = ["conda-forge"]
 platforms = ["linux-64"] # "osx-arm64", "osx-64" 
 version = "2025.07.06"
 [environments]
-default = ["gpu", "hamer"]
+default = ["gpu", "hamer", "hamer-all"]
 
 [feature.gpu.system-requirements]
 cuda = "12.1"
@@ -13,46 +13,54 @@ platformdirs = "*"
 python = "3.10.*" # share with gvhmr, optional
 toml = "*" 
 
-cython = "*"
-dill = "*"
-einops = "*"
-gdown = "*"
-hydra-core = "*"
-joblib = "*"
-matplotlib = "*"
-motmetrics = "*"
-numpy = "*"
-open3d = "*"
-opencv = "*"
-pandas = "==1.4.0"
-pyrender = "*"
-pyyaml = "*"
-scikit-image = "*"
-scipy = "*"
-tensorboard = "*"
-timm = "==0.4.9"
-tqdm = "*"
-xtcocotools = "*"
-# setuptools==59.5.0
+cython = "*" 
+dill = "*" 
+einops = "*" 
+gdown = "*" 
+hydra-core = "*" 
+joblib = "*" 
+matplotlib = "*" 
+motmetrics = "*" 
+numpy = "*" 
+open3d = "*" 
+opencv = "*" 
+pandas = "==1.4.0" 
+pyrender = "*" 
+pyyaml = "*" 
+scikit-image = "*" 
+scipy = "*" 
+setuptools = "*" # 59.5.0 
+tensorboard = "*" 
+tqdm = "*" 
+xtcocotools = "*" 
 [pypi-options]
-no-build-isolation = ["chumpy", "detectron2"]
+no-build-isolation = ["chumpy", "detectron2", "setuptools"]
 [pypi-dependencies]
 dyn-hamr = {path = ".", editable = true}
 
-chumpy = {git = "https://github.com/mattloper/chumpy"}
-configer = {git = "https://github.com/nghorbani/configer"}
-
-imageio-ffmpeg = "*"
-mmcv = "==1.3.9"
-smplx = "*"
-torchgeometry = "==0.1.2"
+chumpy = {git = "https://github.com/mattloper/chumpy"} 
+configer = {git = "https://github.com/nghorbani/configer"} 
+imageio-ffmpeg = "*" 
+mmcv = "==1.3.9" 
+smplx = "*" 
+timm = "==0.4.9" # ⚠️ conda package dep need incorrect torch version
+torchgeometry = "==0.1.2" 
 [feature.gpu.pypi-dependencies]
 torch = {version = "==1.13.0", index = "https://download.pytorch.org/whl/cu117"}
-torch-scatter = {version = "==2.1.1", index = "https://data.pyg.org/whl/torch-1.13.0+cu117.html"}
+torch-scatter = {url = "https://data.pyg.org/whl/torch-1.13.0+cu117/torch_scatter-2.1.1+pt113cu117-cp310-cp310-linux_x86_64.whl"}
+# torch-scatter = {version = "==2.1.1", index = "https://data.pyg.org/whl/torch-1.13.0+cu117.html"} # TODO: pixi only support pypi-torch, other index is not supported
 torchvision = {version = "==0.14.0", index = "https://download.pytorch.org/whl/cu117"}
+[feature.gpu.target.linux-64.pypi-dependencies]
+torch-scatter = {url = "https://data.pyg.org/whl/torch-1.13.0+cu117/torch_scatter-2.1.1+pt113cu117-cp310-cp310-linux_x86_64.whl"}
+[feature.gpu.target.win-64.pypi-dependencies]
+torch-scatter = {url = "https://data.pyg.org/whl/torch-1.13.0+cu117/torch_scatter-2.1.1+pt113cu117-cp310-cp310-win_amd64.whl"}
+[feature.cpu.target.linux-64.pypi-dependencies]
+torch-scatter = {url = "https://data.pyg.org/whl/torch-1.13.0+cpu/torch_scatter-2.1.1+pt113cpu-cp310-cp310-linux_x86_64.whl"}
+[feature.cpu.target.win-64.pypi-dependencies]
+torch-scatter = {url = "https://data.pyg.org/whl/torch-1.13.0+cpu/torch_scatter-2.1.1+pt113cpu-cp310-cp310-win_amd64.whl"}
 [feature.cpu.pypi-dependencies]
 torch = {version = "==1.13.0", index = "https://download.pytorch.org/whl/cpu"}
-torch-scatter = {version = "==2.1.1", index = "https://data.pyg.org/whl/cpu"}
+# torch-scatter = {version = "==2.1.1", index = "https://data.pyg.org/whl/cpu"}
 torchvision = {version = "==0.14.0", index = "https://download.pytorch.org/whl/cpu"}
 
 [feature.hamer.dependencies] # 15
@@ -65,7 +73,7 @@ scikit-image = "*"
 xtcocotools = "*"
 yacs = "*"
 [feature.hamer.pypi-dependencies]
-hamer = {path = "third-party/hamer", editable = true, extras = ["all"]}
+hamer = {path = "third-party/hamer", editable = true}# extras = ["hamer-all"]
 mmpose = {path = "third-party/hamer/third-party/ViTPose", editable = true}
 
 chumpy = {git = "https://github.com/mattloper/chumpy"} 
@@ -74,7 +82,7 @@ lightning = "*"
 mmcv = "==1.3.9" 
 smplx = "*" # ==0.1.28
 timm = "*" 
-[feature.dev.dependencies] # 6
+[feature.hamer-all.pypi-dependencies] # 6
 hydra-colorlog = "*"
 hydra-core = "*"
 hydra-submitit-launcher = "*"

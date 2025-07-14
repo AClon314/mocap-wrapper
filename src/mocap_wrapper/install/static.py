@@ -4,9 +4,7 @@ import asyncio
 import itertools
 from pathlib import Path
 from signal import SIGTERM
-
-from mocap_wrapper import IS_DEBUG
-from ..lib import getLogger, run_tail, res_path, get_cmds, wait_all_dl, i_pkgs, Aria_process, TIMEOUT_QUATER, TYPE_RUNS, RUNS, Env
+from ..lib import getLogger, run_tail, res_path, get_cmds, wait_all_dl, i_pkgs, Aria_process, TIMEOUT_QUATER, TIMEOUT_MINUTE, TYPE_RUNS, Env
 from typing import Coroutine, Generator, Sequence, Any
 Log = getLogger(__name__)
 try:
@@ -60,6 +58,15 @@ async def i_python_env(Dir: str | Path, pixi_toml='gvhmr.toml', use_mirror: bool
         if p.get_status() == 0:
             return p
         timeout = TIMEOUT_QUATER
+
+
+async def Git(cmd: Sequence[str]):
+    '''with mirror_cn, return None when failed.'''
+    p = await run_tail(['git', *cmd]).Await(TIMEOUT_MINUTE)
+    if p.get_status() not in [128, 0] and Env.is_mirror:    # 128 means existed
+        from mirror_cn import git
+        p = await asyncio.to_thread(git, *cmd)
+    return p
 
 
 async def git_pull(Dir: str | Path = '', **kwargs):
