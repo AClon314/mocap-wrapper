@@ -1,21 +1,29 @@
 import os
 import gc
+
 import sys
 import toml
 import inspect
 import logging
 import argparse
+import shlex
+import subprocess
 import numpy as np
 from pathlib import Path
 from platformdirs import user_config_path
 from types import ModuleType
-from typing import Any, Literal, Sequence, TypeVar
+from typing import Any, Iterable, Literal, Sequence, TypeVar
+logging.basicConfig(level=os.environ.get('LOG', 'INFO').upper())
 Log = logging.getLogger(__name__)
 VIDEO_EXT = "webm,mkv,flv,flv,vob,vob,ogv,ogg,drc,gifv,webm,gifv,mng,avi,mov,qt,wmv,yuv,rm,rmvb,viv,asf,amv,mp4,m4p,m4v,mpg,mp2,mpeg,mpe,mpv,mpg,mpeg,m2v,m4v,svi,3gp,3g2,mxf,roq,nsv,flv,f4v,f4p,f4a,f4b".split(',')
 TYPE_RANGE = tuple[int, int]
 T = TypeVar('T')
 TN = TypeVar('NT', 'np.ndarray', 'torch.Tensor')    # type: ignore
+_ID = -1
 def vram_gb(torch): return torch.cuda.memory_allocated() / 1024 ** 3
+def _shlex_quote(args: Iterable[str]): return [shlex.quote(str(arg)) for arg in args]
+def _get_cmd(cmds: Iterable[str] | str): return cmds if isinstance(cmds, str) else _shlex_quote(cmds)
+def _strip(s): return str(s).strip() if s else ''
 
 
 _PATH = Path(__file__, '..', '..', '..').resolve()
@@ -60,6 +68,31 @@ def chdir_gitRepo(mod: TYPE_RUNS):
         os.chdir(dst)
     else:
         raise FileNotFoundError(f'config.toml not found in {config_path}')
+
+
+def run(cmd: Sequence[str] | str, Print=True, **kwargs) -> subprocess.CompletedProcess[str]:
+    '''⚠️ Strongly recommended use list[str] instead of str to pass commands,
+    to avoid shell injection risks for online service.'''
+    global _ID
+    _ID += 1
+    prefix = f'{cmd[0]}_{_ID}'
+    shell = True if isinstance(cmd, str) else False
+    cmd = _get_cmd(cmd) if shell else cmd
+    Log.info(f'{prefix}🐣❯ {cmd}') if Print else None
+    try:
+        process = subprocess.run(cmd, shell=shell, text=True, capture_output=True, check=True, **kwargs)
+    except subprocess.CalledProcessError as e:
+        process = e
+    except subprocess.TimeoutExpired as e:
+        process = e
+        process.returncode = 128 + 15  # SIGTERM # type: ignore
+    Log.debug(f'{locals()=}')
+    process.stderr = _strip(process.stderr)  # type: ignore
+    process.stdout = _strip(process.stdout)  # type: ignore
+    if Print:
+        Log.info(f'{prefix}❯ {process.stdout}') if process.stdout else None
+        Log.error(f'{prefix}❯ {process.stderr}') if process.stderr else None
+    return process  # type: ignore
 
 
 def continuous(List: Sequence[int]) -> list[tuple[int, int]]:

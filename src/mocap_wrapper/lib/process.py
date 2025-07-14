@@ -143,10 +143,15 @@ async def unzip(
     return p
 
 
-async def Python(run: TYPE_RUNS, *args: str):
+async def Python(run: TYPE_RUNS | Path, *args: str):
     # TODO: run at same time if vram > 6gb, or 1 by 1 based if vram < 4gb
-    py = str(res_path(module='run', file=f'{run}.py'))
-    cmd = ['pixi', 'run', '-q', '--manifest-path', CONFIG[run], '--', 'python', py, *args]
+    if isinstance(run, Path):
+        RUN = run
+        py = []
+    else:
+        py = [str(res_path(module='run', file=f'{run}.py'))]
+        RUN = CONFIG[run]
+    cmd = ['pixi', 'run', '-q', '--manifest-path', RUN, '--', 'python', *py, *args]
     if '--help' in args or '-h' in args:
         return os.system(' '.join(cmd))
     return await run_tail(cmd, output_prefix='', output_func=print).Await()

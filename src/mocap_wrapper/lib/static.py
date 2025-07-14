@@ -10,11 +10,12 @@ from importlib.metadata import version as _version
 from importlib.resources import path as _res_path
 from types import ModuleType
 from typing import ParamSpec, TypeVar, Callable, Literal, Any, get_args, cast
-from huggingface_hub import HfApi
 try:
     from mirror_cn import is_need_mirror
+    from huggingface_hub import HfApi
 except ImportError:
     def is_need_mirror() -> bool: return bool(os.environ.get('IS_MIRROR', ''))
+    HfApi = dict
 _PS = ParamSpec("_PS")
 _TV = TypeVar("_TV")
 TYPE_RUNS = Literal['wilor', 'gvhmr', 'dynhamr']

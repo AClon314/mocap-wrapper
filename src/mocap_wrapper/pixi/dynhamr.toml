@@ -9,6 +9,7 @@ default = ["gpu", "hamer", "hamer-all"]
 cuda = "12.1"
 
 [dependencies]
+pip = "*" 
 platformdirs = "*" 
 python = "3.10.*" # share with gvhmr, optional
 toml = "*" 
@@ -34,13 +35,14 @@ tensorboard = "*"
 tqdm = "*" 
 xtcocotools = "*" 
 [pypi-options]
-no-build-isolation = ["chumpy", "detectron2", "setuptools"]
+no-build-isolation = ["chumpy", "detectron2", "setuptools", "pip"]
 [pypi-dependencies]
 dyn-hamr = {path = ".", editable = true}
 
 chumpy = {git = "https://github.com/mattloper/chumpy"} 
 configer = {git = "https://github.com/nghorbani/configer"} 
 imageio-ffmpeg = "*" 
+mano = "*" # Dyn-HaMR/dyn-hamr/optim/base_scene.py
 mmcv = "==1.3.9" 
 smplx = "*" 
 timm = "==0.4.9" # ⚠️ conda package dep need incorrect torch version

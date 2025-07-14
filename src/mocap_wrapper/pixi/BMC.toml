@@ -1,0 +1,88 @@
+# pixi init --import environment.yml
+[workspace]
+channels = ["pytorch", "main", "r", "msys2"]
+platforms = ["linux-64"]
+version = "2025.07.14"
+[environments]
+default = ["gpu"]
+
+[dependencies]
+_libgcc_mutex = {version = "==0.1", build = "main"}
+blas = {version = "==1.0", build = "mkl"}
+ca-certificates = {version = "==2021.1.19", build = "h06a4308_0"}
+certifi = {version = "==2020.12.5", build = "py37h06a4308_0"}
+cffi = {version = "==1.14.5", build = "py37h261ae71_0"}
+cudatoolkit = {version = "==10.0.130", build = "0"}
+cycler = {version = "==0.10.0", build = "py37_0"}
+dbus = {version = "==1.13.18", build = "hb2f20db_0"}
+expat = {version = "==2.2.10", build = "he6710b0_2"}
+fontconfig = {version = "==2.13.1", build = "h6c09931_0"}
+freetype = {version = "==2.10.4", build = "h5ab3b9f_0"}
+glib = {version = "==2.67.4", build = "h36276a3_1"}
+gst-plugins-base = {version = "==1.14.0", build = "h8213a91_2"}
+gstreamer = {version = "==1.14.0", build = "h28cd5cc_2"}
+icu = {version = "==58.2", build = "he6710b0_3"}
+intel-openmp = {version = "==2020.2", build = "254"}
+jpeg = {version = "==9b", build = "h024ee3a_2"}
+kiwisolver = {version = "==1.3.1", build = "py37h2531618_0"}
+lcms2 = {version = "==2.11", build = "h396b838_0"}
+ld_impl_linux-64 = {version = "==2.33.1", build = "h53a641e_7"}
+libedit = {version = "==3.1.20191231", build = "h14c3975_1"}
+libffi = {version = "==3.3", build = "he6710b0_2"}
+libgcc-ng = {version = "==9.1.0", build = "hdf63c60_0"}
+libpng = {version = "==1.6.37", build = "hbc83047_0"}
+libstdcxx-ng = {version = "==9.1.0", build = "hdf63c60_0"}
+libtiff = {version = "==4.1.0", build = "h2733197_1"}
+libuuid = {version = "==1.0.3", build = "h1bed415_2"}
+libxcb = {version = "==1.14", build = "h7b6447c_0"}
+libxml2 = {version = "==2.9.10", build = "hb55368b_3"}
+lz4-c = {version = "==1.9.3", build = "h2531618_0"}
+matplotlib = {version = "==3.3.4", build = "py37h06a4308_0"}
+matplotlib-base = {version = "==3.3.4", build = "py37h62a2d02_0"}
+mkl = {version = "==2020.2", build = "256"}
+mkl-service = {version = "==2.3.0", build = "py37he8ac12f_0"}
+mkl_fft = {version = "==1.3.0", build = "py37h54f3939_0"}
+mkl_random = {version = "==1.1.1", build = "py37h0573a6f_0"}
+ncurses = {version = "==6.2", build = "he6710b0_1"}
+ninja = {version = "==1.10.2", build = "py37hff7bd54_0"}
+numpy = {version = "==1.19.2", build = "py37h54aff64_0"}
+numpy-base = {version = "==1.19.2", build = "py37hfa32c7d_0"}
+olefile = {version = "==0.46", build = "py_0"}
+openssl = {version = "==1.1.1j", build = "h27cfd23_0"}
+pcre = {version = "==8.44", build = "he6710b0_0"}
+pillow = {version = "==8.1.0", build = "py37he98fc37_0"}
+pip = {version = "==21.0.1", build = "py37h06a4308_0"}
+pycparser = {version = "==2.20", build = "py_2"}
+pyparsing = {version = "==2.4.7", build = "pyhd3eb1b0_0"}
+pyqt = {version = "==5.9.2", build = "py37h05f1152_2"}
+python = {version = "==3.7.10", build = "hdb3f193_0"}
+python-dateutil = {version = "==2.8.1", build = "pyhd3eb1b0_0"}
+qt = {version = "==5.9.7", build = "h5867ecd_1"}
+readline = {version = "==8.1", build = "h27cfd23_0"}
+setuptools = {version = "==52.0.0", build = "py37h06a4308_0"}
+sip = {version = "==4.19.8", build = "py37hf484d3e_0"}
+six = {version = "==1.15.0", build = "pyhd3eb1b0_0"}
+sqlite = {version = "==3.33.0", build = "h62c20be_0"}
+tk = {version = "==8.6.10", build = "hbc83047_0"}
+tornado = {version = "==6.1", build = "py37h27cfd23_0"}
+tqdm = {version = "==4.56.0", build = "pyhd3eb1b0_0"}
+wheel = {version = "==0.36.2", build = "pyhd3eb1b0_0"}
+xz = {version = "==5.2.5", build = "h7b6447c_0"}
+zlib = {version = "==1.2.11", build = "h7b6447c_3"}
+zstd = {version = "==1.4.5", build = "h9ceee32_0"}
+# pytorch = { version = "==1.2.0", build = "py3.7_cuda10.0.130_cudnn7.6.2_0" }
+# torchvision = {version = "==0.4.0", build = "py37_cu100"}
+
+[pypi-dependencies]
+art = "==3.7"
+coverage = "==4.5.3"
+mxnet = "==1.6.0"
+rdp = "==0.8"
+
+[feature.cpu.pypi-dependencies]
+torch = {version = "==1.2.0", index = "https://download.pytorch.org/whl/cpu"}
+torchvision = {version = "==0.4.0", index = "https://download.pytorch.org/whl/cpu"}
+
+[feature.gpu.pypi-dependencies]
+torch = {version = "==1.2.0", index = "https://download.pytorch.org/whl/cu100"}
+torchvision = {version = "==0.4.0", index = "https://download.pytorch.org/whl/cu100"}
