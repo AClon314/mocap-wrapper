@@ -74,7 +74,7 @@ async def mocap(
             # TODO: auto parallelize if vram > 6gb
             await run(by, i, outdir, Range=Range, args=args)
     else:
-        for b in by:
+        for b in [b for b in by if b in RUNS]:
             p = await Python(args.pop(0) if args else '', *args, run=b)
 
 
