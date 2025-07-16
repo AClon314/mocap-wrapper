@@ -260,15 +260,14 @@ def set_shell_init_venv_PATH():
     _activate = '. ~/.venv/bin/activate'
     _export = f'export PATH="$PATH:{PIXI_BIN}:$HOME/.venv/bin"'
     profile = os.path.expanduser(f'~/.profile')
-    _source = f'. {profile}'   # because re-source ~/.bashrc would break some ENV, and usually ~/.profile is simple.
     write('\n'.join([_activate, _export]), profile)
 
     shells = [_sh for _sh in ['bash', 'zsh', 'xonsh'] if shutil.which(_sh)]
     for sh in shells:
         _shrc = os.path.expanduser(f'~/.{sh}rc')
-        write(_source, _shrc)
+        write(_activate, _shrc)
     if not shells:
-        Log.warning(f'⚠️⚠️⚠️ venv/PATH update at {profile}, add to your .*shrc: {_source} ⚠️⚠️⚠️')
+        Log.warning(f'⚠️⚠️⚠️ venv/PATH update at {profile}, add to your .*shrc: {_activate} ⚠️⚠️⚠️')
     return _activate
 
 

@@ -11,7 +11,8 @@ _name_ = RUNS_REPO[_STEM]
 async def i_gvhmr(Dir: str | Path = CONFIG[_STEM]):
     Log.info(f"📦 Install {_name_} at {CONFIG[_STEM]}")
     os.makedirs(Dir, exist_ok=True)
-    p = await Git(['clone', 'https://github.com/zju3dv/GVHMR', str(Dir)])
+    if not Path(Dir).exists():
+        await Git(['clone', 'https://github.com/zju3dv/GVHMR', str(Dir)])
     link_config(Dir)
     # dir_checkpoints = str(Path(Dir, 'inputs', 'checkpoints'))
     # os.makedirs(Path(dir_checkpoints, 'body_models'), exist_ok=True)

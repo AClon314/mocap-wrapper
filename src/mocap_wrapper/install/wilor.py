@@ -10,7 +10,8 @@ async def i_wilor(Dir: str | Path = CONFIG[_STEM]):
     '''install wilor-mini'''
     Log.info(f"📦 Install {_name_}")
     os.makedirs(Dir, exist_ok=True)
-    p = await Git(['clone', 'https://github.com/warmshao/WiLoR-mini', str(Dir)])
+    if not Path(Dir).exists():
+        await Git(['clone', 'https://github.com/warmshao/WiLoR-mini', str(Dir)])
     tasks = [
         i_python_env(Dir=Dir, pixi_toml=f'{_STEM}.toml', use_mirror=False),
         i_hugging_face(_STEM),

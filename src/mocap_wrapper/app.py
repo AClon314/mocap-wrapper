@@ -75,7 +75,7 @@ async def mocap(
             await run(by, i, outdir, Range=Range, args=args)
     else:
         for b in [b for b in by if b in RUNS]:
-            p = await Python(args.pop(0) if args else '', *args, run=b)
+            p = await Python(args.pop(0) if args else '', *args, run=b)  # type: ignore
 
 
 def script_entry():
