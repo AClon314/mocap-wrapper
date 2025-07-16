@@ -5,7 +5,7 @@ from pathlib import Path
 from dataclasses import dataclass, field
 from huggingface_hub import HfApi
 from typing import Literal, Sequence
-from .static import TYPE_RUNS, gather_notify
+from .static import TYPE_RUNS, gather
 from ..lib import Env, CONFIG, IS_DEBUG, copy_args, getLogger
 Log = getLogger(__name__)
 HF_MAIN = 'https://huggingface.co/{}/tree/main'
@@ -151,7 +151,7 @@ async def i_hugging_face(*run: TYPE_RUNS, concurrent=2):
             tasks.append(dl(
                 Env.HF, repo_id=repo_id, filename=fname,
                 subfolder='/'.join(rpath.parent.parts), dsts=dsts))    # type: ignore
-    files, _e = await gather_notify(tasks, f'Download models {run}')
+    _, files, _e = await gather(tasks, f'Download models {run}')
     exceptions.extend(_e)
     if exceptions:
         Log.error(f"Try download from {[HF_MAIN.format(OWNER_REPO[k]) for k in repos]}")

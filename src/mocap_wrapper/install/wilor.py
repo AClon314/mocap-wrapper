@@ -1,4 +1,4 @@
-from .static import gather_notify, i_python_env, Git
+from .static import gather, i_python_env, Git
 from .huggingface import i_hugging_face
 from ..lib import *
 Log = getLogger(__name__)
@@ -15,4 +15,4 @@ async def i_wilor(Dir: str | Path = CONFIG[_STEM]):
         i_python_env(Dir=Dir, pixi_toml=f'{_STEM}.toml', use_mirror=False),
         i_hugging_face(_STEM),
     ]
-    return await gather_notify(tasks, success_msg=f'Installed {_name_}')
+    return await gather(tasks, success_msg=f'Installed {_name_}')

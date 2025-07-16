@@ -11,11 +11,12 @@ from importlib.resources import path as _res_path
 from types import ModuleType
 from typing import ParamSpec, TypeVar, Callable, Literal, Any, get_args, cast
 try:
-    from mirror_cn import is_need_mirror
+    from mirror_cn import is_need_mirror, set_mirror
     from huggingface_hub import HfApi
 except ImportError:
     def is_need_mirror() -> bool: return bool(os.environ.get('IS_MIRROR', ''))
-    HfApi = dict
+    from argparse import Namespace
+    HfApi = Namespace
 _PS = ParamSpec("_PS")
 _TV = TypeVar("_TV")
 TYPE_RUNS = Literal['wilor', 'gvhmr', 'dynhamr']
@@ -85,7 +86,12 @@ class _Env:
     '''Global variables and properties for the package.'''
     # HUGFACE = 'https://{domain}/{owner_repo}/resolve/main/'
     @cached_property
-    def is_mirror(cls): return is_need_mirror()
+    def is_mirror(cls):
+        _is = is_need_mirror()
+        if _is:
+            set_mirror('uv')
+        return _is
+
     @cached_property
     def HF(cls): return HfApi(endpoint=cls.domain_hf)
 

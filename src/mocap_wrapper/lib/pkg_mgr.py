@@ -17,14 +17,15 @@ BIN_PKG: dict[TYPE_BINS, str] = {
 }
 
 
-async def i_pkgs(*bin: TYPE_BINS):
-    bins = bin or BINS
-    bin_path: dict[TYPE_BINS, str | None] = {p: shutil.which(p) for p in bins}
-    missing_bins: list[TYPE_BINS] = [p for p, v in bin_path.items() if not v]
+async def i_pkgs(*bin: TYPE_BINS | str, bin_pkg: dict[str, str] = {}):
+    '''pixi global install bin'''
+    bins: list[str] = list(bin) + list(bin_pkg.keys()) or list(BINS)
+    bin_path = {p: shutil.which(p) for p in bins}
+    missing_bins = [p for p, v in bin_path.items() if not v]
     Log.debug(f'{bin_path=}')
     if not missing_bins:
         return
-    pkgs = [BIN_PKG[p] for p in missing_bins]
+    pkgs = [BIN_PKG[b] for b in missing_bins if b in TYPE_BINS] + [bin_pkg[b] for b in missing_bins if b in bin_pkg.keys()]  # type: ignore
     if is_win and 'aria2' in pkgs:
         pkgs.pop(0)
         cmd_install = 'winget install --accept-package-agreements aria2.aria2'

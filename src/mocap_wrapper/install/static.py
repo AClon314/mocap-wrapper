@@ -28,7 +28,7 @@ async def install(runs: Sequence[TYPE_RUNS], **kwargs):
         tasks.append(i_wilor(**kwargs))
 
     done, pending = await asyncio.wait(
-        [asyncio.gather(*tasks), asyncio.create_task(wait_all_dl())],
+        [asyncio.gather(*tasks, return_exceptions=True), asyncio.create_task(wait_all_dl())],
         return_when=asyncio.FIRST_COMPLETED
     )
     ret = done.pop().result()
@@ -38,7 +38,7 @@ async def install(runs: Sequence[TYPE_RUNS], **kwargs):
     return ret
 
 
-async def i_python_env(Dir: str | Path, pixi_toml='gvhmr.toml', use_mirror: bool | None = None):
+async def i_python_env(Dir: str | Path, pixi_toml='gvhmr.toml', env=['default'], use_mirror: bool | None = None):
     '''when `use_mirror` is None, use `Env.is_mirror`'''
     _toml = str(res_path(file=pixi_toml))
     pixi_toml = Path(Dir, 'pixi.toml')
@@ -52,7 +52,8 @@ async def i_python_env(Dir: str | Path, pixi_toml='gvhmr.toml', use_mirror: bool
         if pixi_toml.exists():
             os.remove(pixi_toml)
         shutil.copy(file, pixi_toml)
-        cmd = ['pixi', 'install', '-q', '--manifest-path', str(pixi_toml)]
+        _env = [f'-e={_}' for _ in env]
+        cmd = ['pixi', 'install', '-q', *_env, '--manifest-path', str(pixi_toml)]
         Log.info(f'🐍 {" ".join(cmd)}')
         p = await run_tail(cmd).Await(timeout)
         if p.get_status() == 0:
@@ -60,12 +61,14 @@ async def i_python_env(Dir: str | Path, pixi_toml='gvhmr.toml', use_mirror: bool
         timeout = TIMEOUT_QUATER
 
 
-async def Git(cmd: Sequence[str]):
+async def Git(cmd: Sequence[str], retry=True):
     '''with mirror_cn, return None when failed.'''
-    p = await run_tail(['git', *cmd]).Await(TIMEOUT_MINUTE)
-    if p.get_status() not in [128, 0] and Env.is_mirror:    # 128 means existed
+    Log.debug(f'{cmd=}')
+    if Env.is_mirror:    # 128 means existed
         from mirror_cn import git
-        p = await asyncio.to_thread(git, *cmd)
+        p = await asyncio.to_thread(git, *cmd, retry=retry)
+    else:
+        p = await run_tail(['git', *cmd]).Await(TIMEOUT_MINUTE)
     return p
 
 
@@ -77,14 +80,17 @@ git submodule update --init --recursive
     """
     _dir = os.getcwd()
     os.chdir(Dir) if Dir else None
-    timeout = kwargs.pop('timeout', TIMEOUT_QUATER)
     cmds = get_cmds(git_pull.__doc__)
     for cmd in cmds:
-        await run_tail(cmd, **kwargs).Await(timeout=timeout)
+        await Git(cmd.lstrip('git ').split(), **kwargs)
     os.chdir(_dir) if Dir else None
 
 
-async def gather_notify(coros: Sequence[Coroutine], success_msg=''):
+async def gather(coros: Sequence[Coroutine], success_msg=''):
+    '''gather, notify by `Log.info/Log.exception`'''
+    Log.debug(f'{coros=}')
+    if not coros:   # fix: gather(*coros) will stuck when coros=[]
+        return [], [], []
     _results = await asyncio.gather(*coros, return_exceptions=True)
     exceptions = [r for r in _results if isinstance(r, Exception)]
     results = [r for r in _results if not isinstance(r, BaseException)]
@@ -92,4 +98,4 @@ async def gather_notify(coros: Sequence[Coroutine], success_msg=''):
         [Log.exception('', exc_info=e) for e in exceptions]
     else:
         Log.info(f"✔ {success_msg}") if success_msg else None
-    return results, exceptions
+    return _results, results, exceptions

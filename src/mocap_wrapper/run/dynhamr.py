@@ -14,7 +14,9 @@ kw = [f'{k}={v}' for k, v in _kw.items()]
 
 
 def run_1():
-    p = run(['pixi', 'run', '-q', '--', 'python', os.path.join('dyn-hamr', 'run_opt.py'), *kw])
+    os.chdir('dyn-hamr')
+    print(f'{os.getcwd()=}')
+    p = run(['pixi', 'run', '-q', '--', 'python', 'run_opt.py', *kw])
     return p
 
 

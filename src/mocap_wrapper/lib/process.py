@@ -13,6 +13,8 @@ import asyncio
 from math import inf
 from pathlib import Path
 from typing import Coroutine, Literal, Sequence
+
+from numpy import isin
 from .logger import Log, getLogger
 from .static import TYPE_RUNS, copy_args, TIMEOUT_MINUTE, res_path
 from .config import CONFIG
@@ -143,15 +145,19 @@ async def unzip(
     return p
 
 
-async def Python(run: TYPE_RUNS | Path, *args: str):
+async def Python(arg0: str | Path = '', *args: str, run: TYPE_RUNS | Path, env='default'):
+    '''pixi run -e=env -- python args...
+
+    if `arg0` is Path: pixi run -e=env -- python arg0 args...  
+    else if `arg0` is str and run==gvhmr: pixi run -e=env -- python ...run/gvhmr.py args...
+    '''
     # TODO: run at same time if vram > 6gb, or 1 by 1 based if vram < 4gb
-    if isinstance(run, Path):
-        RUN = run
-        py = []
-    else:
-        py = [str(res_path(module='run', file=f'{run}.py'))]
-        RUN = CONFIG[run]
-    cmd = ['pixi', 'run', '-q', '--manifest-path', RUN, '--', 'python', *py, *args]
-    if '--help' in args or '-h' in args:
+    _arg0 = [str(arg0)] if arg0 else []
+    py = _arg0 if isinstance(arg0, Path) else [str(res_path(module='run', file=f'{run}.py')), *_arg0]
+    RUN = str(run) if isinstance(run, Path) else CONFIG[run]
+    _env = [] if not env or env == 'default' else [f'-e={env}']
+    _args = [*py, *args]
+    cmd = ['pixi', 'run', '-q', *_env, '--manifest-path', RUN, '--', 'python', *_args]
+    if '--help' in _args or '-h' in _args:
         return os.system(' '.join(cmd))
     return await run_tail(cmd, output_prefix='', output_func=print).Await()

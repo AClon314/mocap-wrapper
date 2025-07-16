@@ -27,7 +27,7 @@ Log = getLogger(__name__)
 async def run(runs: Sequence[TYPE_RUNS], input: str, outdir: str, Range='', args: Sequence[str] = []):
     video = await ffmpeg_or_link(input, outdir, Range=Range)
     for m in runs:
-        IS = await Python(m, '--input', video, '-o', outdir, *args)
+        p = await Python('--input', video, '-o', outdir, *args, run=m)
 
 
 class ArgParser(argparse.ArgumentParser):
@@ -35,7 +35,7 @@ class ArgParser(argparse.ArgumentParser):
         print(QRCODE)
         print(f'example: mocap -I -@ .. -i input.mp4')
         super().print_help(file)
-        tasks = [Python(m, '--help')for m in DEFAULT]
+        tasks = [Python('--help', run=m)for m in DEFAULT]
         asyncio.run(gather(*tasks))
 
 
@@ -73,6 +73,9 @@ async def mocap(
         for i in inputs:
             # TODO: auto parallelize if vram > 6gb
             await run(by, i, outdir, Range=Range, args=args)
+    else:
+        for b in by:
+            p = await Python(args.pop(0) if args else '', *args, run=b)
 
 
 def script_entry():
@@ -90,7 +93,7 @@ def script_entry():
 
     if args.install and by and by[0]:  # fix mocap -I -b ''
         for r in by:
-            del CONFIG[r]
+            del CONFIG[r]   # TODO
             setattr(CONFIG, r, None)
 
     asyncio.run(mocap(

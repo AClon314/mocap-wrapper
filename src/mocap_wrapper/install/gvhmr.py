@@ -1,6 +1,6 @@
 import os
 from pathlib import Path
-from .static import gather_notify, i_python_env, Git
+from .static import gather, i_python_env, Git
 from .huggingface import i_hugging_face
 from ..lib import TIMEOUT_MINUTE, TIMEOUT_QUATER, RUNS_REPO, CONFIG, IS_DEBUG, getLogger, get_uncomplete, run_tail, res_path, File, download, unzip
 Log = getLogger(__name__)
@@ -22,7 +22,7 @@ async def i_gvhmr(Dir: str | Path = CONFIG[_STEM]):
         # git_pull(Dir=Dir),
         # i_dpvo(Dir=Path(Dir, 'third-party/DPVO')),
     ]
-    return await gather_notify(tasks, f'Installed {_name_}')
+    return await gather(tasks, f'Installed {_name_}')
 
 
 def link_config(Dir: Path | str = CONFIG[_STEM], file='gvhmr.yaml'):
