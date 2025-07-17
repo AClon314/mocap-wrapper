@@ -1,6 +1,6 @@
 import re
 from warnings import deprecated
-from .static import gather, i_python_env, git_pull, Git
+from .static import gather, i_python_env, git_pull, Git, run_1by1
 from .huggingface import i_hugging_face
 from ..lib import *
 Log = getLogger(__name__)
