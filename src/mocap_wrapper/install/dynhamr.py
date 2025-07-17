@@ -46,8 +46,8 @@ def i_dpvo(setup_py=Path(CONFIG[_STEM], 'third-party', 'DROID-SLAM', 'setup.py')
 def i_bmc(Dir=Path(CONFIG[_STEM], 'Hand-BMC-pytorch')):
     '''if *.npy is not ready-made, we build from BMC'''
     if_missing_then_calc = {
-        Path(CONFIG[_STEM], '_DATA', 'BMC', 'bone_len_max.npy'): Python(Dir.joinpath('calculate_bmc.py'), run='dynhamr', env='bmc'),
-        Path(CONFIG[_STEM], '_DATA', 'BMC', 'CONVEX_HULLS.npy'): Python(Dir.joinpath('calculate_convex_hull.py'), run='dynhamr', env='bmc'),
+        Path(CONFIG[_STEM], '_DATA', 'BMC', 'bone_len_max.npy'): Python(Dir / 'calculate_bmc.py', run='dynhamr', env='bmc'),
+        Path(CONFIG[_STEM], '_DATA', 'BMC', 'CONVEX_HULLS.npy'): Python(Dir / 'calculate_convex_hull.py', run='dynhamr', env='bmc'),
     }
     queue = []
     _gather = []

@@ -24,7 +24,7 @@ class Config(UserDict):
         CONFIG['search_dir'] = '.'
         ```
         """
-        self.path = user_config_path(appname=PACKAGE, ensure_exists=True).joinpath(file)
+        self.path = user_config_path(appname=PACKAGE, ensure_exists=True) / file
         if Path(self.path).exists():
             config = toml.load(self.path)
             dic.update(config)

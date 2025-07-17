@@ -4,7 +4,7 @@ import asyncio
 import itertools
 from pathlib import Path
 from signal import SIGTERM
-from ..lib import getLogger, run_tail, res_path, get_cmds, wait_all_dl, i_pkgs, Aria_process, is_debug, TIMEOUT_QUATER, TIMEOUT_MINUTE, TYPE_RUNS, Env
+from ..lib import getLogger, run_tail, res_path, get_cmds, wait_all_dl, i_pkgs, is_debug, TIMEOUT_QUATER, TIMEOUT_MINUTE, TYPE_RUNS, Env
 from typing import Coroutine, Generator, Sequence, Any
 Log = getLogger(__name__)
 IS_DEBUG = is_debug(Log)
@@ -35,7 +35,7 @@ async def install(runs: Sequence[TYPE_RUNS], **kwargs):
     ret = done.pop().result()
     for task in pending:
         task.cancel()
-    Aria_process.kill(SIGTERM) if Aria_process else None
+    Env.aria_process.kill(SIGTERM) if Env.aria_process else None
     return ret
 
 

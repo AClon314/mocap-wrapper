@@ -8,7 +8,7 @@ import hashlib
 from pathlib import Path
 from datetime import timedelta
 from typing import Callable, Literal, Sequence, TypedDict, Unpack, get_args
-from .static import TIMEOUT_SECONDS, CONCURRENT
+from .static import TIMEOUT_SECONDS, CONCURRENT, Env
 from .logger import is_debug, getLogger
 from .pkg_mgr import i_pkgs
 Log = getLogger(__name__)
@@ -30,7 +30,7 @@ _ARIA_PORTS = [6800, 16800]
 _ARIA_CMD = f'aria2c --enable-rpc --rpc-listen-port=6800 {" ".join([f"--{k}={v}" for k, v in _OPT.items()])}'
 DOWNLOADS = []
 def get_uncomplete(dls: Sequence['aria2p.Download|None']): return [dl for dl in dls if dl and not dl.is_complete]
-def refresh_downloads(dls: Sequence['aria2p.Download'] = DOWNLOADS): return Aria.get_downloads([dl.gid for dl in dls]) if dls else []
+def refresh_downloads(dls: Sequence['aria2p.Download'] = DOWNLOADS): return Env.aria.get_downloads([dl.gid for dl in dls]) if dls else []
 
 
 class Kw_download(TypedDict, total=False):
@@ -134,7 +134,7 @@ def download(
     dls = []
     for f in files:
         _options = {**_OPT, **options, 'dir': str(f.path.parent), 'out': str(f.path.name)}
-        dls.append(Aria.add_uris(f.urls, options=_options))
+        dls.append(Env.aria.add_uris(f.urls, options=_options))
     DOWNLOADS.extend(dls)
     return dls
 
@@ -172,7 +172,7 @@ async def wait_all_dl():
         dls = refresh_downloads(DOWNLOADS)
         slowest = get_slowest(dls, refresh=False)
         if slowest:
-            Log.info(f"⬇ {slowest.name} ETA: {slowest.eta}. {Aria.get_stats()}")
+            Log.info(f"⬇ {slowest.name} ETA: {slowest.eta}. {Env.aria.get_stats()}")
         await asyncio.sleep(TIMEOUT_SECONDS)
 
 
@@ -203,9 +203,8 @@ async def get_aria():
         process = run_tail(_ARIA_CMD)
         await asyncio.sleep(1.5)
         Aria = try_aria_port()
-    Log.debug(Aria)
+    Log.debug(f'{locals()=}')
     return Aria, process
-Aria, Aria_process = asyncio.run(get_aria())
 
 if __name__ == '__main__':
     from .process import run_tail

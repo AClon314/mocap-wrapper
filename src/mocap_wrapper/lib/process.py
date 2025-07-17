@@ -21,7 +21,6 @@ IS_DEBUG = is_debug(Log)
 _RUN_ID = 0
 _INTERVAL = 0.1
 _RE_CTRL_ASCII = re.compile(r'\x1b\[[0-9;]*m')
-def run_async(func: Coroutine, timeout=TIMEOUT_MINUTE, loop: asyncio.AbstractEventLoop | None = None): return asyncio.run_coroutine_threadsafe(func, loop=loop if loop else asyncio.get_event_loop()).result(timeout)
 def shlex_quote(args: Sequence[str]): return ' '.join(shlex.quote(str(arg)) for arg in args)
 
 

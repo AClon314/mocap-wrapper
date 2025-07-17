@@ -1,6 +1,6 @@
 import os
 from pathlib import Path
-from .static import gather, i_python_env, Git
+from .static import gather, i_python_env, Git, git_pull, run_1by1
 from .huggingface import i_hugging_face
 from ..lib import TIMEOUT_QUATER, RUNS_REPO, CONFIG, is_debug, getLogger, get_uncomplete, run_tail, res_path, File, download, unzip
 Log = getLogger(__name__)
@@ -18,8 +18,7 @@ async def i_gvhmr(Dir: str | Path = CONFIG[_STEM]):
     coros = [
         i_python_env(Dir=Dir, pixi_toml='gvhmr.toml'),
         i_dl_models(),
-        # git_pull(Dir=Dir),
-        # i_dpvo(Dir=Path(Dir, 'third-party/DPVO')),
+        # run_1by1([git_pull(Dir=Dir), i_dpvo(Dir=Path(Dir, 'third-party/DPVO'))])
     ]
     return await gather(coros, f'Installed {_name_}')
 

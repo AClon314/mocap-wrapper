@@ -58,7 +58,7 @@ def free_ram(torch):
 
 
 def chdir_gitRepo(mod: TYPE_RUNS):
-    config_path = user_config_path(appname='mocap_wrapper', ensure_exists=True).joinpath('config.toml')
+    config_path = user_config_path(appname='mocap_wrapper', ensure_exists=True) / 'config.toml'
     if os.path.exists(config_path):
         config = toml.load(config_path)
         dst = CONFIG[mod]

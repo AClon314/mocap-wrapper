@@ -2,6 +2,7 @@
 To prevent recursive import, this file can NOT import self modules!
 '''
 import os
+import asyncio
 from sys import platform
 from pathlib import Path
 from datetime import timedelta
@@ -9,7 +10,7 @@ from functools import cache, cached_property
 from importlib.metadata import version as _version
 from importlib.resources import path as _res_path
 from types import ModuleType
-from typing import ParamSpec, TypeVar, Callable, Literal, Any, get_args, cast
+from typing import Coroutine, ParamSpec, TypeVar, Callable, Literal, Any, get_args, cast
 try:
     from mirror_cn import is_need_mirror, set_mirror
     from huggingface_hub import HfApi
@@ -50,6 +51,7 @@ QRCODE = """
 █ ███ █  █▀█▄▀ ▀███▀▀█▀█▄
 █ ▀▀▀ █ ▄▀▄▄    █  ▀▄█▀ █
 ▀▀▀▀▀▀▀ ▀ ▀▀  ▀ ▀ ▀▀▀▀  ▀"""[1:]
+def run_async(func: Coroutine[Any, Any, _TV], timeout=TIMEOUT_MINUTE, loop: asyncio.AbstractEventLoop | None = None): return asyncio.run_coroutine_threadsafe(func, loop=loop if loop else asyncio.get_event_loop()).result(timeout)
 
 
 def remove_if_p(path: str | Path):
@@ -84,25 +86,35 @@ def get_cmds(doc: str | None):
 
 class _Env:
     '''Global variables and properties for the package.'''
-    # HUGFACE = 'https://{domain}/{owner_repo}/resolve/main/'
+
+    def __init__(self) -> None:
+        self.aria_process = None
+
     @cached_property
-    def is_mirror(cls):
+    def is_mirror(self):
         _is = is_need_mirror()
         if _is:
             set_mirror('uv')
         return _is
 
     @cached_property
-    def HF(cls): return HfApi(endpoint=cls.domain_hf)
+    def HF(self): return HfApi(endpoint=self.domain_hf)
 
     @cached_property
-    def domain_hf(cls):
-        DOMAIN_HF = 'hf-mirror.com' if cls.is_mirror else 'huggingface.co'
+    def aria(self):
+        from .aria import get_aria
+        a = run_async(get_aria())
+        self.aria_process = a[1]
+        return a[0]
+
+    @cached_property
+    def domain_hf(self):
+        DOMAIN_HF = 'hf-mirror.com' if self.is_mirror else 'huggingface.co'
         DOMAIN_HF = 'https://' + DOMAIN_HF
         return DOMAIN_HF
 
     @cache
-    def mod(cls, Dir: Literal['install', 'lib', 'runs']):
+    def mod(self, Dir: Literal['install', 'lib', 'runs']):
         '''lru_cache! Example: `Env.mod('install')['gvhmr']()`'''
         import importlib
         files = os.listdir(Path(__file__, '..', '..', Dir).resolve())

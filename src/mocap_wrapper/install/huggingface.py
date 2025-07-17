@@ -12,7 +12,7 @@ IS_DEBUG = is_debug(Log)
 HF_MAIN = 'https://huggingface.co/{}/tree/main'
 TYPE_HUGFACE = TYPE_RUNS | Literal['smplx', 'hamer', 'hawor']   # TODO: remove hamer/hawor if supported in run
 TYPE_FILE_RUN_DIR = dict[str, dict[TYPE_HUGFACE, str]]
-RUN_TO_REPOS: dict[TYPE_RUNS, list[TYPE_HUGFACE]] = {
+RUN_TO_REPOS: dict[TYPE_HUGFACE, list[TYPE_HUGFACE]] = {
     'gvhmr': ['smplx'],
     'dynhamr': ['hamer', 'hawor'],
 }
@@ -29,6 +29,7 @@ REGEX: dict[TYPE_HUGFACE, str] = {
     'gvhmr': r'^(?!preproc_data|\.).*',
     'wilor': r'^(?!.*wilor_vit\.onnx).*',
     'hamer': r'_DATA',
+    'hawor': r'.*\.yaml',  # TODO: for test only
 }
 LOCAL_REMAP: TYPE_FILE_RUN_DIR = {
     'SMPL_NEUTRAL.pkl': {
@@ -51,7 +52,7 @@ LOCAL_REMAP: TYPE_FILE_RUN_DIR = {
     # TODO: hmp_model/...
 
 }
-REPO_TO_LOCAL_PREFIX: dict[TYPE_RUNS, str] = {
+REPO_TO_LOCAL_PREFIX: dict[TYPE_HUGFACE, str] = {
     'gvhmr': 'inputs/checkpoints',
     'wilor': 'wilor_mini',
     'dynhamr': '_DATA',
@@ -65,7 +66,7 @@ class _File:
     locals: list[Path] = field(default_factory=list)
 
 
-async def i_hugging_face(*run: TYPE_RUNS, concurrent=2):
+async def i_hugging_face(*run: TYPE_HUGFACE, concurrent=2):
     '''Download models from Hugging Face. `Dir` depends on `CONFIG`'''
     Log.info(f"📦 Download {run} models (📝 By downloading, you agree to the corresponding licences)")
     repos: list[TYPE_HUGFACE] = list(run)
@@ -90,6 +91,13 @@ async def i_hugging_face(*run: TYPE_RUNS, concurrent=2):
             Rpath = Path(str_path)
             run_dir = LOCAL_REMAP.get(Rpath.name, {})
             _locals: list[Path] = []
+            if (repo_in_run := repo in run):
+                # 当 gvhmr 仅需要 gvhmr 仓库时
+                _locals += [Path(
+                    CONFIG.get(repo, ''),
+                    REPO_TO_LOCAL_PREFIX.get(repo, ''),
+                    Rpath
+                )]
             if (is_run_dir := set(run).intersection(set(run_dir.keys()))):
                 # 当 gvhmr 需要 smplx 仓库时
                 _locals += [Path(
@@ -97,16 +105,9 @@ async def i_hugging_face(*run: TYPE_RUNS, concurrent=2):
                     REPO_TO_LOCAL_PREFIX.get(_run, ''),  # type: ignore
                     dir, Rpath.name
                 ) for _run, dir in run_dir.items()]
-            if (is_run := repo in run):
-                # 当 gvhmr 仅需要 gvhmr 仓库时
-                _locals += [Path(
-                    CONFIG.get(repo, ''),
-                    REPO_TO_LOCAL_PREFIX.get(repo, ''),
-                    Rpath
-                )]
-            if not (is_run_dir or is_run):
+            if not (is_run_dir or repo_in_run):
                 continue
-            Log.debug(f'{repo=}\t{_locals=}')
+            Log.debug(f'{repo=} {repo_in_run=},{is_run_dir=}\t{_locals=}')
             _file = _files.setdefault(Rpath.name, _File())
             _file.remotes.setdefault(repo, []).append(Rpath)
             _file.locals.extend(_locals)
@@ -121,19 +122,21 @@ async def i_hugging_face(*run: TYPE_RUNS, concurrent=2):
 
     @copy_args(HfApi.hf_hub_download)
     async def dl(self=Env.HF, *args, dsts: list[Path], **kwargs):
+        _dst = dsts[0]
+        filename = str(kwargs.get('filename', args[1] if len(args) > 1 else ''))
+        _dir = Path() if Path(filename) == _dst else _dst   # TODO: hf_hub_download replicate file structure! like dpvo/dpvo/dpvo.ckpt
+        _dir = _dir if _dir.is_dir() else _dir.parent
         if IS_DEBUG:
-            print('⬇️', kwargs, f'{dsts=}')
+            print('⬇', kwargs, f'{dsts=} {locals()=}')
             return
         if not dsts:
             Log.error(f"No destination paths provided for {kwargs=}{args=}")
             return
-        _dst = dsts[0]
-        _dir = _dst if _dst.is_dir() else _dst.parent
         kwargs.setdefault('local_dir', _dir)
         async with semaphore:
-            p = await asyncio.to_thread(self.hf_hub_download, *args, **kwargs)
-            os_link(p, dsts[1:])
-            return p
+            src = await asyncio.to_thread(self.hf_hub_download, *args, **kwargs)
+            os_link(src, dsts[1:])
+            return src
 
     tasks = []
     exceptions = []
@@ -150,8 +153,7 @@ async def i_hugging_face(*run: TYPE_RUNS, concurrent=2):
                 exceptions.append(e)
         else:
             tasks.append(dl(
-                Env.HF, repo_id=repo_id, filename=fname,
-                subfolder='/'.join(rpath.parent.parts), dsts=dsts))    # type: ignore
+                Env.HF, repo_id=repo_id, filename=str(rpath), dsts=dsts))    # type: ignore
     _, files, _e = await gather(tasks, f'Download models {run}')
     exceptions.extend(_e)
     if exceptions:
@@ -177,7 +179,7 @@ def _get_exists_andNot(paths: Sequence[Path]):
             not_exists.append(p)
     return exists, not_exists
 
-
+# HUGFACE = 'https://{domain}/{owner_repo}/resolve/main/'
 # async def i_hugging_face_aria2(key: TYPE_HUGFACE):
 #     Log.info(f"📦 Download {key} models (📝 By downloading, you agree to the corresponding licences)")
 #     HUG_FACE = HUGFACE.format(domain=DOMAIN_HF, owner_repo=OWNER_REPO[key])
@@ -191,5 +193,7 @@ def _get_exists_andNot(paths: Sequence[Path]):
 #     if not get_uncomplete(dls):
 #         Log.info(f"✔ Download {key} models")
 
+
 if __name__ == '__main__':
-    asyncio.run(i_hugging_face('dynhamr', 'gvhmr', 'wilor'))
+    # asyncio.run(i_hugging_face('dynhamr', 'gvhmr', 'wilor'))
+    asyncio.run(i_hugging_face('hawor'))
