@@ -124,7 +124,7 @@ async def i_hugging_face(*run: TYPE_HUGFACE, concurrent=2):
     async def dl(self=Env.HF, *args, dsts: list[Path], **kwargs):
         _dst = dsts[0]
         filename = str(kwargs.get('filename', args[1] if len(args) > 1 else ''))
-        _dir = Path() if Path(filename) == _dst else _dst   # TODO: hf_hub_download replicate file structure! like dpvo/dpvo/dpvo.ckpt
+        _dir = _dst.resolve().parent if Path(filename).parent == _dst.parent.name else _dst   # TODO: hf_hub_download replicate file structure! like dpvo/dpvo/dpvo.ckpt
         _dir = _dir if _dir.is_dir() else _dir.parent
         if IS_DEBUG:
             print('⬇', kwargs, f'{dsts=} {locals()=}')
@@ -132,10 +132,13 @@ async def i_hugging_face(*run: TYPE_HUGFACE, concurrent=2):
         if not dsts:
             Log.error(f"No destination paths provided for {kwargs=}{args=}")
             return
-        kwargs.setdefault('local_dir', _dir)
+        kwargs.setdefault('local_dir', str(_dir))
         async with semaphore:
             src = await asyncio.to_thread(self.hf_hub_download, *args, **kwargs)
-            os_link(src, dsts[1:])
+            if Path(src) != _dst:
+                import shutil
+                shutil.move(src, _dst)
+            os_link(_dst, dsts[1:])
             return src
 
     tasks = []

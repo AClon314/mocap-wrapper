@@ -130,7 +130,7 @@ def download(
     files = [d for d in file if not d.exists()]
     if files:
         _info = [f'({f.path},{f.urls})\t' for f in files] if IS_DEBUG else [str(f.path.name) for f in files]
-        Log.debug(f'⬇ {_info}') if IS_DEBUG else Log.info(f'⬇ {"\t".join(_info)}')
+        Log.debug(f'⬇ {_info}')
     dls = []
     for f in files:
         _options = {**_OPT, **options, 'dir': str(f.path.parent), 'out': str(f.path.name)}

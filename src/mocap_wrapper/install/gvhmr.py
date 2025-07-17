@@ -16,7 +16,7 @@ async def i_gvhmr(Dir: str | Path = CONFIG[_STEM]):
     link_config(Dir)
     os.makedirs(Path(Dir, 'inputs', 'checkpoints', 'body_models'), exist_ok=True)
     coros = [
-        i_python_env(Dir=Dir, pixi_toml='gvhmr.toml'),
+        i_python_env(Dir=Dir, pixi_toml='gvhmr.toml'),  # TODO mirror keep same toml
         i_dl_models(),
         # run_1by1([git_pull(Dir=Dir), i_dpvo(Dir=Path(Dir, 'third-party/DPVO'))])
     ]
