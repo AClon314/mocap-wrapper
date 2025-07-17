@@ -6,9 +6,8 @@ import os
 import sys
 import json
 import logging
-from numpy import isin
 from tqdm import tqdm
-from typing import Any, Callable, Coroutine, ParamSpec, TypeVar, cast
+from typing import Any, Callable, ParamSpec, TypeVar, cast
 _LOG_KEYS = ['LOG', 'LOGLEVEL', 'LOG_LEVEL']
 _LOGLEVEL = [os.environ.get(k) for k in _LOG_KEYS]
 _LOGLEVEL = [x for x in _LOGLEVEL if x is not None]
@@ -31,6 +30,7 @@ _LEVEL_PREFIX = {
 }
 _PS = ParamSpec("_PS")
 _TV = TypeVar("_TV")
+def is_debug(Log: logging.Logger): return Log.isEnabledFor(logging.DEBUG)
 
 
 def copy_args(
@@ -40,34 +40,6 @@ def copy_args(
     def return_func(func: Callable[..., _TV]) -> Callable[_PS, _TV]:
         return cast(Callable[_PS, _TV], func)
     return return_func
-
-
-async def run_1by1(coros: list[Coroutine], raise_if_none=True, raise_if_return0=True):
-    results: list[Any] = []
-    exception = None
-    for coro in coros:
-        Log.debug(f'{coro=}')
-        try:
-            if isinstance(coro, Coroutine):
-                ret = await coro
-            elif callable(coro):
-                ret = coro()
-            else:
-                ret = coro
-
-            if raise_if_none and ret is None:
-                raise ValueError(f'{coro} returned None')
-            if hasattr(ret, 'get_status') and callable(ret.get_status):
-                returncode = ret.get_status()
-                Log.debug(f'{returncode=}')
-                if raise_if_return0 and returncode != 0:
-                    raise RuntimeError(ret)
-            results.append(ret)
-        except Exception as e:
-            exception = e
-            Log.exception('', exc_info=e) if IS_DEBUG else None
-            break
-    return results, exception
 
 
 class CustomFormatter(logging.Formatter):

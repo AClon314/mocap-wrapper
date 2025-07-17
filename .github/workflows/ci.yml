@@ -35,19 +35,23 @@ jobs:
         run: python src/mocap_wrapper/install/pixi.py -y #| tee ./.log/init.log
 
       - name: set CN mirror
-        if: ${{ env.ACT == 'true' }}
+        if: ${{ env.ACT == 'true' && env.SKIP == '' }}
         run: grep -q "mirror" /etc/apt/sources.list || curl -I https://www.google.com/ --max-time 4 || bash <(curl -sSL https://gitee.com/SuperManito/LinuxMirrors/raw/main/ChangeMirrors.sh) --source mirrors.aliyun.com --protocol http --use-intranet-source false --backup true --upgrade-software false --clean-cache false --ignore-backup-tips
 
       - name: apt upgrade
-        if: ${{ env.ACT == 'true' }}
+        if: ${{ env.ACT == 'true' && env.SKIP == '' }}
         run: sudo apt update && sudo apt upgrade -y
 
       #  This will remove unnecessary files to free up space. This has done because some package needs more space to install. e.g.) torch
       # - name: Cleanup
       #   run: rm -rf /opt/hostedtoolcache ; sudo apt-get clean ; sudo apt-get autoremove -y ; sudo rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
 
-      - name: (install 7z,aria2c,gvhmr,wilor) mocap --install
+      - name: (install 7z,aria2c) mocap --install
         run: . ~/.profile && mocap --install -b '' # 2>&1 | tee ./.log/install.log
+
+      - name: (install gvhmr) mocap --install -b gvhmr
+        if: ${{ env.ACT == 'true' }}
+        run: . ~/.profile && mocap --install -b gvhmr # 2>&1 | tee ./.log/install.log
 
       #  `-rs` flag is used to debug for the test failure
       # - name: pytest

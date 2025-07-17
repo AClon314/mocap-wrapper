@@ -6,8 +6,9 @@ from dataclasses import dataclass, field
 from huggingface_hub import HfApi
 from typing import Literal, Sequence
 from .static import TYPE_RUNS, gather
-from ..lib import Env, CONFIG, IS_DEBUG, copy_args, getLogger
+from ..lib import Env, CONFIG, is_debug, copy_args, getLogger
 Log = getLogger(__name__)
+IS_DEBUG = is_debug(Log)
 HF_MAIN = 'https://huggingface.co/{}/tree/main'
 TYPE_HUGFACE = TYPE_RUNS | Literal['smplx', 'hamer', 'hawor']   # TODO: remove hamer/hawor if supported in run
 TYPE_FILE_RUN_DIR = dict[str, dict[TYPE_HUGFACE, str]]

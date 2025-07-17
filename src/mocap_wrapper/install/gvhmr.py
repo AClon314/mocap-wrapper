@@ -2,34 +2,34 @@ import os
 from pathlib import Path
 from .static import gather, i_python_env, Git
 from .huggingface import i_hugging_face
-from ..lib import TIMEOUT_MINUTE, TIMEOUT_QUATER, RUNS_REPO, CONFIG, IS_DEBUG, getLogger, get_uncomplete, run_tail, res_path, File, download, unzip
+from ..lib import TIMEOUT_QUATER, RUNS_REPO, CONFIG, is_debug, getLogger, get_uncomplete, run_tail, res_path, File, download, unzip
 Log = getLogger(__name__)
+IS_DEBUG = is_debug(Log)
 _STEM = 'gvhmr'
 _name_ = RUNS_REPO[_STEM]
 
 
 async def i_gvhmr(Dir: str | Path = CONFIG[_STEM]):
     Log.info(f"📦 Install {_name_} at {CONFIG[_STEM]}")
-    os.makedirs(Dir, exist_ok=True)
-    if not Path(Dir).exists():
+    if not Path(Dir, '.git').exists():
         await Git(['clone', 'https://github.com/zju3dv/GVHMR', str(Dir)])
     link_config(Dir)
-    # dir_checkpoints = str(Path(Dir, 'inputs', 'checkpoints'))
-    # os.makedirs(Path(dir_checkpoints, 'body_models'), exist_ok=True)
-
-    tasks = [
+    os.makedirs(Path(Dir, 'inputs', 'checkpoints', 'body_models'), exist_ok=True)
+    coros = [
         i_python_env(Dir=Dir, pixi_toml='gvhmr.toml'),
         i_dl_models(),
         # git_pull(Dir=Dir),
         # i_dpvo(Dir=Path(Dir, 'third-party/DPVO')),
     ]
-    return await gather(tasks, f'Installed {_name_}')
+    return await gather(coros, f'Installed {_name_}')
 
 
 def link_config(Dir: Path | str = CONFIG[_STEM], file='gvhmr.yaml'):
     src = res_path(module='install', file=file)
     dst = Path(Dir, 'hmr4d', 'configs', file)
-    if dst.exists() and dst.readlink() == src:
+    src_text = src.read_text(encoding='utf-8')
+    dst_text = dst.read_text(encoding='utf-8') if dst.exists() else ''
+    if src_text == dst_text:
         return
     try:
         os.link(src, dst)

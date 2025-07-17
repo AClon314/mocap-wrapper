@@ -10,8 +10,7 @@ _name_ = RUNS_REPO[_STEM]
 
 async def i_dynhamr(Dir: Path | str = CONFIG[_STEM]):
     Log.info(f"📦 Install {_name_}")
-    os.makedirs(Dir, exist_ok=True)
-    if not Path(Dir).exists():
+    if not Path(Dir, '.git').exists():
         await Git(['clone', 'https://github.com/ZhengdiYu/Dyn-HaMR', str(Dir)])
     tasks = [
         i_thirdparty(Dir=Dir),

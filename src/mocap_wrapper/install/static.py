@@ -4,9 +4,10 @@ import asyncio
 import itertools
 from pathlib import Path
 from signal import SIGTERM
-from ..lib import getLogger, run_tail, res_path, get_cmds, wait_all_dl, i_pkgs, Aria_process, TIMEOUT_QUATER, TIMEOUT_MINUTE, TYPE_RUNS, Env
+from ..lib import getLogger, run_tail, res_path, get_cmds, wait_all_dl, i_pkgs, Aria_process, is_debug, TIMEOUT_QUATER, TIMEOUT_MINUTE, TYPE_RUNS, Env
 from typing import Coroutine, Generator, Sequence, Any
 Log = getLogger(__name__)
+IS_DEBUG = is_debug(Log)
 try:
     from mirror_cn import replace_github_with_mirror
 except ImportError:
@@ -42,13 +43,13 @@ async def i_python_env(Dir: str | Path, pixi_toml='gvhmr.toml', env=['default'],
     '''when `use_mirror` is None, use `Env.is_mirror`'''
     _toml = str(res_path(file=pixi_toml))
     pixi_toml = Path(Dir, 'pixi.toml')
-    # if (txt := Path(Dir, 'requirements.txt')).exists():
-    #     shutil.move(txt, Path(Dir, 'requirements.txt.bak'))
     use_mirror = Env.is_mirror if use_mirror is None else use_mirror
     timeout = 4 if Env.is_mirror and use_mirror else TIMEOUT_QUATER  # fail quickly if CN use github.com
+    Log.debug(f'{locals()=}')
     iter_github = [(_toml, 'github.com')]
     iters = itertools.chain(iter_github, replace_github_with_mirror(file=str(_toml))) if use_mirror else iter_github
-    for file, _ in iters:
+    for file, github_mirror in iters:
+        Log.debug(f'{github_mirror=}, {file=}')
         if pixi_toml.exists():
             os.remove(pixi_toml)
         shutil.copy(file, pixi_toml)
@@ -61,14 +62,18 @@ async def i_python_env(Dir: str | Path, pixi_toml='gvhmr.toml', env=['default'],
         timeout = TIMEOUT_QUATER
 
 
-async def Git(cmd: Sequence[str], retry=True):
-    '''with mirror_cn, return None when failed.'''
-    Log.debug(f'{cmd=}')
-    if Env.is_mirror:    # 128 means existed
+async def Git(cmd: Sequence[str], timeout: float | None = TIMEOUT_MINUTE, retry=True, Raise=True):
+    '''with mirror_cn'''
+    Log.debug(f'Git {cmd=}')
+    if Env.is_mirror:
         from mirror_cn import git
-        p = await asyncio.to_thread(git, *cmd, retry=retry)
+        p = await asyncio.to_thread(git, *cmd, retry=retry, timeout=timeout)
+        if Raise and p is None:
+            raise RuntimeError(f"Git failed: {' '.join(cmd)}")
     else:
-        p = await run_tail(['git', *cmd]).Await(TIMEOUT_MINUTE)
+        p = await run_tail(['git', *cmd]).Await(timeout)
+        if Raise and p.get_status() not in [0, 128]:
+            raise RuntimeError(f"Git failed: {' '.join(cmd)}", p)
     return p
 
 
@@ -99,3 +104,31 @@ async def gather(coros: Sequence[Coroutine], success_msg=''):
     else:
         Log.info(f"✔ {success_msg}") if success_msg else None
     return _results, results, exceptions
+
+
+async def run_1by1(coros: list[Coroutine], raise_if_none=True, raise_if_return0=True):
+    results: list[Any] = []
+    exception = None
+    for coro in coros:
+        Log.debug(f'{coro=}')
+        try:
+            if isinstance(coro, Coroutine):
+                ret = await coro
+            elif callable(coro):
+                ret = coro()
+            else:
+                ret = coro
+
+            if raise_if_none and ret is None:
+                raise ValueError(f'{coro} returned None')
+            if hasattr(ret, 'get_status') and callable(ret.get_status):
+                returncode = ret.get_status()
+                Log.debug(f'{returncode=}')
+                if raise_if_return0 and returncode != 0:
+                    raise RuntimeError(ret)
+            results.append(ret)
+        except Exception as e:
+            exception = e
+            Log.exception('', exc_info=e) if IS_DEBUG else None
+            break
+    return results, exception

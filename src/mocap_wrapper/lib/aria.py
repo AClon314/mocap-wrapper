@@ -9,9 +9,10 @@ from pathlib import Path
 from datetime import timedelta
 from typing import Callable, Literal, Sequence, TypedDict, Unpack, get_args
 from .static import TIMEOUT_SECONDS, CONCURRENT
-from .logger import IS_DEBUG, getLogger
+from .logger import is_debug, getLogger
 from .pkg_mgr import i_pkgs
 Log = getLogger(__name__)
+IS_DEBUG = is_debug(Log)
 _INTERVAL = 0.5
 TYPE_HASH = Literal['md5', 'sha1', 'sha256', 'sha512', 'shake_128', 'shake_256']
 HASH = get_args(TYPE_HASH)

@@ -5,9 +5,10 @@ import asyncio
 from ffmpeg import probe as ffprobe
 from fractions import Fraction
 from datetime import datetime, timedelta
-from .logger import IS_DEBUG, getLogger
+from .logger import IS_DEBUG, is_debug, getLogger
 from typing import Any, Literal
 Log = getLogger(__name__)
+IS_DEBUG = is_debug(Log)
 
 
 def is_vbr(metadata: dict[str, Any], codec_type: Literal['video', 'audio'] = 'video'):

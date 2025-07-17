@@ -13,12 +13,11 @@ import asyncio
 from math import inf
 from pathlib import Path
 from typing import Coroutine, Literal, Sequence
-
-from numpy import isin
-from .logger import Log, getLogger
+from .logger import Log, getLogger, is_debug
 from .static import TYPE_RUNS, copy_args, TIMEOUT_MINUTE, res_path
 from .config import CONFIG
 Log = getLogger(__name__)
+IS_DEBUG = is_debug(Log)
 _RUN_ID = 0
 _INTERVAL = 0.1
 _RE_CTRL_ASCII = re.compile(r'\x1b\[[0-9;]*m')
@@ -35,6 +34,19 @@ def get_coro_sig(coro) -> tuple[str, dict]:
     func_name = coro.__qualname__
     args = coro.cr_frame.f_locals
     return func_name, args
+
+
+def set_status(self: 'aexpect.Spawn', status: int, timeout: float = 1):
+    from aexpect.shared import wait_for_lock
+    b = wait_for_lock(self.lock_server_running_filename, timeout=timeout)   # type: ignore
+    if not b:
+        Log.error(f'wait_for_lock exceed {timeout=}: {locals()=}')
+        return
+    try:
+        with open(self.status_filename, "w", encoding="utf-8") as status_file:
+            status_file.write(str(status))
+    except IOError as e:
+        Log.exception('', exc_info=e) if IS_DEBUG else None
 
 
 async def Await(self: 'aexpect.Spawn', timeout: int | float | None = None, interval=_INTERVAL):
@@ -56,10 +68,12 @@ async def Await(self: 'aexpect.Spawn', timeout: int | float | None = None, inter
     timeout = abs(timeout)
     while self.is_alive() and (is_inf or no_kill or timer < timeout):
         await asyncio.sleep(interval)
+        # Log.debug(f'{locals()=}\n\n\n\n\n')
         timer += interval
     if self.is_alive():
         if not no_kill:
             self.kill()
+            set_status(self, -9)    # patch fix
         else:
             Log.warning(f'Still running after {timeout=}: {self}')
     else:
@@ -71,6 +85,11 @@ aexpect.Spawn.Await = Await  # type: ignore[method-assign]
 class Spawn(aexpect.Spawn):
     @copy_args(Await)
     async def Await(self, *args, **kwargs): return await Await(self, *args, **kwargs)
+    @property
+    def status(self): return self.get_status()
+    @status.setter
+    @copy_args(set_status)
+    def status(self, status: int): return set_status(self, status)
 
 
 class Tail(aexpect.Tail, Spawn):
