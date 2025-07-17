@@ -73,11 +73,13 @@ async def Await(self: 'aexpect.Spawn', timeout: int | float | None = None, inter
     if self.is_alive():
         if not no_kill:
             self.kill()
-            set_status(self, -9)    # patch fix
+            set_status(self, 128 + 15)    # SIGTERM, fix aexpect always return 0 even if killed
         else:
             Log.warning(f'Still running after {timeout=}: {self}')
     else:
-        Log.debug(f'{timer=}')
+        Log.debug(f'{locals()=}')
+        if self.get_status() == 128 + 9:    # SIGKILL
+            Log.error('The process is forced to be terminated by the system (-9), which may be caused by insufficient memory (OOM). Please check the system memory or issue to developer. 进程被系统强制终止（-9），可能是内存不足（OOM）导致，请检查系统内存或联系开发者。')
     return self
 aexpect.Spawn.Await = Await  # type: ignore[method-assign]
 

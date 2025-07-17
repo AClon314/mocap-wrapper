@@ -49,7 +49,7 @@ async def i_python_env(Dir: str | Path, pixi_toml='gvhmr.toml', env=['default'],
     iter_github = [(_toml, 'github.com')]
     iters = itertools.chain(iter_github, replace_github_with_mirror(file=str(_toml))) if use_mirror else iter_github
     for file, github_mirror in iters:
-        Log.debug(f'{github_mirror=}, {file=}')
+        Log.debug(f'{github_mirror=}, {timeout=}, {file=}')
         if pixi_toml.exists():
             os.remove(pixi_toml)
         shutil.copy(file, pixi_toml)
@@ -59,6 +59,8 @@ async def i_python_env(Dir: str | Path, pixi_toml='gvhmr.toml', env=['default'],
         p = await run_tail(cmd).Await(timeout)
         if p.get_status() == 0:
             return p
+        elif p.get_status() == 128 + 9:  # OOM
+            return
         timeout = TIMEOUT_QUATER
 
 
