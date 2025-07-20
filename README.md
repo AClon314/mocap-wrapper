@@ -121,7 +121,7 @@ p[pixi]
 u[uv]
 m[mocap]
 p --global install--> u
-u --global venv--> m
+u --global ~/.venv--> m
 p --search_dir--> gvhmr,wilor...
 m --> 7z,aria2c,ffmpeg...
 ```

@@ -93,7 +93,7 @@ git submodule update --init --recursive
     os.chdir(_dir) if Dir else None
 
 
-async def gather(coros: Sequence[Coroutine], success_msg=''):
+async def gather(coros: Sequence[Coroutine], success_msg='', Raise=False):
     '''gather, notify by `Log.info/Log.exception`'''
     Log.debug(f'{coros=}')
     if not coros:   # fix: gather(*coros) will stuck when coros=[]
@@ -102,7 +102,10 @@ async def gather(coros: Sequence[Coroutine], success_msg=''):
     exceptions = [r for r in _results if isinstance(r, Exception)]
     results = [r for r in _results if not isinstance(r, BaseException)]
     if exceptions:
-        [Log.exception('', exc_info=e) for e in exceptions]
+        if Raise:
+            raise ExceptionGroup('', exceptions) if len(exceptions) > 1 else exceptions[0]
+        else:
+            [Log.exception('', exc_info=e) for e in exceptions]
     else:
         Log.info(f"✔ {success_msg}") if success_msg else None
     return _results, results, exceptions

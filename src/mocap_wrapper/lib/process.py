@@ -10,12 +10,12 @@ import re
 import shlex
 import aexpect
 import asyncio
-from math import inf
 from pathlib import Path
-from typing import Coroutine, Literal, Sequence
+from typing import Literal, Sequence
 from .logger import Log, getLogger, is_debug
-from .static import TYPE_RUNS, copy_args, TIMEOUT_MINUTE, res_path
+from .static import TYPE_RUNS, copy_args, res_path
 from .config import CONFIG
+INF = float('inf')
 Log = getLogger(__name__)
 IS_DEBUG = is_debug(Log)
 _RUN_ID = 0
@@ -60,7 +60,7 @@ async def Await(self: 'aexpect.Spawn', timeout: int | float | None = None, inter
     timer = 0
     if timeout is None:
         is_inf = True
-        timeout = inf
+        timeout = INF
     else:
         is_inf = False
     no_kill = timeout < 0
