@@ -25,7 +25,7 @@ def i_thirdparty(Dir: Path | str = CONFIG[_STEM]):
         i_dpvo(),
     ]
     if not Path(Dir, "third-party", "DROID-SLAM", "setup.py").exists():
-        queue.insert(0, git_pull())
+        queue.insert(0, git_pull(Dir=Dir))
     return run_1by1(queue)
 
 

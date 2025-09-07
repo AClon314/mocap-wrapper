@@ -17,7 +17,7 @@ dependencies = [
   "mirror_cn @ git+https://gitee.com/aclon314/mirror-cn.git",
   "aria2p[tui]",
   "aiohttp",
-  "aexpect @ git+https://github.com/avocado-framework/aexpect.git", # TODO: don't use git when v1.7.1 released
+  "aexpect>=1.8",
   "platformdirs",
   "huggingface_hub",
   "typed-ffmpeg", ## mamba failed:
