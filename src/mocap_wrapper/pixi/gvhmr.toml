@@ -1,7 +1,8 @@
 [workspace]
 channels = ["nvidia", "pytorch", "conda-forge"]
-platforms = ["linux-64"] # TODO: add in python
-version = "2025.07.17"
+platforms = ["linux-64", "win-64"]
+version = "2025.10.03"
+
 [environments]
 default = ["gpu", "dev"]
 # cpu = ["cpu"]
@@ -9,19 +10,19 @@ default = ["gpu", "dev"]
 [feature.gpu.system-requirements]
 cuda = "12.1"
 [feature.gpu.target.linux-64.pypi-dependencies]
-pytorch3d = {url = "https://github.com/MiroPsota/torch_packages_builder/releases/download/pytorch3d-0.7.8/pytorch3d-0.7.8+pt2.3.0cu121-cp310-cp310-linux_x86_64.whl"}
+pytorch3d = { url = "https://github.com/MiroPsota/torch_packages_builder/releases/download/pytorch3d-0.7.8/pytorch3d-0.7.8+pt2.3.0cu121-cp310-cp310-linux_x86_64.whl" }
 # pytorch3d = {url = "https://dl.fbaipublicfiles.com/pytorch3d/packaging/wheels/py310_cu121_pyt230/pytorch3d-0.7.0-cp310-cp310-linux_x86_64.whl"}
 [feature.gpu.target.win-64.pypi-dependencies]
-pytorch3d = {url = "https://github.com/MiroPsota/torch_packages_builder/releases/download/pytorch3d-0.7.8/pytorch3d-0.7.8+pt2.3.0cu121-cp310-cp310-win_amd64.whl"}
+pytorch3d = { url = "https://github.com/MiroPsota/torch_packages_builder/releases/download/pytorch3d-0.7.8/pytorch3d-0.7.8+pt2.3.0cu121-cp310-cp310-win_amd64.whl" }
 [feature.cpu.pypi-dependencies]
-torch = {version = "==2.3.0", index = "https://download.pytorch.org/whl/cpu"}
-torchvision = {version = "==0.18.0", index = "https://download.pytorch.org/whl/cpu"}
+torch = { version = "==2.3.0", index = "https://download.pytorch.org/whl/cpu" }
+torchvision = { version = "==0.18.0", index = "https://download.pytorch.org/whl/cpu" }
 [feature.cpu.target.linux-64.pypi-dependencies]
-pytorch3d = {url = "https://github.com/MiroPsota/torch_packages_builder/releases/download/pytorch3d-0.7.8/pytorch3d-0.7.8+pt2.3.0cpu-cp310-cp310-linux_x86_64.whl"}
+pytorch3d = { url = "https://github.com/MiroPsota/torch_packages_builder/releases/download/pytorch3d-0.7.8/pytorch3d-0.7.8+pt2.3.0cpu-cp310-cp310-linux_x86_64.whl" }
 [feature.cpu.target.win-64.pypi-dependencies]
-pytorch3d = {url = "https://github.com/MiroPsota/torch_packages_builder/releases/download/pytorch3d-0.7.8/pytorch3d-0.7.8+pt2.3.0cpu-cp310-cp310-win_amd64.whl"}
+pytorch3d = { url = "https://github.com/MiroPsota/torch_packages_builder/releases/download/pytorch3d-0.7.8/pytorch3d-0.7.8+pt2.3.0cpu-cp310-cp310-win_amd64.whl" }
 [feature.cpu.target.osx-arm64.pypi-dependencies]
-pytorch3d = {url = "https://github.com/MiroPsota/torch_packages_builder/releases/download/pytorch3d-0.7.8/pytorch3d-0.7.8+pt2.3.0cpu-cp310-cp310-macosx_11_0_universal2.whl"}
+pytorch3d = { url = "https://github.com/MiroPsota/torch_packages_builder/releases/download/pytorch3d-0.7.8/pytorch3d-0.7.8+pt2.3.0cpu-cp310-cp310-macosx_11_0_universal2.whl" }
 # [feature.cpu.target.osx-64.pypi-dependencies]
 # pytorch3d = {url = "https://github.com/MiroPsota/torch_packages_builder/releases/download/pytorch3d-0.7.8/pytorch3d-0.7.8+pt2.2.2cpu-cp310-cp310-macosx_12_0_x86_64.whl"}# ⚠️ pytorch 2.2.2 != 2.3.0
 
@@ -31,50 +32,50 @@ python = "3.10.*"
 toml = "*"
 
 hydra-core = ">=1.3" # config & logging
-hydra-zen = "*" 
-rich = "*" 
+hydra-zen = "*"
+rich = "*"
 
-av = "*" # imageio[pyav], improved performance over imageio[ffmpeg]
-black = "*" 
-einops = "*" 
-ffmpeg-python = "*" 
-imageio = ">=2.34.1" 
-ipdb = "*" 
-joblib = "*" 
-matplotlib = "*" 
-numpy = "*" 
-opencv = "*" 
-setuptools = ">=68.0" 
+av = "*"              # imageio[pyav], improved performance over imageio[ffmpeg]
+black = "*"
+einops = "*"
+ffmpeg-python = "*"
+imageio = ">=2.34.1"
+ipdb = "*"
+joblib = "*"
+matplotlib = "*"
+numpy = "*"
+opencv = "*"
+setuptools = ">=68.0"
 
 pycolmap = "*" # 3D-Vision
-trimesh = "*" 
+trimesh = "*"
 
 # fix build errors:
 cython = "*" # cython-bbox 
-pip = "*" # chumpy
+pip = "*"    # chumpy
 # fix strict channel priority:
-ffmpeg = {version = "*", channel = "conda-forge"}
-libjpeg-turbo = {version = "*", channel = "conda-forge"}
+ffmpeg = { version = "*", channel = "conda-forge" }
+libjpeg-turbo = { version = "*", channel = "conda-forge" }
 
 packaging = "24.*" # fix: lightning dep
-yacs = "*" # fix ModuleNotFoundError
+yacs = "*"         # fix ModuleNotFoundError
 [pypi-options]
 no-build-isolation = ["chumpy", "cython_bbox"]
 [pypi-dependencies]
-gvhmr = {path = ".", editable = true}
+gvhmr = { path = ".", editable = true }
 
 lightning = "==2.3.0"
 timm = "==0.9.12"
-torch = {version = "==2.3.0", index = "https://download.pytorch.org/whl/cu121"}
-torchvision = {version = "==0.18.0", index = "https://download.pytorch.org/whl/cu121"}
+torch = { version = "==2.3.0", index = "https://download.pytorch.org/whl/cu121" }
+torchvision = { version = "==0.18.0", index = "https://download.pytorch.org/whl/cu121" }
 
-chumpy = {git = "https://github.com/mattloper/chumpy"}# 3D-Vision
+chumpy = { git = "https://github.com/mattloper/chumpy" } # 3D-Vision
 smplx = "*"
 wis3d = "*"
 
-cython_bbox = "*" #2D-Pose, YOLO
-lapx = "*" 
-ultralytics = ">=8.2.42" 
+cython_bbox = "*"        #2D-Pose, YOLO
+lapx = "*"
+ultralytics = ">=8.2.42"
 
 hydra_colorlog = "*" # logging
 
@@ -93,4 +94,4 @@ plotly = "*" # data_viewer.ipynb
 numba = "*"
 [feature.dpvo.pypi-dependencies]
 pypose = "*"
-pytorch-scatter = {version = "*", index = "https://data.pyg.org/whl/torch-2.3.0+cu121.html"}
+pytorch-scatter = { version = "*", index = "https://data.pyg.org/whl/torch-2.3.0+cu121.html" }
