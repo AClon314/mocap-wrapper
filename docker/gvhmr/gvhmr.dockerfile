@@ -10,6 +10,7 @@ RUN git clone https://github.com/zju3dv/GVHMR /gvhmr
 WORKDIR /gvhmr
 COPY ${IMAGE}/${IMAGE}.yaml hmr4d/configs/
 COPY lib.py ${IMAGE}/${IMAGE}.py ${IMAGE}/pixi.toml .
+RUN pixi global install --environment build-essential gcc g++ make libcxx
 RUN pixi install --quiet
 
 RUN pixi global install pip
