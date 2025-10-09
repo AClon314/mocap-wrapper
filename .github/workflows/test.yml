@@ -1,13 +1,18 @@
-name: CI
+name: test
 on:
   workflow_dispatch:
-
   push:
-    branches:
-      - master
+    branches: ['main']
+    paths:
+      - 'src/mocap_wrapper/**'
+      - 'tests/**'
+      - '.github/workflows/test.yml'
   pull_request:
-    branches:
-      - master
+    branches: ['main']
+    paths:
+      - 'src/mocap_wrapper/**'
+      - 'tests/**'
+      - '.github/workflows/test.yml'
 
 jobs:
   test:
@@ -17,10 +22,6 @@ jobs:
         #  Update python version matrix compatible with your project
         python: ["3.13"]
         # python: ["3.11", "3.12", "3.13"]
-
-    env:
-      #  Use API Key from GA's environment variables for testing. You can remove this line if you don't need it.
-      SERVICE_API_KEY: ${{ secrets.SERVICE_API_KEY }}
 
     steps:
       - uses: actions/checkout@v4
