@@ -10,9 +10,10 @@ sincerelly thanks to gvhmr/wilor/wilor-mini developers and others that help each
 
 > [!CAUTION]
 > TODO in v0.2.1:
-> - support MCP/fastAPI
-> - support Dyn-HaMR
-> - wilor continuous predict.
+> - [ ] refactor, use podman / udocker
+> - [ ] support MCP/fastAPI
+> - [ ] support Dyn-HaMR
+> - [ ] wilor continuous predict.
 
 | Feature 功能      |                |
 | ----------------- | -------------- |
@@ -96,7 +97,7 @@ mocap --install -b gvhmr,wilor
 The python scripts are equivalent to the following:
 ```bash
 #!/bin/bash -eou pipefail
-# 1. pixi.py: use system python
+# 1. pixi.py
 curl -fsSL https://pixi.sh/install.sh | sh
 pixi global install uv
 uv python install
@@ -117,13 +118,12 @@ pixi run run/gvhmr.py
 ```mermaid
 %%{init:{'flowchart':{'padding':0, 'htmlLabels':false}, 'htmlLabels':false, 'theme':'base', 'themeVariables':{'primaryColor':'#fff','clusterBkg':'#fff','edgeLabelBackground':'#fff','lineColor':'#888','primaryTextColor':'#000','primaryBorderColor':'#000','secondaryTextColor':'#000', 'clusterBorder':'#888','tertiaryTextColor':'#000'} }}%%
 graph TD
-p[pixi]
-u[uv]
-m[mocap]
-p --global install--> u
-u --global ~/.venv--> m
-p --search_dir--> gvhmr,wilor...
-m --> 7z,aria2c,ffmpeg...
+pkgs["7z,aria2c,ffmpeg, podman/udocker"]
+ai["gvhmr,wilor..."]
+pixi --global install--> uv
+uv --~/.venv--> mocap
+mocap --global install--> pkgs
+pkgs -.container.-> ai
 ```
 
 ## usage 用法
@@ -146,7 +146,7 @@ You have to read these if you want to modify code.
 LOG=debug mocap -I
 ```
 
-### [docker](docker/Dockerfile)
+### [docker](container/Dockerfile)
 ```sh
 # docker build -t mocap -f docker/Dockerfile .
 podman build -t mocap -f docker/Dockerfile . --security-opt label=disable

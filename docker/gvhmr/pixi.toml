@@ -1,6 +1,7 @@
 [workspace]
 channels = ["nvidia", "pytorch", "conda-forge"]
-platforms = ["linux-64", "win-64"]
+# TODO: "win-64", "osx-arm64", "osx-64", "linux-aarch64"
+platforms = ["linux-64"]
 version = "2025.10.03"
 
 [environments]

@@ -117,10 +117,6 @@ class _Env:
         return _is
 
     @cached_property
-    def HF(self):
-        return HfApi(endpoint=self.domain_hf)
-
-    @cached_property
     def aria(self):
         from .aria import get_aria
 
