@@ -23,11 +23,13 @@ jobs:
       contents: read
       packages: write
     steps:
+      - run: df -h
       - name: Checkout
         uses: actions/checkout@v4
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
+      - run: df -h
 
       - name: Login to DockerHub
         if: github.event_name != 'pull_request'
@@ -64,6 +66,7 @@ jobs:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           context: workflow
 
+      - run: df -h
       - name: Build and push
         uses: docker/build-push-action@v5
         with:
