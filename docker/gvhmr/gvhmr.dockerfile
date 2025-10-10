@@ -17,8 +17,8 @@ RUN --mount=type=cache,target=/root/.cache/huggingface/hub \
 FROM base AS builder
 ARG IMAGE="gvhmr"
 # --recursive for DPVO
-RUN pixi global install git && \
-    --mount=type=cache,target=/root/.cache/git \
+RUN --mount=type=cache,target=/root/.cache/git \
+    pixi global install git && \
     git clone https://github.com/zju3dv/GVHMR /${IMAGE}
 WORKDIR /${IMAGE}
 RUN pixi global install --environment build-tools gcc gxx make libcxx
