@@ -6,24 +6,24 @@ FROM base AS model_weights
 ARG HF_TOKEN=""
 RUN pixi global install git pip && \
     pip install --no-cache-dir huggingface_hub[cli]>=0.35.3
-RUN --mount=type=cache,target=/root/.cache/huggingface/hub \
+RUN --mount=type=cache,target=/model_weights/.cache/huggingface/ \
     --mount=type=secret,id=hf_token \
     sh -c '\
     HF="$(cat /run/secrets/hf_token 2>/dev/null || true)"; \
     if [ -z "$HF" ]; then HF="${HF_TOKEN}"; fi; \
     if [ -n "$HF" ]; then export HF_TOKEN="$HF"; echo "Use HF_TOKEN"; else echo "No HF_TOKEN(may have rate limits)"; fi; \
-    /root/.pixi/envs/pip/bin/hf download camenduru/GVHMR --local-dir /model_weights'
-
+    /root/.pixi/envs/pip/bin/hf download camenduru/GVHMR --local-dir /model_weights --exclude "preproc_data/*"; \
+    /root/.pixi/envs/pip/bin/hf download camenduru/SMPLer-X --local-dir /model_weights/body_models/smpl --include "SMPL_NEUTRAL.pkl"; \
+    /root/.pixi/envs/pip/bin/hf download camenduru/SMPLer-X --local-dir /model_weights/body_models/smplx --include "SMPLX_NEUTRAL.npz"'
 FROM base AS builder
 ARG IMAGE="gvhmr"
 # --recursive for DPVO
-RUN --mount=type=cache,target=/root/.cache/git \
-    pixi global install git && \
+RUN pixi global install git && \
     git clone https://github.com/zju3dv/GVHMR /${IMAGE}
 WORKDIR /${IMAGE}
 RUN pixi global install --environment build-tools gcc gxx make libcxx
 COPY ${IMAGE}/pixi.toml ./
-RUN --mount=type=cache,target=/root/.cache/pixi \
+RUN --mount=type=cache,target=/root/.cache/rattler/cache \
     pixi install --quiet
 
 COPY --from=model_weights /model_weights /${IMAGE}/inputs/checkpoints
