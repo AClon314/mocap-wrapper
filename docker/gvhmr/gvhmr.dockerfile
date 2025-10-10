@@ -1,6 +1,5 @@
 # syntax=docker/dockerfile:1.3
 #! /bin/podman build --build-arg HF_TOKEN=hf_ -f docker/gvhmr/gvhmr.dockerfile docker/
-ARG IMAGE="gvhmr"
 FROM ghcr.io/prefix-dev/pixi:0.56.0-noble-cuda-13.0.0 AS base
 
 FROM base AS model_weights
@@ -16,6 +15,7 @@ RUN --mount=type=cache,target=/root/.cache/huggingface/hub \
     /root/.pixi/envs/pip/bin/hf download camenduru/GVHMR --local-dir /model_weights'
 
 FROM base AS builder
+ARG IMAGE="gvhmr"
 # --recursive for DPVO
 RUN pixi global install git && \
     --mount=type=cache,target=/root/.cache/git \
