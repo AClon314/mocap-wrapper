@@ -22,13 +22,13 @@ RUN pixi global install git && \
     git clone https://github.com/zju3dv/GVHMR /${IMAGE}
 WORKDIR /${IMAGE}
 RUN pixi global install --environment build-tools gcc gxx make libcxx
-COPY --link ${IMAGE}/pixi.toml ./
+COPY ${IMAGE}/pixi.toml ./
 RUN --mount=type=cache,target=/root/.cache/pixi \
     pixi install --quiet
 
 COPY --from=model_weights /model_weights /${IMAGE}/inputs/checkpoints
-COPY --link ${IMAGE}/${IMAGE}.yaml /${IMAGE}/hmr4d/configs/
-COPY --link lib.py ${IMAGE}/${IMAGE}.py ${IMAGE}/pixi.toml ./
+COPY ${IMAGE}/${IMAGE}.yaml /${IMAGE}/hmr4d/configs/
+COPY lib.py ${IMAGE}/${IMAGE}.py ${IMAGE}/pixi.toml ./
 
 RUN pixi global uninstall $(ls ~/.pixi/envs) && \
     pixi clean cache --yes
