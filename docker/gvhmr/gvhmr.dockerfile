@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1.3
 #! /bin/podman build --build-arg HF_TOKEN=hf_ -f docker/gvhmr/gvhmr.dockerfile docker/
-FROM ghcr.io/prefix-dev/pixi:latest AS model_weights
+FROM ghcr.io/prefix-dev/pixi:0.56.0 AS model_weights
 ARG HF_TOKEN=""
 RUN pixi global install git pip && \
     pip install --no-cache-dir huggingface_hub[cli]>=0.35.3
@@ -17,20 +17,23 @@ RUN --mount=type=cache,target=/model_weights/.cache/huggingface/ \
     /root/.pixi/envs/pip/bin/hf download camenduru/SMPLer-X --local-dir /model_weights/body_models/smplx --include "SMPLX_NEUTRAL.npz"'
 
 FROM ghcr.io/prefix-dev/pixi:0.56.0-noble-cuda-13.0.0 AS builder
-ARG IMAGE="gvhmr"
+ARG NAME="gvhmr"
 # --recursive for DPVO
 RUN pixi global install git && \
-    git clone https://github.com/zju3dv/GVHMR /${IMAGE}
-WORKDIR /${IMAGE}
+    git clone https://github.com/zju3dv/GVHMR /${NAME}
+WORKDIR /${NAME}
 RUN df -h && pixi global install --environment build-tools gcc gxx make libcxx && df -h
-COPY ${IMAGE}/pixi.toml ./
+COPY ${NAME}/pixi.toml ./
 RUN --mount=type=cache,target=/root/.cache/rattler/cache \
     df -h && pixi install --quiet
 
-COPY --from=model_weights /model_weights /${IMAGE}/inputs/checkpoints
-COPY ${IMAGE}/${IMAGE}.yaml /${IMAGE}/hmr4d/configs/
-COPY lib.py ${IMAGE}/${IMAGE}.py ${IMAGE}/pixi.toml ./
+COPY --from=model_weights /model_weights /${NAME}/inputs/checkpoints
+COPY ${NAME}/${NAME}.yaml /${NAME}/hmr4d/configs/
+COPY lib.py ${NAME}/${NAME}.py ${NAME}/pixi.toml ./
 
 RUN pixi global uninstall $(ls ~/.pixi/envs) && \
     pixi clean cache --yes
-ENTRYPOINT ["pixi","run","-q","--","python","${IMAGE}.py"]
+LABEL org.opencontainers.image.description "GVHMR motion capture pipeline with build info: Built with CUDA 13.0.0, Pixi 0.56.0, Ubuntu Noble."
+LABEL org.opencontainers.image.authors="zju3dv(original), AClon314(build&patch)"
+LABEL org.opencontainers.image.source="https://github.com/zju3dv/GVHMR"
+ENTRYPOINT ["pixi","run","-q","--","python","${NAME}.py"]

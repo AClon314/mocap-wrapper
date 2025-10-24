@@ -1,38 +1,49 @@
-import os
-import gc
-
-import sys
-import toml
-import inspect
-import logging
-import argparse
-import shlex
-import subprocess
+import os, gc, sys, toml, shlex, inspect, logging, argparse, subprocess
 import numpy as np
 from pathlib import Path
 from platformdirs import user_config_path
 from types import ModuleType
 from typing import Any, Iterable, Literal, Sequence, TypeVar
-logging.basicConfig(level=os.environ.get('LOG', 'INFO').upper())
+
+logging.basicConfig(level=os.environ.get("LOG", "INFO").upper())
 Log = logging.getLogger(__name__)
-VIDEO_EXT = "webm,mkv,flv,flv,vob,vob,ogv,ogg,drc,gifv,webm,gifv,mng,avi,mov,qt,wmv,yuv,rm,rmvb,viv,asf,amv,mp4,m4p,m4v,mpg,mp2,mpeg,mpe,mpv,mpg,mpeg,m2v,m4v,svi,3gp,3g2,mxf,roq,nsv,flv,f4v,f4p,f4a,f4b".split(',')
+VIDEO_EXT = "webm,mkv,flv,flv,vob,vob,ogv,ogg,drc,gifv,webm,gifv,mng,avi,mov,qt,wmv,yuv,rm,rmvb,viv,asf,amv,mp4,m4p,m4v,mpg,mp2,mpeg,mpe,mpv,mpg,mpeg,m2v,m4v,svi,3gp,3g2,mxf,roq,nsv,flv,f4v,f4p,f4a,f4b".split(
+    ","
+)
 TYPE_RANGE = tuple[int, int]
-T = TypeVar('T')
-TN = TypeVar('NT', 'np.ndarray', 'torch.Tensor')    # type: ignore
+T = TypeVar("T")
+TN = TypeVar("NT", "np.ndarray", "torch.Tensor")  # type: ignore
 _ID = -1
-def vram_gb(torch): return torch.cuda.memory_allocated() / 1024 ** 3
-def _shlex_quote(args: Iterable[str]): return [shlex.quote(str(arg)) for arg in args]
-def _get_cmd(cmds: Iterable[str] | str): return cmds if isinstance(cmds, str) else _shlex_quote(cmds)
-def _strip(s): return str(s).strip() if s else ''
 
 
-_PATH = Path(__file__, '..', '..', '..').resolve()
+def vram_gb(torch):
+    return torch.cuda.memory_allocated() / 1024**3
+
+
+def _shlex_quote(args: Iterable[str]):
+    return [shlex.quote(str(arg)) for arg in args]
+
+
+def _get_cmd(cmds: Iterable[str] | str):
+    return cmds if isinstance(cmds, str) else _shlex_quote(cmds)
+
+
+def _strip(s):
+    return str(s).strip() if s else ""
+
+
+_PATH = Path(__file__, "..", "..", "..").resolve()
 sys.path.append(str(_PATH))  # relative import
-from mocap_wrapper.lib import TYPE_RUNS, RUNS_REPO, CONFIG, tqdm
+TYPE_RUNS = Literal["wilor", "gvhmr", "dynhamr"]
+RUNS_REPO: dict[TYPE_RUNS, str] = {
+    "wilor": "WiLoR-mini",
+    "gvhmr": "GVHMR",
+    "dynhamr": "Dyn-HaMR",
+}
 
 
-def savez(npz: 'str|Path', new_data: dict[str, Any], mode: Literal['w', 'a'] = 'a'):
-    if mode == 'a' and os.path.exists(npz):
+def savez(npz: "str|Path", new_data: dict[str, Any], mode: Literal["w", "a"] = "a"):
+    if mode == "a" and os.path.exists(npz):
         new_data = {**np.load(npz, allow_pickle=True), **new_data}
     np.savez_compressed(npz, **new_data)
 
@@ -57,41 +68,32 @@ def free_ram(torch):
         # Log.warning(f'(DEBUG: Need removed) {msg}')
 
 
-def chdir_gitRepo(mod: TYPE_RUNS):
-    config_path = user_config_path(appname='mocap_wrapper', ensure_exists=True) / 'config.toml'
-    if os.path.exists(config_path):
-        config = toml.load(config_path)
-        dst = CONFIG[mod]
-        if not os.path.exists(dst):
-            dst = os.path.join(config['search_dir'], RUNS_REPO[mod])
-        sys.path.append(dst)
-        os.chdir(dst)
-    else:
-        raise FileNotFoundError(f'config.toml not found in {config_path}')
-
-
-def run(cmd: Sequence[str] | str, Print=True, **kwargs) -> subprocess.CompletedProcess[str]:
-    '''⚠️ Strongly recommended use list[str] instead of str to pass commands,
-    to avoid shell injection risks for online service.'''
+def run(
+    cmd: Sequence[str] | str, Print=True, **kwargs
+) -> subprocess.CompletedProcess[str]:
+    """⚠️ Strongly recommended use list[str] instead of str to pass commands,
+    to avoid shell injection risks for online service."""
     global _ID
     _ID += 1
-    prefix = f'{cmd[0]}_{_ID}'
+    prefix = f"{cmd[0]}_{_ID}"
     shell = True if isinstance(cmd, str) else False
     cmd = _get_cmd(cmd) if shell else cmd
-    Log.info(f'{prefix}🐣❯ {cmd}') if Print else None
+    Log.info(f"{prefix}🐣❯ {cmd}") if Print else None
     try:
-        process = subprocess.run(cmd, shell=shell, text=True, capture_output=True, check=True, **kwargs)
+        process = subprocess.run(
+            cmd, shell=shell, text=True, capture_output=True, check=True, **kwargs
+        )
     except subprocess.CalledProcessError as e:
         process = e
     except subprocess.TimeoutExpired as e:
         process = e
         process.returncode = 128 + 15  # SIGTERM # type: ignore
-    Log.debug(f'{locals()=}')
+    Log.debug(f"{locals()=}")
     process.stderr = _strip(process.stderr)  # type: ignore
     process.stdout = _strip(process.stdout)  # type: ignore
     if Print:
-        Log.info(f'{prefix}❯ {process.stdout}') if process.stdout else None
-        Log.error(f'{prefix}❯ {process.stderr}') if process.stderr else None
+        Log.info(f"{prefix}❯ {process.stdout}") if process.stdout else None
+        Log.error(f"{prefix}❯ {process.stderr}") if process.stderr else None
     return process  # type: ignore
 
 
@@ -168,13 +170,17 @@ def invert_ranges(ranges: Sequence[tuple], total_range: tuple) -> list[tuple]:
     return inverted
 
 
-def squeeze(v: np.ndarray, axis=0, key=''):
+def squeeze(v: np.ndarray, axis=0, key=""):
     if not isinstance(v, np.ndarray):
         return v
     shape_old = v.shape
     while len(v.shape) > axis and v.shape[axis] == 1:  # TODO: maybe buggy
         v = np.squeeze(v, axis=axis)
-    Log.debug(f"🧽 key squeezed: {key}, {v.shape} ← {shape_old}") if shape_old != v.shape else None
+    (
+        Log.debug(f"🧽 key squeezed: {key}, {v.shape} ← {shape_old}")
+        if shape_old != v.shape
+        else None
+    )
     return v
 
 
@@ -186,7 +192,12 @@ def _get_mod(mod1: ModuleType | str):
     return _mod1
 
 
-def Lib(arr, mod1: ModuleType | str = np, mod2: ModuleType | str = 'torch', ret_1_if=np.ndarray):
+def Lib(
+    arr,
+    mod1: ModuleType | str = np,
+    mod2: ModuleType | str = "torch",
+    ret_1_if=np.ndarray,
+):
     """usage:
     ```python
     lib = Lib(arr)
@@ -210,7 +221,7 @@ def Lib(arr, mod1: ModuleType | str = np, mod2: ModuleType | str = 'torch', ret_
 def Norm(arr: TN, dim: int = -1, keepdim: bool = True) -> TN:
     """计算范数，支持批量输入"""
     lib = Lib(arr)
-    is_torch = lib.__name__ == 'torch'
+    is_torch = lib.__name__ == "torch"
     if is_torch:
         return lib.norm(arr, dim=dim, keepdim=keepdim)
     else:
@@ -220,7 +231,7 @@ def Norm(arr: TN, dim: int = -1, keepdim: bool = True) -> TN:
 def skew_symmetric(v: TN) -> TN:
     """生成反对称矩阵，支持批量输入"""
     lib = Lib(v)
-    is_torch = lib.__name__ == 'torch'
+    is_torch = lib.__name__ == "torch"
     axis = Axis(is_torch)
     axis_1 = {axis: -1}
     # 创建各分量
@@ -254,9 +265,11 @@ def Rodrigues(rot_vec3: TN) -> TN:
     """
     if rot_vec3.shape[-1] == 4:
         return rot_vec3
-    assert rot_vec3.shape[-1] == 3, f"Last dimension must be 3, but got {rot_vec3.shape}"
+    assert (
+        rot_vec3.shape[-1] == 3
+    ), f"Last dimension must be 3, but got {rot_vec3.shape}"
     lib = Lib(rot_vec3)
-    is_torch = lib.__name__ == 'torch'
+    is_torch = lib.__name__ == "torch"
 
     # 计算旋转角度
     theta = Norm(rot_vec3, dim=-1, keepdim=True)  # (...,1)
@@ -300,19 +313,22 @@ def RotMat_to_quat(R: TN) -> TN:
         return R
     assert R.shape[-2:] == (3, 3), f"输入R的末两维必须为3x3，当前为{R.shape}"
     lib = Lib(R)  # 自动检测模块
-    is_torch = lib.__name__ == 'torch'
+    is_torch = lib.__name__ == "torch"
     EPSILON = 1e-12  # 数值稳定系数
 
     # 计算迹，形状为(...)
-    trace = lib.einsum('...ii->...', R)
+    trace = lib.einsum("...ii->...", R)
 
     # 计算四个分量的平方（带数值稳定处理）
-    q_sq = lib.stack([
-        (trace + 1) / 4,
-        (1 + 2 * R[..., 0, 0] - trace) / 4,
-        (1 + 2 * R[..., 1, 1] - trace) / 4,
-        (1 + 2 * R[..., 2, 2] - trace) / 4,
-    ], axis=-1)
+    q_sq = lib.stack(
+        [
+            (trace + 1) / 4,
+            (1 + 2 * R[..., 0, 0] - trace) / 4,
+            (1 + 2 * R[..., 1, 1] - trace) / 4,
+            (1 + 2 * R[..., 2, 2] - trace) / 4,
+        ],
+        axis=-1,
+    )
 
     other = 0.0
     if is_torch:
@@ -376,20 +392,23 @@ def RotMat_to_new(R: TN, out=4) -> TN:
         return R
     assert R.shape[-2:] == (3, 3), f"输入R的末两维必须为3x3，当前为{R.shape}"
     lib = Lib(R)  # 自动检测模块
-    is_torch = lib.__name__ == 'torch'
+    is_torch = lib.__name__ == "torch"
     EPSILON = 1e-12  # 数值稳定系数
 
     if out == 4:
         # 计算迹，形状为(...)
-        trace = lib.einsum('...ii->...', R)
+        trace = lib.einsum("...ii->...", R)
 
         # 计算四个分量的平方（带数值稳定处理）
-        q_sq = lib.stack([
-            (trace + 1) / 4,
-            (1 + 2 * R[..., 0, 0] - trace) / 4,
-            (1 + 2 * R[..., 1, 1] - trace) / 4,
-            (1 + 2 * R[..., 2, 2] - trace) / 4,
-        ], axis=-1)
+        q_sq = lib.stack(
+            [
+                (trace + 1) / 4,
+                (1 + 2 * R[..., 0, 0] - trace) / 4,
+                (1 + 2 * R[..., 1, 1] - trace) / 4,
+                (1 + 2 * R[..., 2, 2] - trace) / 4,
+            ],
+            axis=-1,
+        )
 
         other = 0.0
         if is_torch:
@@ -447,6 +466,8 @@ def RotMat_to_new(R: TN, out=4) -> TN:
         return ret
     elif out == 3:
         if is_torch:
+            import torch
+
             sy = torch.sqrt(R[..., 0, 0] * R[..., 0, 0] + R[..., 1, 0] * R[..., 1, 0])
             singular = sy < 1e-6
             if singular.any():
@@ -474,8 +495,12 @@ def RotMat_to_new(R: TN, out=4) -> TN:
         raise ValueError("out参数只能为3或4")
 
 
-def quat_rotAxis(arr: TN) -> TN: return RotMat_to_quat(Rodrigues(arr))
-def Axis(is_torch=False): return 'dim' if is_torch else 'axis'
+def quat_rotAxis(arr: TN) -> TN:
+    return RotMat_to_quat(Rodrigues(arr))
+
+
+def Axis(is_torch=False):
+    return "dim" if is_torch else "axis"
 
 
 def quat(xyz: TN) -> TN:
@@ -489,7 +514,7 @@ def quat(xyz: TN) -> TN:
         return xyz
     assert xyz.shape[-1] == 3, f"Last dimension should be 3, but found {xyz.shape}"
     lib = Lib(xyz)  # 自动检测库类型
-    is_torch = lib.__name__ == 'torch'
+    is_torch = lib.__name__ == "torch"
 
     # 计算半角三角函数（支持广播）
     half_angles = 0.5 * xyz
@@ -526,7 +551,7 @@ def euler(wxyz: TN) -> TN:
         return wxyz
     assert wxyz.shape[-1] == 4, f"Last dimension should be 4, but found {wxyz.shape}"
     lib = Lib(wxyz)  # 自动检测库类型
-    is_torch = lib.__name__ == 'torch'
+    is_torch = lib.__name__ == "torch"
     EPSILON = 1e-12  # 数值稳定系数
 
     # 归一化四元数（防止输入未归一化）
@@ -578,11 +603,23 @@ def mano_to_smplx(smplx_body_gvhmr, mano_hand_hamer):
 
     lib = Lib(smplx_body_gvhmr["global_orient"])
     # Assuming that your data are stored in gvhmr_smplx_params and hamer_mano_params
-    full_body_pose = lib.concatenate((smplx_body_gvhmr["global_orient"], smplx_body_gvhmr["body_pose"].reshape(21, 3)), dim=0)     # gvhmr_smplx_params["global_orient"]: (3, 3)
-    left_elbow_global_rot = compute_global_rotation(full_body_pose, 18)  # left elbow IDX: 18
-    right_elbow_global_rot = compute_global_rotation(full_body_pose, 19)  # left elbow IDX: 19
+    full_body_pose = lib.concatenate(
+        (
+            smplx_body_gvhmr["global_orient"],
+            smplx_body_gvhmr["body_pose"].reshape(21, 3),
+        ),
+        dim=0,
+    )  # gvhmr_smplx_params["global_orient"]: (3, 3)
+    left_elbow_global_rot = compute_global_rotation(
+        full_body_pose, 18
+    )  # left elbow IDX: 18
+    right_elbow_global_rot = compute_global_rotation(
+        full_body_pose, 19
+    )  # left elbow IDX: 19
 
-    left_wrist_global_rot = mano_hand_hamer["global_orient"][0].cpu().numpy()  # hamer_mano_params["global_orient"]: (2, 3, 3)
+    left_wrist_global_rot = (
+        mano_hand_hamer["global_orient"][0].cpu().numpy()
+    )  # hamer_mano_params["global_orient"]: (2, 3, 3)
     left_wrist_global_rot = M @ left_wrist_global_rot @ M  # mirror switch
     left_wrist_pose = np.linalg.inv(left_elbow_global_rot) @ left_wrist_global_rot
 
@@ -595,16 +632,18 @@ def mano_to_smplx(smplx_body_gvhmr, mano_hand_hamer):
     left_hand_pose = np.ones(45)
     right_hand_pose = np.ones(45)
     for i in range(15):
-        left_finger_pose = M @ mano_hand_hamer["hand_pose"][0][i].cpu().numpy() @ M  # hamer_mano_params["hand_pose"]: (2, 15, 3, 3)
+        left_finger_pose = (
+            M @ mano_hand_hamer["hand_pose"][0][i].cpu().numpy() @ M
+        )  # hamer_mano_params["hand_pose"]: (2, 15, 3, 3)
         left_finger_pose_vec = euler(RotMat_to_quat(left_finger_pose))
-        left_hand_pose[i * 3: i * 3 + 3] = left_finger_pose_vec
+        left_hand_pose[i * 3 : i * 3 + 3] = left_finger_pose_vec
 
         right_finger_pose = mano_hand_hamer["hand_pose"][1][i].cpu().numpy()
         right_finger_pose_vec = euler(RotMat_to_quat(right_finger_pose))
-        right_hand_pose[i * 3: i * 3 + 3] = right_finger_pose_vec
+        right_hand_pose[i * 3 : i * 3 + 3] = right_finger_pose_vec
 
-    smplx_body_gvhmr["body_pose"][57: 60] = left_wrist_pose_vec
-    smplx_body_gvhmr["body_pose"][60: 63] = right_wrist_pose_vec
+    smplx_body_gvhmr["body_pose"][57:60] = left_wrist_pose_vec
+    smplx_body_gvhmr["body_pose"][60:63] = right_wrist_pose_vec
     smplx_body_gvhmr["left_hand_pose"] = left_hand_pose
     smplx_body_gvhmr["right_hand_pose"] = right_hand_pose
 
@@ -615,7 +654,7 @@ class ArgParser(argparse.ArgumentParser):
         exit(1)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     arr = np.array([[1, 1, 1], [1, 0, 0]])
     _arr = quat(arr)
     print(_arr.shape, _arr)

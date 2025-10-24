@@ -1,54 +1,69 @@
 #!/bin/env -S pixi -e mocap -- python
+# PYTHON_ARGCOMPLETE_OK
 """
 ⚠️ This [file](https://github.com/zju3dv/GVHMR/blob/main/tools/demo/demo.py) is protected under the GVHMR license agreement, not the AGPL of this repository. See: https://github.com/zju3dv/GVHMR/blob/main/LICENSE
 
-Copyright 2022-2023 3D Vision Group at the State Key Lab of CAD&CG,  
-Zhejiang University. All Rights Reserved. 
+Copyright 2022-2023 3D Vision Group at the State Key Lab of CAD&CG,
+Zhejiang University. All Rights Reserved.
 
-For more information see <https://github.com/zju3dv/GVHMR> 
-If you use this software, please cite the corresponding publications   
-listed on the above website. 
+For more information see <https://github.com/zju3dv/GVHMR>
+If you use this software, please cite the corresponding publications
+listed on the above website.
 
-Permission to use, copy, modify and distribute this software and its 
-documentation for educational, research and non-profit purposes only. 
-Any modification based on this work must be open-source and prohibited 
-for commercial use. 
-You must retain, in the source form of any derivative works that you  
-distribute, all copyright, patent, trademark, and attribution notices  
-from the source form of this work. 
- 
+Permission to use, copy, modify and distribute this software and its
+documentation for educational, research and non-profit purposes only.
+Any modification based on this work must be open-source and prohibited
+for commercial use.
+You must retain, in the source form of any derivative works that you
+distribute, all copyright, patent, trademark, and attribution notices
+from the source form of this work.
+
 For commercial uses of this software, please send email to xwzhou@zju.edu.cn
 """
-from typing import Sequence, Set
-from pathlib import Path
-from lib import Rodrigues, RotMat_to_quat, savez, chdir_gitRepo, continuous, euler, free_ram as _free_ram  # type: ignore
-chdir_gitRepo('gvhmr')
 import argparse
-from os import symlink
+
 CRF = 23  # 17 is lossless, every +6 halves the mp4 size
 person_count = None
 
 
 def argParse():
-    # Put all args to cfg
+    """Put all args to cfg"""
     parser = argparse.ArgumentParser()
-    parser.add_argument("-i", "--input", type=str, metavar='in.mp4')
-    parser.add_argument("-o", "--outdir", type=str, default='output', metavar='output')
+    parser.add_argument("-i", "--input", type=str, metavar="in.mp4")
+    parser.add_argument("-o", "--outdir", type=str, default="output", metavar="output")
     parser.add_argument("-s", "--static_cam", action="store_true", help="skip DPVO")
-    parser.add_argument("--use_dpvo", action="store_true", help="use DPVO. By default not using DPVO.")
+    parser.add_argument(
+        "--use_dpvo", action="store_true", help="use DPVO. By default not using DPVO."
+    )
     parser.add_argument(
         "--f_mm",
         type=int,
         default=None,
-        metavar='24',
+        metavar="24",
         help="Focal length of fullframe camera in mm. Leave it as None to use default values."
         "For iPhone 15p, the [0.5x, 1x, 2x, 3x] lens have typical values [13, 24, 48, 77]."
         "If the camera zoom in a lot, you can try 135, 200 or even larger values.",
     )
-    parser.add_argument("--render", action="store_true", help="render the incam/global result video")
-    parser.add_argument("-p", "--persons", type=str, help="List of persons to process, e.g. '0,1,2'")
-    parser.add_argument("--euler", action="store_true", help="use euler angles on bones rotation. Default is quaternion.")
-    parser.add_argument("--verbose", action="store_true", help="draw intermediate results")
+    parser.add_argument(
+        "--render", action="store_true", help="render the incam/global result video"
+    )
+    parser.add_argument(
+        "-p", "--persons", type=str, help="List of persons to process, e.g. '0,1,2'"
+    )
+    parser.add_argument(
+        "--euler",
+        action="store_true",
+        help="use euler angles on bones rotation. Default is quaternion.",
+    )
+    parser.add_argument(
+        "--verbose", action="store_true", help="draw intermediate results"
+    )
+    try:
+        import argcomplete
+
+        argcomplete.autocomplete(parser)
+    except ImportError:
+        pass
     args, _ = parser.parse_known_args()
     if not args.input:
         parser.print_help()
@@ -64,6 +79,10 @@ def argParse():
 if __name__ == "__main__":
     cfg = argParse()
 
+from os import symlink
+from pathlib import Path
+from typing import Sequence, Set
+from lib import Rodrigues, RotMat_to_quat, savez, continuous, euler, free_ram as _free_ram  # type: ignore
 import cv2
 import torch
 import pytorch_lightning as pl
@@ -89,16 +108,35 @@ from hmr4d.utils.seq_utils import (  # patched
     frame_id_to_mask,
     rearrange_by_mask,
 )
-from hmr4d.utils.vis.cv2_utils import draw_bbx_xyxy_on_image_batch, draw_coco17_skeleton_batch
+from hmr4d.utils.vis.cv2_utils import (
+    draw_bbx_xyxy_on_image_batch,
+    draw_coco17_skeleton_batch,
+)
 from hmr4d.utils.preproc import Tracker, Extractor, VitPoseExtractor, SimpleVO
-from hmr4d.utils.geo.hmr_cam import get_bbx_xys_from_xyxy, estimate_K, convert_K_to_K4, create_camera_sensor
+from hmr4d.utils.geo.hmr_cam import (
+    get_bbx_xys_from_xyxy,
+    estimate_K,
+    convert_K_to_K4,
+    create_camera_sensor,
+)
 from hmr4d.utils.geo_transform import compute_cam_angvel
 from hmr4d.model.gvhmr.gvhmr_pl_demo import DemoPL
-from hmr4d.utils.net_utils import detach_to_cpu, to_cuda, moving_average_smooth  # patched
+from hmr4d.utils.net_utils import (
+    detach_to_cpu,
+    to_cuda,
+    moving_average_smooth,
+)  # patched
 from hmr4d.utils.smplx_utils import make_smplx
-from hmr4d.utils.vis.renderer import Renderer, get_global_cameras_static, get_ground_params_from_points
+from hmr4d.utils.vis.renderer import (
+    Renderer,
+    get_global_cameras_static,
+    get_ground_params_from_points,
+)
 from hmr4d.utils.geo_transform import apply_T_on_points, compute_T_ayfz2ay
-def free_ram(): _free_ram(torch)
+
+
+def free_ram():
+    _free_ram(torch)
 
 
 def parse_args_to_cfg(args=argParse()):
@@ -115,7 +153,7 @@ def parse_args_to_cfg(args=argParse()):
             f"static_cam={args.static_cam}",
             f"verbose={args.verbose}",
             f"use_dpvo={args.use_dpvo}",
-            f"person=0",    # u need to override with `cfg.person = 1`
+            f"person=0",  # u need to override with `cfg.person = 1`
             f"+render={args.render}",
         ]
         if args.f_mm is not None:
@@ -156,29 +194,29 @@ def save_bbox(cfg, id_frames, id_bbox_xyxy, ids):
         if len(ranges) > 1:
             Log.warning(f"Person {p} has multiple ranges: {ranges}")
         start = str(ranges[0][0])
-        key = ';'.join(['smplx;gvhmr', f'person{p}', start, 'bbox'])
-        savez(cfg.npz_path, {key: id_bbox_xyxy[i]}, mode='a')
+        key = ";".join(["smplx;gvhmr", f"person{p}", start, "bbox"])
+        savez(cfg.npz_path, {key: id_bbox_xyxy[i]}, mode="a")
 
 
 def load_yolo_track(cfg):
     global person_count
-    file = cfg.paths.yolo_track + '.npz'
+    file = cfg.paths.yolo_track + ".npz"
 
     data = np.load(file, allow_pickle=True)
-    id_frames = data['id_frames'].item()
-    id_bbox_xyxy = data['id_bbox_xyxy'].item()
-    ids = data['ids']
+    id_frames = data["id_frames"].item()
+    id_bbox_xyxy = data["id_bbox_xyxy"].item()
+    ids = data["ids"]
     save_bbox(cfg, id_frames, id_bbox_xyxy, ids)
 
     person_count = len(ids)
     if not person_count:
-        Log.info(f'How many people in the video? {person_count}')
+        Log.info(f"How many people in the video? {person_count}")
     return id_frames, id_bbox_xyxy, ids
 
 
 def get_one_track_patch(self, video_path, cfg):
     track_path = cfg.paths.yolo_track
-    if Path(track_path + '.npz').exists():
+    if Path(track_path + ".npz").exists():
         id_frames, id_bbox_xyxy, ids = load_yolo_track(cfg)
     else:
         # track
@@ -186,7 +224,11 @@ def get_one_track_patch(self, video_path, cfg):
 
         # parse track_history & use top1 track
         id_frames, id_bbox_xyxy, ids = self.sort_track_length(track_history, video_path)
-        savez(track_path, {'id_frames': id_frames, 'id_bbox_xyxy': id_bbox_xyxy, 'ids': ids}, mode='w')
+        savez(
+            track_path,
+            {"id_frames": id_frames, "id_bbox_xyxy": id_bbox_xyxy, "ids": ids},
+            mode="w",
+        )
     save_bbox(cfg, id_frames, id_bbox_xyxy, ids)
     id_track = ids[cfg.person]
     frames = torch.tensor(id_frames[id_track])  # (N,)
@@ -195,9 +237,13 @@ def get_one_track_patch(self, video_path, cfg):
     # TODO: remove interpolate to save size, seperate begins on same person
     # interpolate missing frames
     mask = frame_id_to_mask(frames, get_video_lwh(video_path)[0])
-    bbx_xyxy_one_track = rearrange_by_mask(bbox_xyxy, mask)  # (F, 4), missing filled with 0
+    bbx_xyxy_one_track = rearrange_by_mask(
+        bbox_xyxy, mask
+    )  # (F, 4), missing filled with 0
     missing_frame_id_list = get_frame_id_list_from_mask(~mask)  # list of list
-    bbx_xyxy_one_track = linear_interpolate_frame_ids(bbx_xyxy_one_track, missing_frame_id_list)
+    bbx_xyxy_one_track = linear_interpolate_frame_ids(
+        bbx_xyxy_one_track, missing_frame_id_list
+    )
     assert (bbx_xyxy_one_track.sum(1) != 0).all()
 
     bbx_xyxy_one_track = moving_average_smooth(bbx_xyxy_one_track, window_size=5, dim=0)
@@ -226,7 +272,9 @@ def run_preprocess(cfg):
     if not Path(paths.bbx).exists():
         tracker = Tracker()
         bbx_xyxy = tracker.get_one_track(video_path, cfg).float()  # (L, 4)
-        bbx_xys = get_bbx_xys_from_xyxy(bbx_xyxy, base_enlarge=1.2).float()  # (L, 3) apply aspect ratio and enlarge
+        bbx_xys = get_bbx_xys_from_xyxy(
+            bbx_xyxy, base_enlarge=1.2
+        ).float()  # (L, 3) apply aspect ratio and enlarge
         torch.save({"bbx_xyxy": bbx_xyxy, "bbx_xys": bbx_xys}, paths.bbx)
         del tracker
     else:
@@ -267,7 +315,9 @@ def run_preprocess(cfg):
     if not static_cam:  # use slam to get cam rotation
         if not Path(paths.slam).exists():
             if not cfg.use_dpvo:
-                simple_vo = SimpleVO(cfg.video_path, scale=0.5, step=8, method="sift", f_mm=cfg.f_mm)
+                simple_vo = SimpleVO(
+                    cfg.video_path, scale=0.5, step=8, method="sift", f_mm=cfg.f_mm
+                )
                 vo_results = simple_vo.compute()  # (L, 4, 4), numpy
                 torch.save(vo_results, paths.slam)
             else:  # DPVO
@@ -276,7 +326,9 @@ def run_preprocess(cfg):
                 length, width, height = get_video_lwh(cfg.video_path)
                 K_fullimg = estimate_K(width, height)
                 intrinsics = convert_K_to_K4(K_fullimg)
-                slam = SLAMModel(video_path, width, height, intrinsics, buffer=4000, resize=0.5)
+                slam = SLAMModel(
+                    video_path, width, height, intrinsics, buffer=4000, resize=0.5
+                )
                 bar = tqdm(total=length, desc="DPVO")
                 while True:
                     ret = slam.track()
@@ -305,7 +357,9 @@ def load_data_dict(cfg):
         else:  # SimpleVO
             R_w2c = torch.from_numpy(traj[:, :3, :3])
     if cfg.f_mm is not None:
-        K_fullimg = create_camera_sensor(width, height, cfg.f_mm)[2].repeat(length, 1, 1)
+        K_fullimg = create_camera_sensor(width, height, cfg.f_mm)[2].repeat(
+            length, 1, 1
+        )
     else:
         K_fullimg = estimate_K(width, height).repeat(length, 1, 1)
 
@@ -333,7 +387,9 @@ def render_incam(cfg):
 
     # smpl
     smplx_out = smplx(**to_cuda(pred["smpl_params_incam"]))
-    pred_c_verts = torch.stack([torch.matmul(smplx2smpl, v_) for v_ in smplx_out.vertices])
+    pred_c_verts = torch.stack(
+        [torch.matmul(smplx2smpl, v_) for v_ in smplx_out.vertices]
+    )
 
     # -- rendering code -- #
     video_path = cfg.video_path
@@ -348,7 +404,9 @@ def render_incam(cfg):
     # -- render mesh -- #
     verts_incam = pred_c_verts
     writer = get_writer(incam_video_path, fps=30, crf=CRF)
-    for i, img_raw in tqdm(enumerate(reader), total=get_video_lwh(video_path)[0], desc=f"Rendering Incam"):
+    for i, img_raw in tqdm(
+        enumerate(reader), total=get_video_lwh(video_path)[0], desc=f"Rendering Incam"
+    ):
         img = renderer.render_mesh(verts_incam[i].cuda(), img_raw, [0.8, 0.8, 0.8])
 
         # # bbx
@@ -373,11 +431,15 @@ def render_global(cfg):
     smplx = make_smplx("supermotion").cuda()
     smplx2smpl = torch.load("hmr4d/utils/body_model/smplx2smpl_sparse.pt").cuda()
     faces_smpl = make_smplx("smpl").faces
-    J_regressor = torch.load("hmr4d/utils/body_model/smpl_neutral_J_regressor.pt").cuda()
+    J_regressor = torch.load(
+        "hmr4d/utils/body_model/smpl_neutral_J_regressor.pt"
+    ).cuda()
 
     # smpl
     smplx_out = smplx(**to_cuda(pred["smpl_params_global"]))
-    pred_ay_verts = torch.stack([torch.matmul(smplx2smpl, v_) for v_ in smplx_out.vertices])
+    pred_ay_verts = torch.stack(
+        [torch.matmul(smplx2smpl, v_) for v_ in smplx_out.vertices]
+    )
 
     def move_to_start_point_face_z(verts):
         "XZ to origin, Start from the ground, Face-Z"
@@ -387,7 +449,9 @@ def render_global(cfg):
         offset[1] = verts[:, :, [1]].min()
         verts = verts - offset
         # face direction
-        T_ay2ayfz = compute_T_ayfz2ay(einsum(J_regressor, verts[[0]], "j v, l v i -> l j i"), inverse=True)
+        T_ay2ayfz = compute_T_ayfz2ay(
+            einsum(J_regressor, verts[[0]], "j v, l v i -> l j i"), inverse=True
+        )
         verts = apply_T_on_points(verts, T_ay2ayfz)
         return verts
 
@@ -418,14 +482,16 @@ def render_global(cfg):
     writer = get_writer(global_video_path, fps=30, crf=CRF)
     for i in tqdm(range(render_length), desc=f"Rendering Global"):
         cameras = renderer.create_camera(global_R[i], global_T[i])
-        img = renderer.render_with_ground(verts_glob[[i]], color[None], cameras, global_lights)
+        img = renderer.render_with_ground(
+            verts_glob[[i]], color[None], cameras, global_lights
+        )
         writer.write_frame(img)
     writer.close()
 
 
 def export(
     pred: dict,
-    file: Path | str = 'gvhmr.mocap.npz',
+    file: Path | str = "gvhmr.mocap.npz",
     who=0,
 ):
     """
@@ -434,40 +500,40 @@ def export(
     keyname = 'smplx;gvhmr;customKey;person{ID};global'
     """
     data = {}
-    prefix = 'smplx;gvhmr'
-    key_who = f'person{who}'
-    R = {'incam': Rodrigues(pred['smpl_params_incam']['global_orient'])}
-    K = 'smpl_params_global'
-    if hasattr(pred[K], 'keys'):
+    prefix = "smplx;gvhmr"
+    key_who = f"person{who}"
+    R = {"incam": Rodrigues(pred["smpl_params_incam"]["global_orient"])}
+    K = "smpl_params_global"
+    if hasattr(pred[K], "keys"):
         for k in pred[K].keys():
             # TODO: remove interpolate, detect actually begin frame
-            if k == 'betas':
+            if k == "betas":
                 pred[K][k] = pred[K][k][0]
-            key = ';'.join([prefix, key_who, '0', k])
-            if k in ('global_orient', 'body_pose'):
+            key = ";".join([prefix, key_who, "0", k])
+            if k in ("global_orient", "body_pose"):
                 _R = Rodrigues(pred[K][k])
-                if k == 'global_orient':
-                    R['global'] = _R
+                if k == "global_orient":
+                    R["global"] = _R
                 pred[K][k] = RotMat_to_quat(_R)
                 if IS_EULER:
                     pred[K][k] = euler(pred[K][k])
             data[key] = pred[K][k].cpu().numpy()
     else:
         # 基本不会执行这里
-        key = ';'.join([prefix, '', K])
+        key = ";".join([prefix, "", K])
         data[key] = pred[K].cpu().numpy()
 
-    prefix = f'{prefix};cam@{key_who};0'
+    prefix = f"{prefix};cam@{key_who};0"
     cam_R, cam_T = camera_extrinsics(
-        R['global'],
-        R['incam'],
-        pred['smpl_params_global']['transl'],
-        pred['smpl_params_incam']['transl'],
+        R["global"],
+        R["incam"],
+        pred["smpl_params_global"]["transl"],
+        pred["smpl_params_incam"]["transl"],
     )
     cam_R = RotMat_to_quat(cam_R).cpu().numpy()
     cam_T = cam_T.cpu().numpy()
-    data[f'{prefix};global_orient'] = cam_R
-    data[f'{prefix};transl'] = cam_T
+    data[f"{prefix};global_orient"] = cam_R
+    data[f"{prefix};transl"] = cam_T
 
     savez(file, data)
 
@@ -528,7 +594,9 @@ def per_person(cfg):
         data_remap(pred)
         pred = detach_to_cpu(pred)
         data_time = data["length"] / 30
-        Log.info(f"[HMR4D] Elapsed: {Log.sync_time() - tic:.2f}s for data-length={data_time:.1f}s")
+        Log.info(
+            f"[HMR4D] Elapsed: {Log.sync_time() - tic:.2f}s for data-length={data_time:.1f}s"
+        )
         torch.save(pred, hmr4d_results)
     else:
         pred = torch.load(hmr4d_results)
@@ -544,15 +612,19 @@ def per_person(cfg):
         render_global(cfg)
         if not Path(paths.incam_global_horiz_video).exists():
             Log.info("[Merge Videos]")
-            merge_videos_horizontal([paths.incam_video, paths.global_video], paths.incam_global_horiz_video)
+            merge_videos_horizontal(
+                [paths.incam_video, paths.global_video], paths.incam_global_horiz_video
+            )
     free_ram()
     return pred
 
 
 def data_remap(pred):
-    del pred['smpl_params_incam']['betas']
-    del pred['smpl_params_incam']['body_pose']
-    pred['smpl_params_global']['body_pose'] = pred['smpl_params_global']['body_pose'].reshape(-1, 21, 3)
+    del pred["smpl_params_incam"]["betas"]
+    del pred["smpl_params_incam"]["body_pose"]
+    pred["smpl_params_global"]["body_pose"] = pred["smpl_params_global"][
+        "body_pose"
+    ].reshape(-1, 21, 3)
 
 
 def gvhmr(cfg, Persons: Sequence[int] | Set[int] | None = None):

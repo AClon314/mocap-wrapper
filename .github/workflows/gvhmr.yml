@@ -65,20 +65,11 @@ jobs:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           context: workflow
 
-      - run: df -h
-
       - uses: mathio/gha-cleanup@v1
         with:
           remove-browsers: true
           verbose: false
-
-      - name: clean 🧹
-        run: |
-          df -h
-          sudo docker image prune --all --force
-          sudo docker builder prune -a
-          df -h
-
+          
       - name: Build & push
         uses: docker/build-push-action@v5
         with:
@@ -89,6 +80,13 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           build-args: |
             HF_TOKEN=${{ secrets.HF_TOKEN }}
+          # cache 配置：优先使用 registry（GHCR），同时使用 GitHub Actions cache 作为回退
+          cache-from: |
+            type=registry,ref=ghcr.io/${{ github.repository_owner }}/${{ env.NAME }}:buildcache
+            type=gha
+          cache-to: |
+            type=registry,ref=ghcr.io/${{ github.repository_owner }}/${{ env.NAME }}:buildcache,mode=max
+            type=gha,mode=max
       
       - run: df -h
         if: always()
