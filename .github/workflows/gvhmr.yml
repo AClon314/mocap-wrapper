@@ -82,10 +82,10 @@ jobs:
             HF_TOKEN=${{ secrets.HF_TOKEN }}
           # cache 配置：优先使用 registry（GHCR），同时使用 GitHub Actions cache 作为回退
           cache-from: |
-            type=registry,ref=ghcr.io/${{ github.repository_owner }}/${{ env.NAME }}:buildcache
+            type=registry,ref=ghcr.io/${{ github.repository_owner.toLowerCase() }}/${{ env.NAME }}:buildcache
             type=gha
           cache-to: |
-            type=registry,ref=ghcr.io/${{ github.repository_owner }}/${{ env.NAME }}:buildcache,mode=max
+            type=registry,ref=ghcr.io/${{ github.repository_owner.toLowerCase() }}/${{ env.NAME }}:buildcache,mode=max
             type=gha,mode=max
       
       - run: df -h
