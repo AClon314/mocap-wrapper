@@ -79,6 +79,25 @@ jobs:
           remove-browsers: true
           verbose: false
           
+      - name: 💾Build model_weights cache
+        uses: docker/build-push-action@v5
+        with:
+          context: ./docker
+          file: docker/${{ env.NAME }}/${{ env.NAME }}.dockerfile
+          target: model_weights  # 只构建到此阶段
+          push: false
+          cache-from: |
+            type=registry,ref=ghcr.io/${{ steps.lower.outputs.owner }}/${{ env.NAME }}:model_weights
+          cache-to: |
+            type=registry,ref=ghcr.io/${{ steps.lower.outputs.owner }}/${{ env.NAME }}:model_weights,compression=zstd
+          build-args: |
+            HF_TOKEN=${{ secrets.HF_TOKEN }}
+
+      - uses: mathio/gha-cleanup@v1
+        with:
+          remove-browsers: true
+          verbose: false
+      
       - name: 🔨Build & push
         uses: docker/build-push-action@v5
         with:
@@ -91,9 +110,10 @@ jobs:
             HF_TOKEN=${{ secrets.HF_TOKEN }}
           # cache 配置：>10GB, 用 registry（GHCR）。不压缩缓存以避免空间不足报错
           cache-from: |
-            type=registry,ref=ghcr.io/${{ steps.lower.outputs.owner }}/${{ env.NAME }}:gvhmr-buildcache
+            type=registry,ref=ghcr.io/${{ steps.lower.outputs.owner }}/${{ env.NAME }}:model_weights
+            type=registry,ref=ghcr.io/${{ steps.lower.outputs.owner }}/${{ env.NAME }}:buildcache
           cache-to: |
-            type=registry,ref=ghcr.io/${{ steps.lower.outputs.owner }}/${{ env.NAME }}:gvhmr-buildcache,compression=zstd
+            type=registry,ref=ghcr.io/${{ steps.lower.outputs.owner }}/${{ env.NAME }}:buildcache,compression=zstd
       
       - run: df -h
         if: always()

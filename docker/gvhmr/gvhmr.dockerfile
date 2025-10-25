@@ -16,28 +16,32 @@ RUN --mount=type=cache,target=/model_weights/.cache/huggingface/ \
     /root/.pixi/envs/pip/bin/hf download camenduru/SMPLer-X --local-dir /model_weights/body_models/smpl --include "SMPL_NEUTRAL.pkl"; \
     /root/.pixi/envs/pip/bin/hf download camenduru/SMPLer-X --local-dir /model_weights/body_models/smplx --include "SMPLX_NEUTRAL.npz"'
 
-FROM ghcr.io/prefix-dev/pixi:0.56.0-noble-cuda-13.0.0 AS builder
+FROM ghcr.io/prefix-dev/pixi:noble-cuda-13.0.0 AS builder
 ARG NAME="gvhmr"
 # --recursive for DPVO
 RUN pixi global install git && \
-    git clone https://github.com/zju3dv/GVHMR /${NAME}
+    git clone https://github.com/zju3dv/GVHMR /${NAME} && \
+    pixi global uninstall git &&\
+    pixi clean cache --yes
 WORKDIR /${NAME}
-RUN df -h && pixi global install --environment build-tools gcc gxx make libcxx && df -h
 COPY ${NAME}/pixi.toml ./
 RUN --mount=type=cache,target=/root/.cache/rattler/cache \
-    df -h && pixi install --quiet
+    df -h && pixi global install --environment build-tools gcc gxx make libcxx && df -h &&\
+    pixi install --quiet &&\
+    pixi shell-hook > pixi-shell.sh && echo 'exec "$@"' >> pixi-shell.sh &&\
+    pixi global uninstall build-tools && pixi clean cache --yes
 
 COPY --from=model_weights /model_weights /${NAME}/inputs/checkpoints
 COPY ${NAME}/${NAME}.yaml /${NAME}/hmr4d/configs/
 COPY lib.py ${NAME}/${NAME}.py ${NAME}/pixi.toml ./
 
-RUN pixi global uninstall $(ls ~/.pixi/envs) && \
-    pixi clean cache --yes
 LABEL org.opencontainers.image.description "GVHMR motion capture pipeline with build info: Built with CUDA 13.0.0, Pixi 0.56.0, Ubuntu Noble."
 LABEL org.opencontainers.image.authors="zju3dv(original), AClon314(build&patch)"
 LABEL org.opencontainers.image.source="https://github.com/zju3dv/GVHMR"
+
 VOLUME [ "/${NAME}/output" ]
+EXPOSE 8000
 ENV NAME=$NAME
+ENTRYPOINT ["/bin/bash", "pixi-shell.sh", "python", "$NAME.py"]
 CMD ["pixi","run","-q","--","python", "lib.py", "--server"]
-ENTRYPOINT ["pixi","run","-q","--","python", "$NAME.py"]
 # podman run --rm --device nvidia.com/gpu=all -v ./input:/in:ro ghcr.nju.edu.cn/aclon314/gvhmr:latest -i /in/input.mp4
