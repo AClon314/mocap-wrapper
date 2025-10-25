@@ -16,7 +16,7 @@ RUN --mount=type=cache,target=/model_weights/.cache/huggingface/ \
     /root/.pixi/envs/pip/bin/hf download camenduru/SMPLer-X --local-dir /model_weights/body_models/smpl --include "SMPL_NEUTRAL.pkl"; \
     /root/.pixi/envs/pip/bin/hf download camenduru/SMPLer-X --local-dir /model_weights/body_models/smplx --include "SMPLX_NEUTRAL.npz"'
 
-FROM ghcr.io/prefix-dev/pixi:noble-cuda-13.0.0 AS builder
+FROM ghcr.io/prefix-dev/pixi:noble-cuda-13.0.0 AS py_env
 ARG NAME="gvhmr"
 # --recursive for DPVO
 RUN pixi global install git && \
@@ -31,6 +31,11 @@ RUN --mount=type=cache,target=/root/.cache/rattler/cache \
     pixi shell-hook > pixi-shell.sh && echo 'exec "$@"' >> pixi-shell.sh &&\
     pixi global uninstall build-tools && pixi clean cache --yes
 
+# 最后一层负责组装，纯COPY，减少最终镜像体积，适合热更新
+FROM ghcr.io/prefix-dev/pixi:noble-cuda-13.0.0
+ARG NAME="gvhmr"
+WORKDIR /${NAME}
+COPY --from=py_env /${NAME} /${NAME}
 COPY --from=model_weights /model_weights /${NAME}/inputs/checkpoints
 COPY ${NAME}/${NAME}.yaml /${NAME}/hmr4d/configs/
 COPY lib.py ${NAME}/${NAME}.py ${NAME}/pixi.toml ./
@@ -39,9 +44,12 @@ LABEL org.opencontainers.image.description "GVHMR motion capture pipeline with b
 LABEL org.opencontainers.image.authors="zju3dv(original), AClon314(build&patch)"
 LABEL org.opencontainers.image.source="https://github.com/zju3dv/GVHMR"
 
+# 容器内输出路径，用 -v ./output:/gvhmr/output 挂载
 VOLUME [ "/${NAME}/output" ]
 EXPOSE 8000
 ENV NAME=$NAME
+# podman run <image> 后面的参数，附加在 ENTRYPOINT 后面
 ENTRYPOINT ["/bin/bash", "pixi-shell.sh", "python", "$NAME.py"]
+# 无参数则使用 CMD 指定的参数
 CMD ["pixi","run","-q","--","python", "lib.py", "--server"]
 # podman run --rm --device nvidia.com/gpu=all -v ./input:/in:ro ghcr.nju.edu.cn/aclon314/gvhmr:latest -i /in/input.mp4

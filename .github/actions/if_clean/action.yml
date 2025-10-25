@@ -1,0 +1,28 @@
+name: "Check Disk and Cleanup🧹"
+description: "Check disk space and cleanup if low"
+inputs:
+  remain_gb:
+    description: "At least remain ? GB of disk space"
+    required: false
+    default: "7"
+runs:
+  using: "composite"
+  steps:
+    - name: Check disk space
+      id: check_space
+      run: |
+        available=$(df / | tail -1 | awk '{print $4}')  # 获取可用块数（1K 块）
+        available_gb=$((available / 1024 / 1024))  # 转换为 GB
+        threshold=${{ inputs.remain_gb }}
+        if [ $available_gb -lt $threshold ]; then
+          echo "low_space=true" >> $GITHUB_OUTPUT
+        else
+          echo "low_space=false" >> $GITHUB_OUTPUT
+        fi
+      shell: bash
+
+    - uses: mathio/gha-cleanup@v1
+      if: steps.check_space.outputs.low_space == 'true'
+      with:
+        remove-browsers: true
+        verbose: false

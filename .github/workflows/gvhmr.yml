@@ -1,16 +1,16 @@
 name: gvhmr
 on:
   push:
-    branches: [ "main" ]
-    tags: [ 'v*.*.*' ]
+    branches: ["main"]
+    tags: ["v*.*.*"]
     paths:
-      - 'docker/gvhmr/**'
-      - '.github/workflows/gvhmr.yml'
+      - "docker/gvhmr/**"
+      - ".github/workflows/gvhmr.yml"
   pull_request:
-    branches: [ "main" ]
+    branches: ["main"]
     paths:
-      - 'docker/gvhmr/**'
-      - '.github/workflows/gvhmr.yml'
+      - "docker/gvhmr/**"
+      - ".github/workflows/gvhmr.yml"
   workflow_dispatch:
 
 env:
@@ -74,17 +74,14 @@ jobs:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           context: workflow
 
-      - uses: mathio/gha-cleanup@v1
-        with:
-          remove-browsers: true
-          verbose: false
-          
-      - name: 💾Build model_weights cache
+      - uses: ./.github/actions/if_clean
+
+      - name: 💾Cache model_weights
         uses: docker/build-push-action@v5
         with:
           context: ./docker
           file: docker/${{ env.NAME }}/${{ env.NAME }}.dockerfile
-          target: model_weights  # 只构建到此阶段
+          target: model_weights # 只构建到此阶段
           push: false
           cache-from: |
             type=registry,ref=ghcr.io/${{ steps.lower.outputs.owner }}/${{ env.NAME }}:model_weights
@@ -93,11 +90,24 @@ jobs:
           build-args: |
             HF_TOKEN=${{ secrets.HF_TOKEN }}
 
-      - uses: mathio/gha-cleanup@v1
+      - uses: ./.github/actions/if_clean
+
+      - name: 💾Cache git repo & pytorch env
+        uses: docker/build-push-action@v5
         with:
-          remove-browsers: true
-          verbose: false
-      
+          context: ./docker
+          file: docker/${{ env.NAME }}/${{ env.NAME }}.dockerfile
+          target: py_env # 只构建到此阶段
+          push: false
+          cache-from: |
+            type=registry,ref=ghcr.io/${{ steps.lower.outputs.owner }}/${{ env.NAME }}:py_env
+          cache-to: |
+            type=registry,ref=ghcr.io/${{ steps.lower.outputs.owner }}/${{ env.NAME }}:py_env,compression=zstd
+          build-args: |
+            HF_TOKEN=${{ secrets.HF_TOKEN }}
+
+      - uses: ./.github/actions/if_clean
+
       - name: 🔨Build & push
         uses: docker/build-push-action@v5
         with:
@@ -111,9 +121,7 @@ jobs:
           # cache 配置：>10GB, 用 registry（GHCR）。不压缩缓存以避免空间不足报错
           cache-from: |
             type=registry,ref=ghcr.io/${{ steps.lower.outputs.owner }}/${{ env.NAME }}:model_weights
-            type=registry,ref=ghcr.io/${{ steps.lower.outputs.owner }}/${{ env.NAME }}:buildcache
-          cache-to: |
-            type=registry,ref=ghcr.io/${{ steps.lower.outputs.owner }}/${{ env.NAME }}:buildcache,compression=zstd
-      
+            type=registry,ref=ghcr.io/${{ steps.lower.outputs.owner }}/${{ env.NAME }}:py_env
+
       - run: df -h
         if: always()
