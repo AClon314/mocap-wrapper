@@ -107,6 +107,8 @@ jobs:
             HF_TOKEN=${{ secrets.HF_TOKEN }}
 
       - uses: ./.github/actions/if_clean
+        with:
+          remain_gb: 10
 
       - name: 🔨Build & push
         uses: docker/build-push-action@v5

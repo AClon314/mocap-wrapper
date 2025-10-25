@@ -19,6 +19,7 @@ runs:
         else
           echo "low_space=false" >> $GITHUB_OUTPUT
         fi
+        df -h
       shell: bash
 
     - uses: mathio/gha-cleanup@v1
