@@ -89,13 +89,11 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           build-args: |
             HF_TOKEN=${{ secrets.HF_TOKEN }}
-          # cache 配置：优先使用 registry（GHCR），同时使用 GitHub Actions cache 作为回退
+          # cache 配置：>10GB, 用 registry（GHCR）。不压缩缓存以避免空间不足报错
           cache-from: |
-            type=registry,ref=ghcr.io/${{ steps.lower.outputs.owner }}/${{ env.NAME }}:buildcache
-            type=gha
+            type=registry,ref=ghcr.io/${{ steps.lower.outputs.owner }}/${{ env.NAME }}:gvhmr-buildcache
           cache-to: |
-            type=registry,ref=ghcr.io/${{ steps.lower.outputs.owner }}/${{ env.NAME }}:buildcache,mode=max
-            type=gha,mode=max
+            type=registry,ref=ghcr.io/${{ steps.lower.outputs.owner }}/${{ env.NAME }}:gvhmr-buildcache,compression=zstd
       
       - run: df -h
         if: always()

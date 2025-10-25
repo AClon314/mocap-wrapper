@@ -36,4 +36,8 @@ RUN pixi global uninstall $(ls ~/.pixi/envs) && \
 LABEL org.opencontainers.image.description "GVHMR motion capture pipeline with build info: Built with CUDA 13.0.0, Pixi 0.56.0, Ubuntu Noble."
 LABEL org.opencontainers.image.authors="zju3dv(original), AClon314(build&patch)"
 LABEL org.opencontainers.image.source="https://github.com/zju3dv/GVHMR"
-ENTRYPOINT ["pixi","run","-q","--","python","${NAME}.py"]
+VOLUME [ "/${NAME}/output" ]
+ENV NAME=$NAME
+CMD ["pixi","run","-q","--","python", "lib.py", "--server"]
+ENTRYPOINT ["pixi","run","-q","--","python", "$NAME.py"]
+# podman run --rm --device nvidia.com/gpu=all -v ./input:/in:ro ghcr.nju.edu.cn/aclon314/gvhmr:latest -i /in/input.mp4
