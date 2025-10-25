@@ -21,7 +21,6 @@ ARG NAME="gvhmr"
 # --recursive for DPVO
 RUN pixi global install git && \
     git clone https://github.com/zju3dv/GVHMR /${NAME} && \
-    pixi global uninstall git &&\
     pixi clean cache --yes
 WORKDIR /${NAME}
 COPY ${NAME}/pixi.toml ./
@@ -29,7 +28,7 @@ RUN --mount=type=cache,target=/root/.cache/rattler/cache \
     df -h && pixi global install --environment build-tools gcc gxx make libcxx && df -h &&\
     pixi install --quiet &&\
     pixi shell-hook > pixi-shell.sh && echo 'exec "$@"' >> pixi-shell.sh &&\
-    pixi global uninstall build-tools && pixi clean cache --yes
+    pixi global uninstall build-tools git && pixi clean cache --yes
 
 # 最后一层负责组装，纯COPY，减少最终镜像体积，适合热更新
 FROM ghcr.io/prefix-dev/pixi:0.49.0-noble-cuda-12.8.1
