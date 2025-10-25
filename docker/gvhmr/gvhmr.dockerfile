@@ -16,7 +16,7 @@ RUN --mount=type=cache,target=/model_weights/.cache/huggingface/ \
     /root/.pixi/envs/pip/bin/hf download camenduru/SMPLer-X --local-dir /model_weights/body_models/smpl --include "SMPL_NEUTRAL.pkl"; \
     /root/.pixi/envs/pip/bin/hf download camenduru/SMPLer-X --local-dir /model_weights/body_models/smplx --include "SMPLX_NEUTRAL.npz"'
 
-FROM ghcr.io/prefix-dev/pixi:0.49.0-noble-cuda-13.0.0 AS py_env
+FROM ghcr.io/prefix-dev/pixi:0.49.0-noble-cuda-12.8.1 AS py_env
 ARG NAME="gvhmr"
 # --recursive for DPVO
 RUN pixi global install git && \
@@ -32,7 +32,7 @@ RUN --mount=type=cache,target=/root/.cache/rattler/cache \
     pixi global uninstall build-tools && pixi clean cache --yes
 
 # 最后一层负责组装，纯COPY，减少最终镜像体积，适合热更新
-FROM ghcr.io/prefix-dev/pixi:noble-cuda-13.0.0
+FROM ghcr.io/prefix-dev/pixi:0.49.0-noble-cuda-12.8.1
 ARG NAME="gvhmr"
 WORKDIR /${NAME}
 COPY --from=py_env /${NAME} /${NAME}
