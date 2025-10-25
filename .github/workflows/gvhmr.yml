@@ -108,7 +108,7 @@ jobs:
 
       - uses: ./.github/actions/if_clean
         with:
-          remain_gb: 40
+          remain_gb: 21
 
       - name: 🔨Build & push
         uses: docker/build-push-action@v5

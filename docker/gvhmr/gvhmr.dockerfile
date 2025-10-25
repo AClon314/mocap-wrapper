@@ -34,6 +34,9 @@ RUN --mount=type=cache,target=/root/.cache/rattler/cache \
 FROM ghcr.io/prefix-dev/pixi:noble-cuda-12.8.1
 ARG NAME="gvhmr"
 WORKDIR /${NAME}
+RUN rm -rf /${NAME}/output || true && \
+    mkdir -p /out && \
+    ln -s /out /${NAME}/output
 COPY --from=py_env /${NAME} /${NAME}
 COPY --from=model_weights /model_weights /${NAME}/inputs/checkpoints
 COPY ${NAME}/${NAME}.yaml /${NAME}/hmr4d/configs/
@@ -44,11 +47,11 @@ LABEL org.opencontainers.image.authors="zju3dv(original), AClon314(build&patch)"
 LABEL org.opencontainers.image.source="https://github.com/zju3dv/GVHMR"
 
 # 容器内输出路径，用 -v ./output:/gvhmr/output 挂载
-VOLUME [ "/${NAME}/output" ]
+VOLUME [ "/out" ]
 EXPOSE 8000
 ENV NAME=$NAME
 # podman run <image> 后面的参数，附加在 ENTRYPOINT 后面
 ENTRYPOINT ["/bin/bash", "pixi-shell.sh", "python", "$NAME.py"]
 # 无参数则使用 CMD 指定的参数
 CMD ["pixi","run","-q","--","python", "lib.py", "--server"]
-# podman run --rm --device nvidia.com/gpu=all -v ./input:/in:ro ghcr.nju.edu.cn/aclon314/gvhmr:latest -i /in/input.mp4
+# podman run --rm --device nvidia.com/gpu=all -v ./input:/in:ro -v ./output:/out ghcr.nju.edu.cn/aclon314/gvhmr:latest -i /in/input.mp4
