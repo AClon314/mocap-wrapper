@@ -1,23 +1,22 @@
-name: gvhmr
+name: dynhamr
 on:
   push:
     branches: ["main"]
     tags: ["v*.*.*"]
     paths:
-      - "docker/gvhmr/**"
-      - ".github/workflows/gvhmr.yml"
+      - "docker/dynhamr/**"
+      - ".github/workflows/dynhamr.yml"
   pull_request:
     branches: ["main"]
     paths:
-      - "docker/gvhmr/**"
-      - ".github/workflows/gvhmr.yml"
+      - "docker/dynhamr/**"
+      - ".github/workflows/dynhamr.yml"
   workflow_dispatch:
 jobs:
   call-template:
     uses: ./.github/workflows/build_push.yml
     with:
-      name: gvhmr
-      remain_gb: 40
+      name: dynhamr
     secrets:
       DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
       DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
