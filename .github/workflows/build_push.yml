@@ -31,44 +31,25 @@ jobs:
   model_weights:
     runs-on: ubuntu-latest
     steps:
-      - run: df -h
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: A→a lowercased
-        id: lower
-        run: |
-          echo "owner=${GITHUB_REPOSITORY_OWNER,,}" >> $GITHUB_OUTPUT
-          echo "actor=${GITHUB_ACTOR,,}" >> $GITHUB_OUTPUT
-          echo "dockerhub=${DOCKERHUB_USERNAME,,}" >> $GITHUB_OUTPUT
-        env:
-          DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-
-      - name: Login to GHCR
-        if: github.event_name != 'pull_request'
-        uses: docker/login-action@v3
-        with:
-          registry: ghcr.io
-          username: ${{ steps.lower.outputs.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - uses: ./.github/actions/if_clean
+      - uses: .github/actions/pre
+        id: pre
         with:
           remain_gb: ${{ inputs.remain_gb }}
+          DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: 💾Cache model_weights (push cache tag)
+      - name: 💾Cache model_weights
         uses: docker/build-push-action@v5
         with:
           context: ./docker
           file: docker/${{ env.NAME }}/${{ env.NAME }}.dockerfile
           target: model_weights
           push: true
-          tags: ghcr.io/${{ steps.lower.outputs.owner }}/${{ env.NAME }}:model_weights
+          tags: ghcr.io/${{ steps.pre.outputs.owner }}/${{ env.NAME }}:model_weights
+          cache-from: |
+            type=registry,ref=ghcr.io/${{ steps.pre.outputs.owner }}/${{ env.NAME }}:model_weights
           cache-to: |
-            type=registry,ref=ghcr.io/${{ steps.lower.outputs.owner }}/${{ env.NAME }}:model_weights,compression=zstd
+            type=registry,ref=ghcr.io/${{ steps.pre.outputs.owner }}/${{ env.NAME }}:model_weights,compression=zstd
           build-args: |
             HF_TOKEN=${{ secrets.HF_TOKEN }}
 
@@ -79,44 +60,25 @@ jobs:
   py_env:
     runs-on: ubuntu-latest
     steps:
-      - run: df -h
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: A→a lowercased
-        id: lower
-        run: |
-          echo "owner=${GITHUB_REPOSITORY_OWNER,,}" >> $GITHUB_OUTPUT
-          echo "actor=${GITHUB_ACTOR,,}" >> $GITHUB_OUTPUT
-          echo "dockerhub=${DOCKERHUB_USERNAME,,}" >> $GITHUB_OUTPUT
-        env:
-          DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-
-      - name: Login to GHCR
-        if: github.event_name != 'pull_request'
-        uses: docker/login-action@v3
-        with:
-          registry: ghcr.io
-          username: ${{ steps.lower.outputs.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - uses: ./.github/actions/if_clean
+      - uses: .github/actions/pre
+        id: pre
         with:
           remain_gb: ${{ inputs.remain_gb }}
+          DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: 💾Cache py_env (push cache tag)
+      - name: 💾Cache py_env
         uses: docker/build-push-action@v5
         with:
           context: ./docker
           file: docker/${{ env.NAME }}/${{ env.NAME }}.dockerfile
           target: py_env
           push: true
-          tags: ghcr.io/${{ steps.lower.outputs.owner }}/${{ env.NAME }}:py_env
+          tags: ghcr.io/${{ steps.pre.outputs.owner }}/${{ env.NAME }}:py_env
+          cache-from: |
+            type=registry,ref=ghcr.io/${{ steps.pre.outputs.owner }}/${{ env.NAME }}:py_env
           cache-to: |
-            type=registry,ref=ghcr.io/${{ steps.lower.outputs.owner }}/${{ env.NAME }}:py_env,compression=zstd
+            type=registry,ref=ghcr.io/${{ steps.pre.outputs.owner }}/${{ env.NAME }}:py_env,compression=zstd
           build-args: |
             HF_TOKEN=${{ secrets.HF_TOKEN }}
 
@@ -128,36 +90,19 @@ jobs:
     needs: [model_weights, py_env]
     runs-on: ubuntu-latest
     steps:
-      - run: df -h
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: A→a lowercased
-        id: lower
-        run: |
-          echo "owner=${GITHUB_REPOSITORY_OWNER,,}" >> $GITHUB_OUTPUT
-          echo "actor=${GITHUB_ACTOR,,}" >> $GITHUB_OUTPUT
-          echo "dockerhub=${DOCKERHUB_USERNAME,,}" >> $GITHUB_OUTPUT
-        env:
+      - uses: .github/actions/pre
+        id: pre
+        with:
+          remain_gb: ${{ inputs.remain_gb }}
           DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Login to DockerHub
         if: github.event_name != 'pull_request'
         uses: docker/login-action@v3
         with:
-          username: ${{ steps.lower.outputs.dockerhub }}
+          username: ${{ steps.pre.outputs.dockerhub }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
-
-      - name: Login to GHCR
-        if: github.event_name != 'pull_request'
-        uses: docker/login-action@v3
-        with:
-          registry: ghcr.io
-          username: ${{ steps.lower.outputs.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Get current date
         id: date
@@ -168,8 +113,8 @@ jobs:
         uses: docker/metadata-action@v5
         with:
           images: |
-            ghcr.io/${{ steps.lower.outputs.owner }}/${{ env.NAME }}
-            ${{ steps.lower.outputs.dockerhub }}/${{ env.NAME }}
+            ghcr.io/${{ steps.pre.outputs.owner }}/${{ env.NAME }}
+            ${{ steps.pre.outputs.dockerhub }}/${{ env.NAME }}
           tags: |
             type=raw,value=${{ github.ref_name }},enable=${{ startsWith(github.ref, 'refs/tags/') }}
             type=raw,value=latest,enable=${{ github.ref_name == github.event.repository.default_branch }}
@@ -178,7 +123,7 @@ jobs:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           context: workflow
 
-      - uses: ./.github/actions/if_clean
+      - uses: .github/actions/if_clean
         with:
           remain_gb: ${{ inputs.remain_gb }}
 
@@ -191,10 +136,10 @@ jobs:
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: |
-            type=registry,ref=ghcr.io/${{ steps.lower.outputs.owner }}/${{ env.NAME }}:model_weights
-            type=registry,ref=ghcr.io/${{ steps.lower.outputs.owner }}/${{ env.NAME }}:py_env
+            type=registry,ref=ghcr.io/${{ steps.pre.outputs.owner }}/${{ env.NAME }}:model_weights
+            type=registry,ref=ghcr.io/${{ steps.pre.outputs.owner }}/${{ env.NAME }}:py_env
           build-args: |
             HF_TOKEN=${{ secrets.HF_TOKEN }}
 
-      - run: df -h
+      - run: df -h ；find . -not -path "*/.*" -not -name ".*" | grep -vE 'pyc|swp|__init' | sed -e "s/[^-][^\/]*\// |/g" -e "s/|\([^ ]\)/|-\1/"
         if: always()

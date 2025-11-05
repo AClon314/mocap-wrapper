@@ -4,7 +4,7 @@ inputs:
   remain_gb:
     description: "At least remain ? GB of disk space"
     required: false
-    default: "7"
+    default: 7
 runs:
   using: "composite"
   steps:
