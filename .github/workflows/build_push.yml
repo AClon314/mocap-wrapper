@@ -1,4 +1,4 @@
-name: Large Docker Image Build & Push (Dockerfile with 3 FROM AS model_weights, py_env, final)
+name: Large Docker Image Build & Push
 
 on:
   workflow_call:
@@ -23,12 +23,109 @@ on:
 env:
   NAME: ${{ inputs.name }}
 
+permissions:
+  contents: read
+  packages: write
+
 jobs:
-  gvhmr:
+  # 并行构建 model_weights cache
+  build_model_weights:
     runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      packages: write
+    steps:
+      - run: df -h
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: A→a lowercased
+        id: lower
+        run: |
+          echo "owner=${GITHUB_REPOSITORY_OWNER,,}" >> $GITHUB_OUTPUT
+          echo "actor=${GITHUB_ACTOR,,}" >> $GITHUB_OUTPUT
+          echo "dockerhub=${DOCKERHUB_USERNAME,,}" >> $GITHUB_OUTPUT
+        env:
+          DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to GHCR
+        if: github.event_name != 'pull_request'
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ steps.lower.outputs.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: ./.github/actions/if_clean
+        with:
+          remain_gb: ${{ inputs.remain_gb }}
+
+      - name: 💾Cache model_weights (push cache tag)
+        uses: docker/build-push-action@v5
+        with:
+          context: ./docker
+          file: docker/${{ env.NAME }}/${{ env.NAME }}.dockerfile
+          target: model_weights
+          push: true
+          tags: ghcr.io/${{ steps.lower.outputs.owner }}/${{ env.NAME }}:model_weights
+          cache-to: |
+            type=registry,ref=ghcr.io/${{ steps.lower.outputs.owner }}/${{ env.NAME }}:model_weights,compression=zstd
+          build-args: |
+            HF_TOKEN=${{ secrets.HF_TOKEN }}
+
+      - run: df -h
+
+  # 并行构建 py_env cache
+  build_py_env:
+    runs-on: ubuntu-latest
+    steps:
+      - run: df -h
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: A→a lowercased
+        id: lower
+        run: |
+          echo "owner=${GITHUB_REPOSITORY_OWNER,,}" >> $GITHUB_OUTPUT
+          echo "actor=${GITHUB_ACTOR,,}" >> $GITHUB_OUTPUT
+          echo "dockerhub=${DOCKERHUB_USERNAME,,}" >> $GITHUB_OUTPUT
+        env:
+          DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to GHCR
+        if: github.event_name != 'pull_request'
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ steps.lower.outputs.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: ./.github/actions/if_clean
+        with:
+          remain_gb: ${{ inputs.remain_gb }}
+
+      - name: 💾Cache py_env (push cache tag)
+        uses: docker/build-push-action@v5
+        with:
+          context: ./docker
+          file: docker/${{ env.NAME }}/${{ env.NAME }}.dockerfile
+          target: py_env
+          push: true
+          tags: ghcr.io/${{ steps.lower.outputs.owner }}/${{ env.NAME }}:py_env
+          cache-to: |
+            type=registry,ref=ghcr.io/${{ steps.lower.outputs.owner }}/${{ env.NAME }}:py_env,compression=zstd
+          build-args: |
+            HF_TOKEN=${{ secrets.HF_TOKEN }}
+
+      - run: df -h
+
+  # 等待上面两个完成，再用 cache 构建并推送最终鏡像
+  assemble_and_push:
+    needs: [build_model_weights, build_py_env]
+    runs-on: ubuntu-latest
     steps:
       - run: df -h
       - name: Checkout
@@ -81,42 +178,10 @@ jobs:
           context: workflow
 
       - uses: ./.github/actions/if_clean
-
-      - name: 💾Cache model_weights
-        uses: docker/build-push-action@v5
         with:
-          context: ./docker
-          file: docker/${{ env.NAME }}/${{ env.NAME }}.dockerfile
-          target: model_weights
-          push: false
-          cache-from: |
-            type=registry,ref=ghcr.io/${{ steps.lower.outputs.owner }}/${{ env.NAME }}:model_weights
-          cache-to: |
-            type=registry,ref=ghcr.io/${{ steps.lower.outputs.owner }}/${{ env.NAME }}:model_weights,compression=zstd
-          build-args: |
-            HF_TOKEN=${{ secrets.HF_TOKEN }}
+          remain_gb: ${{ inputs.remain_gb }}
 
-      - uses: ./.github/actions/if_clean
-
-      - name: 💾Cache git repo & pytorch env
-        uses: docker/build-push-action@v5
-        with:
-          context: ./docker
-          file: docker/${{ env.NAME }}/${{ env.NAME }}.dockerfile
-          target: py_env
-          push: false
-          cache-from: |
-            type=registry,ref=ghcr.io/${{ steps.lower.outputs.owner }}/${{ env.NAME }}:py_env
-          cache-to: |
-            type=registry,ref=ghcr.io/${{ steps.lower.outputs.owner }}/${{ env.NAME }}:py_env,compression=zstd
-          build-args: |
-            HF_TOKEN=${{ secrets.HF_TOKEN }}
-
-      - uses: ./.github/actions/if_clean
-        with:
-          remain_gb: ${{ inputs.name }}
-
-      - name: 🔨Build & push
+      - name: 🔨Build final
         uses: docker/build-push-action@v5
         with:
           context: ./docker
@@ -124,11 +189,11 @@ jobs:
           push: ${{ github.event_name != 'pull_request' }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
-          build-args: |
-            HF_TOKEN=${{ secrets.HF_TOKEN }}
           cache-from: |
             type=registry,ref=ghcr.io/${{ steps.lower.outputs.owner }}/${{ env.NAME }}:model_weights
             type=registry,ref=ghcr.io/${{ steps.lower.outputs.owner }}/${{ env.NAME }}:py_env
+          build-args: |
+            HF_TOKEN=${{ secrets.HF_TOKEN }}
 
       - run: df -h
         if: always()
