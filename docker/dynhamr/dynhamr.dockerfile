@@ -22,9 +22,9 @@ RUN --mount=type=cache,target=/model_weights/.cache/huggingface/ \
 
 FROM ghcr.io/prefix-dev/pixi:noble-cuda-12.8.1 AS py_env
 ARG NAME="dynhamr"
-# --recursive for DPVO
+# --recursive for third-party
 RUN pixi global install git && \
-    git clone https://github.com/ZhengdiYu/Dyn-HaMR /${NAME} && \
+    git clone --recursive https://github.com/ZhengdiYu/Dyn-HaMR /${NAME} && \
     pixi clean cache --yes
 WORKDIR /${NAME}
 COPY ${NAME}/pixi.toml ./
