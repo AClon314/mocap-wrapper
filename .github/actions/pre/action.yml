@@ -45,6 +45,6 @@ runs:
         username: ${{ steps.lower.outputs.actor }}
         password: ${{ inputs.GITHUB_TOKEN }}
 
-    - uses: .github/actions/if_clean
+    - uses: ./.github/actions/if_clean
       with:
         remain_gb: ${{ inputs.remain_gb }}

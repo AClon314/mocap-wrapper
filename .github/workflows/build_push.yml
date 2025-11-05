@@ -31,7 +31,7 @@ jobs:
   model_weights:
     runs-on: ubuntu-latest
     steps:
-      - uses: .github/actions/pre
+      - uses: ./.github/actions/pre
         id: pre
         with:
           remain_gb: ${{ inputs.remain_gb }}
@@ -60,7 +60,7 @@ jobs:
   py_env:
     runs-on: ubuntu-latest
     steps:
-      - uses: .github/actions/pre
+      - uses: ./.github/actions/pre
         id: pre
         with:
           remain_gb: ${{ inputs.remain_gb }}
@@ -90,7 +90,7 @@ jobs:
     needs: [model_weights, py_env]
     runs-on: ubuntu-latest
     steps:
-      - uses: .github/actions/pre
+      - uses: ./.github/actions/pre
         id: pre
         with:
           remain_gb: ${{ inputs.remain_gb }}
@@ -123,7 +123,7 @@ jobs:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           context: workflow
 
-      - uses: .github/actions/if_clean
+      - uses: ./.github/actions/if_clean
         with:
           remain_gb: ${{ inputs.remain_gb }}
 
