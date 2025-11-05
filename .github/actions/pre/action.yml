@@ -22,13 +22,15 @@ runs:
   using: "composite"
   steps:
     - run: df -h
+      shell: bash
     
     - name: A→a lowercased
       id: lower
       run: |
         echo "owner=${GITHUB_REPOSITORY_OWNER,,}" >> $GITHUB_OUTPUT
         echo "actor=${GITHUB_ACTOR,,}" >> $GITHUB_OUTPUT
-        echo "dockerhub=${{ inputs.DOCKERHUB_USERNAME,, }}" >> $GITHUB_OUTPUT
+        echo "dockerhub=${DOCKERHUB_USERNAME,,}" >> $GITHUB_OUTPUT
+      shell: bash
       env:
         DOCKERHUB_USERNAME: ${{ inputs.DOCKERHUB_USERNAME }}
 
