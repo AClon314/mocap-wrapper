@@ -1,0 +1,19 @@
+name: clean up
+description: Clean up untagged images in GHCR to save space
+on:
+  schedule:
+    # every month
+    - cron: '0 0 1 * *'
+  workflow_dispatch:
+permissions:
+  # Needs read:packages and delete:packages permissions.
+  packages: write
+  contents: read
+
+jobs:
+  - uses: quartx-analytics/ghcr-cleaner@v1
+    with:
+        owner-type: user # org/user
+        token: ${{ secrets.PAT_TOKEN }}
+        repository_owner: ${{ github.repository_owner }}
+        delete-untagged: true
