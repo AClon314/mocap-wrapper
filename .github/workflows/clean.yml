@@ -11,9 +11,12 @@ permissions:
   contents: read
 
 jobs:
-  - uses: quartx-analytics/ghcr-cleaner@v1
-    with:
-        owner-type: user # org/user
-        token: ${{ secrets.PAT_TOKEN }}
-        repository_owner: ${{ github.repository_owner }}
-        delete-untagged: true
+  gchr:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: quartx-analytics/ghcr-cleaner@v1
+        with:
+            owner-type: user # org/user
+            token: ${{ secrets.PAT_TOKEN }}
+            repository_owner: ${{ github.repository_owner }}
+            delete-untagged: true
