@@ -123,7 +123,7 @@ jobs:
 
   # 等待上面两个完成，再用 cache 构建并推送最终鏡像
   push:
-    needs: [build_model_weights, build_py_env]
+    needs: [model_weights, py_env]
     runs-on: ubuntu-latest
     steps:
       - run: df -h
