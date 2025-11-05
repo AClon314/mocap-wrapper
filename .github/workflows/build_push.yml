@@ -31,6 +31,7 @@ jobs:
   model_weights:
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@v4
       - uses: ./.github/actions/pre
         id: pre
         with:
@@ -60,6 +61,7 @@ jobs:
   py_env:
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@v4
       - uses: ./.github/actions/pre
         id: pre
         with:
@@ -90,6 +92,7 @@ jobs:
     needs: [model_weights, py_env]
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@v4
       - uses: ./.github/actions/pre
         id: pre
         with:

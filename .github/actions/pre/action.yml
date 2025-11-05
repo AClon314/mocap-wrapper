@@ -22,9 +22,7 @@ runs:
   using: "composite"
   steps:
     - run: df -h
-    - name: Checkout
-      uses: actions/checkout@v4
-
+    
     - name: A→a lowercased
       id: lower
       run: |
