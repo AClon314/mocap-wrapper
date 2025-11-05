@@ -16,7 +16,7 @@ permissions:
   contents: read
   packages: write
 jobs:
-  0:
+  BP:
     uses: ./.github/workflows/build_push.yml
     secrets:
       DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
