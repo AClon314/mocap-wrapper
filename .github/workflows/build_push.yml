@@ -72,7 +72,8 @@ jobs:
           build-args: |
             HF_TOKEN=${{ secrets.HF_TOKEN }}
 
-      - run: df -h
+      - run: df -h ; find . -not -path "*/.*" -not -name ".*" | grep -vE 'pyc|swp|__init' | sed -e "s/[^-][^\/]*\// |/g" -e "s/|\([^ ]\)/|-\1/"
+        if: always()
 
   # 并行构建 py_env cache
   py_env:
@@ -119,7 +120,8 @@ jobs:
           build-args: |
             HF_TOKEN=${{ secrets.HF_TOKEN }}
 
-      - run: df -h
+      - run: df -h ; find . -not -path "*/.*" -not -name ".*" | grep -vE 'pyc|swp|__init' | sed -e "s/[^-][^\/]*\// |/g" -e "s/|\([^ ]\)/|-\1/"
+        if: always()
 
   # 等待上面两个完成，再用 cache 构建并推送最终鏡像
   push:
