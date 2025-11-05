@@ -18,5 +18,5 @@ jobs:
         with:
             owner-type: user # org/user
             token: ${{ secrets.PAT_TOKEN }}
-            repository_owner: ${{ github.repository_owner }}
+            repository-owner: ${{ github.repository_owner }}
             delete-untagged: true
