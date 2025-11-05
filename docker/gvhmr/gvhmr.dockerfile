@@ -10,9 +10,9 @@ RUN --mount=type=cache,target=/model_weights/.cache/huggingface/ \
     HF="$(cat /run/secrets/hf_token 2>/dev/null || true)" && \
     if [ -z "$HF" ]; then HF="${HF_TOKEN}"; fi && \
     if [ -n "$HF" ]; then export HF_TOKEN="$HF" && echo "Use HF_TOKEN"; else echo "😢 No HF_TOKEN(may have rate limits)"; fi && \
-    alias hf="/root/.pixi/envs/pip/bin/hf" && \
-    hf download camenduru/GVHMR --local-dir /model_weights --exclude "preproc_data/*" && \
-    hf download camenduru/SMPLer-X --local-dir /model_weights/body_models/smpl --include "SMPL_NEUTRAL.pkl" --include="SMPLX_NEUTRAL.npz" && \
+    hf="/root/.pixi/envs/pip/bin/hf" && \
+    $hf download camenduru/GVHMR --local-dir /model_weights --exclude "preproc_data/*" && \
+    $hf download camenduru/SMPLer-X --local-dir /model_weights/body_models/smpl --include "SMPL_NEUTRAL.pkl" --include="SMPLX_NEUTRAL.npz" && \
     df -h
 
 FROM ghcr.io/prefix-dev/pixi:noble-cuda-12.8.1 AS py_env

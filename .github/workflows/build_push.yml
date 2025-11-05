@@ -28,8 +28,7 @@ permissions:
   packages: write
 
 jobs:
-  # 并行构建 model_weights cache
-  build_model_weights:
+  model_weights:
     runs-on: ubuntu-latest
     steps:
       - run: df -h
@@ -76,7 +75,7 @@ jobs:
       - run: df -h
 
   # 并行构建 py_env cache
-  build_py_env:
+  py_env:
     runs-on: ubuntu-latest
     steps:
       - run: df -h
@@ -123,7 +122,7 @@ jobs:
       - run: df -h
 
   # 等待上面两个完成，再用 cache 构建并推送最终鏡像
-  assemble_and_push:
+  push:
     needs: [build_model_weights, build_py_env]
     runs-on: ubuntu-latest
     steps:

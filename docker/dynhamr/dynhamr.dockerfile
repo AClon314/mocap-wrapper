@@ -10,13 +10,13 @@ RUN --mount=type=cache,target=/model_weights/.cache/huggingface/ \
     HF="$(cat /run/secrets/hf_token 2>/dev/null || true)" && \
     if [ -z "$HF" ]; then HF="${HF_TOKEN}"; fi && \
     if [ -n "$HF" ]; then export HF_TOKEN="$HF" && echo "Use HF_TOKEN"; else echo "😢 No HF_TOKEN(may have rate limits)"; fi && \
-    alias hf="/root/.pixi/envs/pip/bin/hf" && \
+    hf="/root/.pixi/envs/pip/bin/hf" && \
     # BMC
-    hf download Nolca/Dyn-HaMR --local-dir /model_weights && \
+    $hf download Nolca/Dyn-HaMR --local-dir /model_weights && \
     # HaMeR
-    hf download geopavlakos/HaMeR --repo-type=space --local-dir /model_weights --include "_DATA/" && \
+    $hf download geopavlakos/HaMeR --repo-type=space --local-dir /model_weights --include "_DATA/" && \
     # SLAM (dev mode)
-    # hf download ThunderVVV/HaWoR --local-dir /model_weights --include "external/droid.pth" && \
+    # $hf download ThunderVVV/HaWoR --local-dir /model_weights --include "external/droid.pth" && \
     # TODO: HMP, VPoser
     df -h
 
