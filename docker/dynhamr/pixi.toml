@@ -37,7 +37,7 @@ tensorboard = "*"
 tqdm = "*" 
 xtcocotools = "*" 
 [pypi-options]
-no-build-isolation = ["setuptools", "pip", "chumpy", "torch"]
+no-build-isolation = true
 [pypi-dependencies]
 dyn-hamr = {path = ".", editable = true}
 
