@@ -64,7 +64,7 @@ torch-scatter = {url = "https://data.pyg.org/whl/torch-1.13.0+cpu/torch_scatter-
 [feature.cpu.target.win-64.pypi-dependencies]
 torch-scatter = {url = "https://data.pyg.org/whl/torch-1.13.0+cpu/torch_scatter-2.1.1+pt113cpu-cp310-cp310-win_amd64.whl"}
 [feature.cpu.pypi-dependencies]
-torch = {version = "==1.13.0", index = "https://download.pytorch.org/whl/cpu"}
+torch = {version = "==1.13.0", index = "https://download.pytorch.org/whl/cpu", no-build-isolation = true}
 # torch-scatter = {version = "==2.1.1", index = "https://data.pyg.org/whl/cpu"}
 torchvision = {version = "==0.14.0", index = "https://download.pytorch.org/whl/cpu"}
 
@@ -78,7 +78,7 @@ scikit-image = "*"
 xtcocotools = "*"
 yacs = "*"
 [feature.hamer.pypi-options]
-# https://github.com/prefix-dev/pixi/issues/4392 https://github.com/prefix-dev/pixi/issues/3223
+# https://github.com/prefix-dev/pixi/issues/4392 https://github.com/prefix-dev/pixi/issues/3223 https://github.com/prefix-dev/pixi/issues/1124 https://github.com/prefix-dev/pixi/issues/1834
 no-build-isolation = true
 [feature.hamer.pypi-options.dependency-overrides]
 protobuf = ">=5,<6"
@@ -88,7 +88,6 @@ mmpose = {path = "third-party/hamer/third-party/ViTPose", editable = true}
 
 detectron2 = {git = "https://github.com/facebookresearch/detectron2"} 
 mediapipe = "*" # ⚠️ protobuf too old
-torch = {version = "==1.13.0", index = "https://download.pytorch.org/whl/cu117"} 
 # chumpy = {git = "https://github.com/mattloper/chumpy"} 
 # lightning = "*" 
 # mmcv = "==1.3.9" 
