@@ -9,11 +9,15 @@ sincerelly thanks to gvhmr/wilor/wilor-mini developers and others that help each
 ## WIP 进展
 
 > [!CAUTION]
-> TODO in v0.2.1:
-> - [ ] refactor, use podman / udocker
+> TODO in v0.3:
+> - [ ] support Dyn-HaMR, [gvhmr-realtime](https://github.com/MittelmanDaniel/GVHMR-Realtime)
+> - [ ] PR udocker for **RESTful over Socket/TCP** in podman standard
 > - [ ] support MCP/fastAPI
-> - [ ] support Dyn-HaMR
 > - [ ] wilor continuous predict.
+> - [ ] ~~PR cockpit compatible with webtui+ chawan(PR websocket) in TUI~~
+> - [ ] ~~cockpit **progress** addon(app) with [progress](https://github.com/Xfennec/progress), task-spooler...~~
+>   - [ ] ~~progress and [dbus: org.kde.JobTracker](https://github.com/KDE/kjobwidgets/blob/master/src/kstatusbarjobtracker.h) (https://invent.kde.org/frameworks/kjobwidgets/-/merge_requests/6)~~
+>   - [ ] ~~new (once) task, pause task if pauseable, stop task, task priority(cpu/gpu hang, network traffic speed limit)~~
 
 | Feature 功能      |                |
 | ----------------- | -------------- |
@@ -26,29 +30,7 @@ sincerelly thanks to gvhmr/wilor/wilor-mini developers and others that help each
 | 🚀国内镜像加速     | ✅              |
 
 
-
-
 ## solutions 方案
-<details><summary>
-stage-by-stage scheme
-</summary>
-
-For budget, you can start with a cheap scheme and then upgrade to a more expensive one.
-
-interactable virtual scene & record video & post-calculate → realtime calculate with better GPU → realtime with hardware support
-
-> GPU → iphone → quest3
-
-|                 | minimum                                                 | medium                                                  | higher                                            |
-| --------------- | ------------------------------------------------------- | ------------------------------------------------------- | ------------------------------------------------- |
-| ♿🖥sit           | 🖱⌨️🎮`user input` as **body** motion/**interact** in game | `GPU`(**face+hand**) +`cam`📷                            | UE live link(**face**) +`mini tripod`🔭            |
-| sit cost        | $0 game like VRchat                                     | ≥$200 GPU; $0 if use phone as cam                       | $0 live link app; ≥$350 iphone; $1 mini tripod    |
-| 🧍‍♂️🎣stand         | `tripod cam`🔭+ `GPU`(**body+hand**)                     | UE live link(**face**) +Headrig                         | `UE vcam` to **interact**                         |
-| stand cost $520 | $20 tripod; ≥$200 GPU                                   | $0 live link app; $300 rokoko headrig                   | $0 vcam app                                       |
-| 👓VR             | `quest3` realtime **hand** mocap & natural **interact** | ~~quest4~~ or `pico 4 pro` or DIY hardware for **face** | `tracker` hardware or `GPU` software for **body** |
-| VR cost $850    | $400                                                    | ?                                                       | $450 tracker or ≥$200 GPU                         |
-
-</details>
 
 ### software:OpenSource
 Rank: [body🕺](https://paperswithcode.com/task/3d-human-pose-estimation "3D人体姿态估计")  [hand👋](https://paperswithcode.com/task/3d-hand-pose-estimation "3D手部姿态估计")  [face👤](https://paperswithcode.com/task/facial-landmark-detection "面部特征点检测") [text to motion文](https://paperswithcode.com/task/motion-synthesis "运动合成(文→动作)")
@@ -180,3 +162,13 @@ By using this repository, you must also comply with the terms of these external 
 | GVHMR         | [Copyright 2022-2023 3D Vision Group at the State Key Lab of CAD&CG, Zhejiang University. All Rights Reserved. ![CC BY-NC-SA](https://licensebuttons.net/l/by-nc-sa/3.0/88x31.png)](https://github.com/zju3dv/GVHMR/blob/main/LICENSE "CC BY-NC-SA") |
 | WiLoR         | [![CC BY-NC-ND 4.0](https://licensebuttons.net/l/by-nc-nd/3.0/88x31.png)](https://github.com/rolpotamias/WiLoR/blob/main/license.txt "CC BY-NC-ND 4.0")                                                                                              |
 | mocap-wrapper | [AGPL v3](./LICENSE)                                                                                                                                                                                                                                 |
+
+## Dev Log 开发者日志
+- 2025.12.08: 
+1个月停更是去探索CLI/TUI/webUI的跨平台方案了。 摸索出:
+    - CLI: python argParse+argcomplete **客户端**参数转pandatic http请求
+      - fastAPI **服务器**任务调度/网络请求
+      - podman udocker CLI调用 或 ~~json-RPC通信~~
+    - TUI: chawan 网页浏览器(nim语言，导入websocket C库成功，但nim lang server类型提示没弄出来，遂放弃)
+    - webUI: webTUI css 主题; cockpit webUI 自带简易身份认证; cockpit 任务队列插件;
+综上，这是我对此项目最终的愿景，这里就已经涉及到5个大工程了。个人开发精力有限，最后决定先让项目跑起来，以后有时间慢慢迭代这些 **重要但不紧急**的需求。 

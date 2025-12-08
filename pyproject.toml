@@ -7,28 +7,25 @@ authors = [
   {name = "nolca", email = "nolca@qq.com"},
 ]
 dependencies = [
-  "mcp",
   "toml",
   "tqdm",
   "numpy",
-  "gdown",
   "fastapi",
   "fastmcp",
-  "mirror_cn @ git+https://gitee.com/aclon314/mirror-cn.git",
-  "aria2p[tui]",
-  "aiohttp",
+  "mirror_cn @ git+https://github.com/aclon314/mirror-cn.git",
   "aexpect>=1.8",
   "platformdirs",
   "huggingface_hub",
-  "typed-ffmpeg", ## mamba failed:
-  "netscape-cookies",
+  "typed-ffmpeg",
+  "pydantic",
+  "pydantic-argparse",
 ]
 description = "GVHMR, TRAM, WiLoR...mocap install/run with blender/unreal in one command"
 keywords = ["mocap", "pose estimate", "blender", "unreal", "mcp"]
 license = {file = "LICENSE"}
 name = "mocap-wrapper"
 readme = "README.md"
-version = "0.2.1"
+version = "0.3.20251208"
 
 classifiers = [
   "License :: OSI Approved :: MIT License",
@@ -36,16 +33,21 @@ classifiers = [
   "Development Status :: 3 - Alpha",
   "Intended Audience :: Developers",
   "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.10",
   "Programming Language :: Python :: 3.11",
   "Programming Language :: Python :: 3.12",
   "Programming Language :: Python :: 3.13",
-] 
-requires-python = ">=3.11" # 💡 you can remove the codes about `typing Unpack` to lower the python version
+  "Programming Language :: Python :: 3.14",
+]
+requires-python = ">=3.10"
 
 [tool.setuptools.package-data]
 "*" = ["*.yaml", "*.yml", "*.toml", "*.tml"]
 
 [project.optional-dependencies]
+cn = [
+  "mirror_cn @ git+https://gitee.com/aclon314/mirror-cn.git",
+]
 dev = ["pytest", "pytest-asyncio", "fake-bpy-module-4.3"]
 
 [project.urls]

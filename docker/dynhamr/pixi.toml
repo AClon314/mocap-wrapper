@@ -78,7 +78,7 @@ scikit-image = "*"
 xtcocotools = "*"
 yacs = "*"
 [feature.hamer.pypi-options]
-# https://github.com/prefix-dev/pixi/issues/4392
+# https://github.com/prefix-dev/pixi/issues/4392 https://github.com/prefix-dev/pixi/issues/3223
 no-build-isolation = true
 [feature.hamer.pypi-options.dependency-overrides]
 protobuf = ">=5,<6"
@@ -88,6 +88,7 @@ mmpose = {path = "third-party/hamer/third-party/ViTPose", editable = true}
 
 detectron2 = {git = "https://github.com/facebookresearch/detectron2"} 
 mediapipe = "*" # ⚠️ protobuf too old
+torch = {version = "==1.13.0", index = "https://download.pytorch.org/whl/cu117"} 
 # chumpy = {git = "https://github.com/mattloper/chumpy"} 
 # lightning = "*" 
 # mmcv = "==1.3.9" 
