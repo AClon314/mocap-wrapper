@@ -44,9 +44,7 @@ RUN rm -rf /${NAME}/output || true && \
 COPY --from=py_env /${NAME} /${NAME}
 COPY --from=model_weights /model_weights /${NAME}/_DATA
 COPY lib.py ${NAME}/${NAME}.py ${NAME}/pixi.toml ./
-# https://stackoverflow.com/questions/3455625/linux-command-to-print-directory-structure-in-the-form-of-a-tree
-# RUN find . -not -path "*/.*" -not -name ".*" | grep -vE 'pyc|swp|__init' | sed -e "s/[^-][^\/]*\// |/g" -e "s/|\([^ ]\)/|-\1/"
-RUN df -h
+RUN pixi global install tree && tree -s -h && pixi global uninstall tree && pixi clean cache --yes && df -h
 
 LABEL org.opencontainers.image.description "Dyn-HaMR: Recovering 4D Interacting Hand Motion from a Dynamic Camera (CVPR 2025 Highlight)"
 LABEL org.opencontainers.image.authors="Yu, Zhengdi and Zafeiriou, Stefanos and Birdal, Tolga(original), AClon314(build&patch)"
