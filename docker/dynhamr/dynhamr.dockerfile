@@ -31,9 +31,9 @@ COPY ${NAME}/pixi.toml ./
 RUN --mount=type=cache,target=/root/.cache/rattler/cache \
     df -h && pixi global install --environment build-tools gcc gxx make libcxx && df -h &&\
     pixi install --quiet &&\
-    pixi workspace environment add default --feature hamer --force && \
+    pixi workspace environment add default --feature hamer --force --quiet && \
     pixi shell-hook > pixi-shell.sh && echo 'exec "$@"' >> pixi-shell.sh &&\
-    pixi global uninstall build-tools git && pixi clean cache --yes
+    pixi global uninstall build-tools git && pixi clean cache --yes && df -h
 
 # 最后一层负责组装，纯COPY，减少最终镜像体积，适合热更新
 FROM ghcr.io/prefix-dev/pixi:noble-cuda-12.8.1 AS final
@@ -41,12 +41,12 @@ ARG NAME="dynhamr"
 WORKDIR /${NAME}
 RUN rm -rf /${NAME}/output || true && \
     mkdir -p /out && \
-    ln -s /out /${NAME}/output
+    ln -s /out /${NAME}/output && df -h
 COPY --from=py_env /${NAME} /${NAME}
 COPY --from=model_weights /model_weights /${NAME}/_DATA
 COPY lib.py ${NAME}/${NAME}.py ${NAME}/pixi.toml ./
 # https://stackoverflow.com/questions/3455625/linux-command-to-print-directory-structure-in-the-form-of-a-tree
-RUN find . -not -path "*/.*" -not -name ".*" | grep -vE 'pyc|swp|__init' | sed -e "s/[^-][^\/]*\// |/g" -e "s/|\([^ ]\)/|-\1/"
+# RUN find . -not -path "*/.*" -not -name ".*" | grep -vE 'pyc|swp|__init' | sed -e "s/[^-][^\/]*\// |/g" -e "s/|\([^ ]\)/|-\1/"
 
 LABEL org.opencontainers.image.description "Dyn-HaMR: Recovering 4D Interacting Hand Motion from a Dynamic Camera (CVPR 2025 Highlight)"
 LABEL org.opencontainers.image.authors="Yu, Zhengdi and Zafeiriou, Stefanos and Birdal, Tolga(original), AClon314(build&patch)"
