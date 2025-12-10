@@ -80,7 +80,7 @@ scikit-image = "*"
 xtcocotools = "*"
 yacs = "*"
 
-[feature.hamer.pypi-options]
+[feature.hamer_post.pypi-options]
 no-build-isolation = true
 [feature.hamer_post.pypi-dependencies]
 hamer = {path = "third-party/hamer", editable = true, extras = ["all"]}
