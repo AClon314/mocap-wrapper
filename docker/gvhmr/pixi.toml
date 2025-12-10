@@ -2,7 +2,7 @@
 channels = ["nvidia", "pytorch", "conda-forge"]
 # TODO: "win-64", "osx-arm64", "osx-64", "linux-aarch64"
 platforms = ["linux-64"]
-version = "2025.10.03"
+version = "2025.12.10"
 
 [environments]
 default = ["gpu", "dev"]
