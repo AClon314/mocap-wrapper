@@ -81,6 +81,7 @@ xtcocotools = "*"
 yacs = "*"
 [feature.hamer.pypi-options]
 # https://github.com/prefix-dev/pixi/issues/4392 https://github.com/prefix-dev/pixi/issues/3223 https://github.com/prefix-dev/pixi/issues/1124 https://github.com/prefix-dev/pixi/issues/1834
+extra-index-urls = ["https://miropsota.github.io/torch_packages_builder"]
 no-build-isolation = true
 [feature.hamer.pypi-options.dependency-overrides]
 protobuf = ">=5,<6"
@@ -88,7 +89,8 @@ protobuf = ">=5,<6"
 hamer = {path = "third-party/hamer", editable = true, extras = ["all"]}
 mmpose = {path = "third-party/hamer/third-party/ViTPose", editable = true}
 
-detectron2 = {git = "https://github.com/facebookresearch/detectron2"} 
+# https://detectron2.readthedocs.io/en/latest/tutorials/install.html 
+detectron2 = "0.6+2a420edpt1.13.0cu117" 
 mediapipe = "*" # ⚠️ protobuf too old
 # chumpy = {git = "https://github.com/mattloper/chumpy"} 
 # lightning = "*" 
