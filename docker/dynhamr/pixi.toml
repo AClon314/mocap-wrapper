@@ -92,6 +92,7 @@ detectron2 = "==0.6+2a420edpt1.13.0cu117"
 [feature.hamer.pypi-options]
 # https://github.com/prefix-dev/pixi/issues/4392 https://github.com/prefix-dev/pixi/issues/3223 https://github.com/prefix-dev/pixi/issues/1124 https://github.com/prefix-dev/pixi/issues/1834
 extra-index-urls = ["https://pypi.org/simple", "https://miropsota.github.io/torch_packages_builder"]
+index-strategy = "unsafe-best-match"
 no-build-isolation = true
 [feature.hamer.pypi-options.dependency-overrides]
 protobuf = ">=5,<6"
