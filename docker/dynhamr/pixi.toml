@@ -5,7 +5,7 @@ version = "2025.12.10"
 [environments]
 bmc = {features = ["bmc", "bmc-gpu"], no-default-feature = true, solve-group = "bmc"}
 # cpu = ["cpu", "hamer", "hamer-all", "vposer"] # TODO
-default = {features = ["gpu", "hamer", "vposer"], solve-group = "default"}
+default = {features = ["gpu", "hamer", "hamer_detectron2", "vposer"], solve-group = "default"}
 [tasks]
 install = {cmd = "pixi install --quiet && pixi workspace environment add default --feature hamer_post --force --quiet"}
 
@@ -84,17 +84,19 @@ yacs = "*"
 no-build-isolation = true
 [feature.hamer_post.pypi-dependencies]
 hamer = {path = "third-party/hamer", editable = true, extras = ["all"]}
+[feature.hamer_detectron2.pypi-options]
+extra-index-urls = ["https://miropsota.github.io/torch_packages_builder"]
+[feature.hamer_detectron2.pypi-dependencies]
+# https://github.com/MiroPsota/torch_packages_builder https://detectron2.readthedocs.io/en/latest/tutorials/install.html
+detectron2 = "==0.6+2a420edpt1.13.0cu117"
 [feature.hamer.pypi-options]
 # https://github.com/prefix-dev/pixi/issues/4392 https://github.com/prefix-dev/pixi/issues/3223 https://github.com/prefix-dev/pixi/issues/1124 https://github.com/prefix-dev/pixi/issues/1834
-extra-index-urls = ["https://miropsota.github.io/torch_packages_builder"]
 no-build-isolation = true
 [feature.hamer.pypi-options.dependency-overrides]
 protobuf = ">=5,<6"
 [feature.hamer.pypi-dependencies]
 mmpose = {path = "third-party/hamer/third-party/ViTPose", editable = true}
 
-# https://github.com/MiroPsota/torch_packages_builder https://detectron2.readthedocs.io/en/latest/tutorials/install.html
-detectron2 = "==0.6+2a420edpt1.13.0cu117" 
 mediapipe = "*" # ⚠️ protobuf too old
 # chumpy = {git = "https://github.com/mattloper/chumpy"} 
 # lightning = "*" 
