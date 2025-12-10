@@ -13,9 +13,9 @@ extra-index-urls = ["https://miropsota.github.io/torch_packages_builder"]
 [feature.gpu.system-requirements]
 cuda = "12.1"
 [feature.gpu.pypi-dependencies]
-pytorch3d = "0.7.8+pt2.3.0cu121"
+pytorch3d = "==0.7.8+pt2.3.0cu121"
 [feature.cpu.pypi-dependencies]
-pytorch3d = "0.7.8+pt2.3.0cpu"
+pytorch3d = "==0.7.8+pt2.3.0cpu"
 torch = {version = "==2.3.0", index = "https://download.pytorch.org/whl/cpu"}
 torchvision = {version = "==0.18.0", index = "https://download.pytorch.org/whl/cpu"}
 

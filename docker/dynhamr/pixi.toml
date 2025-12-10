@@ -90,7 +90,7 @@ hamer = {path = "third-party/hamer", editable = true, extras = ["all"]}
 mmpose = {path = "third-party/hamer/third-party/ViTPose", editable = true}
 
 # https://detectron2.readthedocs.io/en/latest/tutorials/install.html 
-detectron2 = "0.6+2a420edpt1.13.0cu117" 
+detectron2 = "==0.6+2a420edpt1.13.0cu117" 
 mediapipe = "*" # ⚠️ protobuf too old
 # chumpy = {git = "https://github.com/mattloper/chumpy"} 
 # lightning = "*" 
