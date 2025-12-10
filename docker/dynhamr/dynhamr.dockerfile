@@ -30,8 +30,7 @@ WORKDIR /${NAME}
 COPY ${NAME}/pixi.toml ./
 RUN --mount=type=cache,target=/root/.cache/rattler/cache \
     df -h && pixi global install --environment build-tools gcc gxx make libcxx && df -h &&\
-    pixi install --quiet &&\
-    pixi --quiet workspace environment add default --feature hamer_post --force && \
+    pixi run install --quiet &&\
     pixi shell-hook > pixi-shell.sh && echo 'exec "$@"' >> pixi-shell.sh &&\
     pixi global uninstall build-tools git && pixi clean cache --yes && df -h
 

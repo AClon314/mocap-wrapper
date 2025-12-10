@@ -7,7 +7,7 @@ bmc = {features = ["bmc", "bmc-gpu"], no-default-feature = true, solve-group = "
 # cpu = ["cpu", "hamer", "hamer-all", "vposer"] # TODO
 default = {features = ["gpu", "hamer", "hamer_detectron2", "vposer"], solve-group = "default"}
 [tasks]
-install = {cmd = "pixi install --quiet && pixi workspace environment add default --feature hamer_post --force --quiet"}
+install = {cmd = "pixi install --quiet && pixi workspace environment add default -f hamer_post -f gpu -f hamer -f hamer_detectron2 -f vposer --force --quiet && pixi install --quiet"}
 
 [feature.gpu.system-requirements]
 cuda = "12.1"
