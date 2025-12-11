@@ -2,11 +2,14 @@ name: pre-process
 description: checkout, lowercase, setup-buildx, login GHCR, run if_clean
 inputs:
   remain_gb:
+    description: remain disk space in GB
     required: false
-    default: 7
+    default: "7"
   DOCKERHUB_USERNAME:
+    description: Dockerhub username for lowering case
     required: true
   GITHUB_TOKEN:
+    description: Github token for GHCR login
     required: true
 outputs:
   owner:

@@ -24,3 +24,4 @@ jobs:
       HF_TOKEN: ${{ secrets.HF_TOKEN }}
     with:
       name: dynhamr
+      remainGB_final: 49

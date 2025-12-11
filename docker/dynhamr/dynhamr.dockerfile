@@ -30,7 +30,7 @@ WORKDIR /${NAME}
 COPY ${NAME}/pixi.toml ./
 RUN --mount=type=cache,target=/root/.cache/rattler/cache \
     df -h && pixi global install --environment build-tools gcc gxx make libcxx && df -h &&\
-    pixi run install --quiet &&\
+    pixi install --quiet &&\
     pixi shell-hook > pixi-shell.sh && echo 'exec "$@"' >> pixi-shell.sh &&\
     pixi global uninstall build-tools git && pixi clean cache --yes && df -h
 
@@ -44,7 +44,7 @@ RUN rm -rf /${NAME}/output || true && \
 COPY --from=py_env /${NAME} /${NAME}
 COPY --from=model_weights /model_weights /${NAME}/_DATA
 COPY lib.py ${NAME}/${NAME}.py ${NAME}/pixi.toml ./
-RUN pixi global install tree && tree -s -h && pixi global uninstall tree && pixi clean cache --yes && df -h
+RUN df -h
 
 LABEL org.opencontainers.image.description "Dyn-HaMR: Recovering 4D Interacting Hand Motion from a Dynamic Camera (CVPR 2025 Highlight)"
 LABEL org.opencontainers.image.authors="Yu, Zhengdi and Zafeiriou, Stefanos and Birdal, Tolga(original), AClon314(build&patch)"

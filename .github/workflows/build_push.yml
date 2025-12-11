@@ -7,11 +7,19 @@ on:
         required: true
         type: string
         description: "The name of the Docker image (e.g., gvhmr,wilor...)"
-      remain_gb:
+      remainGB_model_weights:
         required: false
         type: number
         default: 21
         description: "The remaining disk space in GB before FINAL build & push. Set to <=21 GB to skip cleaning."
+      remainGB_py_env:
+        required: false
+        type: number
+        default: 21
+      remainGB_final:
+        required: false
+        type: number
+        default: 21
     secrets:
       DOCKERHUB_USERNAME:
         required: true
@@ -35,7 +43,7 @@ jobs:
       - uses: ./.github/actions/pre
         id: pre
         with:
-          remain_gb: ${{ inputs.remain_gb }}
+          remainGB: ${{ inputs.remainGB_model_weights }}
           DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -65,7 +73,7 @@ jobs:
       - uses: ./.github/actions/pre
         id: pre
         with:
-          remain_gb: ${{ inputs.remain_gb }}
+          remainGB: ${{ inputs.remainGB_py_env }}
           DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -96,7 +104,7 @@ jobs:
       - uses: ./.github/actions/pre
         id: pre
         with:
-          remain_gb: ${{ inputs.remain_gb }}
+          remainGB: ${{ inputs.remainGB_final }}
           DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -128,7 +136,7 @@ jobs:
 
       - uses: ./.github/actions/if_clean
         with:
-          remain_gb: ${{ inputs.remain_gb }}
+          remainGB: ${{ inputs.remainGB_final }}
 
       - name: 🔨Build final
         uses: docker/build-push-action@v5

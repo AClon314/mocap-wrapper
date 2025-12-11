@@ -24,4 +24,4 @@ jobs:
       HF_TOKEN: ${{ secrets.HF_TOKEN }}
     with:
       name: gvhmr
-      remain_gb: 40
+      remainGB_final: 40

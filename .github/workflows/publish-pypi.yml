@@ -2,8 +2,8 @@ name: Publish to PyPI
 
 on:
   workflow_dispatch:
-    release:
-      types: [created]
+  release:
+    types: [created]
 
 jobs:
   pypi-publish:
@@ -11,7 +11,6 @@ jobs:
     runs-on: ubuntu-latest
     environment:
       name: pypi
-      #  Update URL with your package name
       url: https://pypi.org/p/mocap-wrapper/
     permissions:
       id-token: write  # IMPORTANT: this permission is mandatory for trusted publishing

@@ -4,7 +4,7 @@ inputs:
   remain_gb:
     description: "At least remain ? GB of disk space"
     required: false
-    default: 7
+    default: "7"
 runs:
   using: "composite"
   steps:
@@ -22,8 +22,7 @@ runs:
         df -h
       shell: bash
 
-    - uses: mathio/gha-cleanup@v1
+    - uses: rokibhasansagar/slimhub_actions@main
       if: steps.check_space.outputs.low_space == 'true'
       with:
-        remove-browsers: true
-        verbose: false
+        retain: "docker_buildkit"
