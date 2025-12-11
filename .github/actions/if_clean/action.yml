@@ -14,10 +14,13 @@ runs:
         available=$(df / | tail -1 | awk '{print $4}')  # 获取可用块数（1K 块）
         available_gb=$((available / 1024 / 1024))  # 转换为 GB
         threshold=${{ inputs.remainGB }}
+        echo "if available=${available_gb}GB < threshold=${threshold}GB"
         if [ $available_gb -lt $threshold ]; then
           echo "low_space=true" >> $GITHUB_OUTPUT
+          echo "💥 Low disk space!"
         else
           echo "low_space=false" >> $GITHUB_OUTPUT
+          echo "✅ Skip cleanup."
         fi
         df -h
       shell: bash
