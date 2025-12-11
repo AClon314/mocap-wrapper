@@ -10,16 +10,16 @@ on:
       remainGB_model_weights:
         required: false
         type: number
-        default: 21
+        default: 7
         description: "The remaining disk space in GB before FINAL build & push. Set to <=21 GB to skip cleaning."
       remainGB_py_env:
         required: false
         type: number
-        default: 21
+        default: 7
       remainGB_final:
         required: false
         type: number
-        default: 21
+        default: 7
     secrets:
       DOCKERHUB_USERNAME:
         required: true
