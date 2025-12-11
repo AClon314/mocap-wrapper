@@ -1,13 +1,14 @@
 from .static import gather, i_python_env, git_pull, Git, run_1by1
 from .huggingface import i_hugging_face
 from ..lib import *
+from typing import Union
 
 Log = getLogger(__name__)
 _STEM = "dynhamr"
 _name_ = RUNS_REPO[_STEM]
 
 
-async def i_dynhamr(Dir: Path | str = CONFIG[_STEM]):
+async def i_dynhamr(Dir: Union[Path, str] = CONFIG[_STEM]):
     Log.info(f"📦 Install {_name_}")
     if not Path(Dir, ".git").exists():
         await Git(["clone", "https://github.com/ZhengdiYu/Dyn-HaMR", str(Dir)])
@@ -18,7 +19,7 @@ async def i_dynhamr(Dir: Path | str = CONFIG[_STEM]):
     return await gather(tasks, success_msg=f"Installed {_name_}")
 
 
-def i_thirdparty(Dir: Path | str = CONFIG[_STEM]):
+def i_thirdparty(Dir: Union[Path, str] = CONFIG[_STEM]):
     queue = [
         i_python_env(Dir=Dir, pixi_toml=f"{_STEM}.toml", use_mirror=False),
         ENV_cuda_toolkit(),
@@ -29,7 +30,7 @@ def i_thirdparty(Dir: Path | str = CONFIG[_STEM]):
     return run_1by1(queue)
 
 
-async def ENV_cuda_toolkit(Dir: Path | str = CONFIG[_STEM]):
+async def ENV_cuda_toolkit(Dir: Union[Path, str] = CONFIG[_STEM]):
     CUDA_HOME = Path(Dir, ".pixi", "envs", "default")
     if CUDA_HOME and CUDA_HOME.exists():
         os.environ["CUDA_HOME"] = str(CUDA_HOME)

@@ -3,14 +3,14 @@ import numpy as np
 from pathlib import Path
 from platformdirs import user_config_path
 from types import ModuleType
-from typing import Any, Iterable, Literal, Sequence, TypeVar
+from typing import Any, Iterable, Literal, Sequence, TypeVar, Union, Dict, Tuple
 
 logging.basicConfig(level=os.environ.get("LOG", "INFO").upper())
 Log = logging.getLogger(__name__)
 VIDEO_EXT = "webm,mkv,flv,flv,vob,vob,ogv,ogg,drc,gifv,webm,gifv,mng,avi,mov,qt,wmv,yuv,rm,rmvb,viv,asf,amv,mp4,m4p,m4v,mpg,mp2,mpeg,mpe,mpv,mpg,mpeg,m2v,m4v,svi,3gp,3g2,mxf,roq,nsv,flv,f4v,f4p,f4a,f4b".split(
     ","
 )
-TYPE_RANGE = tuple[int, int]
+TYPE_RANGE = Tuple[int, int]
 T = TypeVar("T")
 TN = TypeVar("NT", "np.ndarray", "torch.Tensor")  # type: ignore
 _ID = -1
@@ -24,7 +24,7 @@ def _shlex_quote(args: Iterable[str]):
     return [shlex.quote(str(arg)) for arg in args]
 
 
-def _get_cmd(cmds: Iterable[str] | str):
+def _get_cmd(cmds: Union[Iterable[str], str]):
     return cmds if isinstance(cmds, str) else _shlex_quote(cmds)
 
 
@@ -35,14 +35,16 @@ def _strip(s):
 _PATH = Path(__file__, "..", "..", "..").resolve()
 sys.path.append(str(_PATH))  # relative import
 TYPE_RUNS = Literal["wilor", "gvhmr", "dynhamr"]
-RUNS_REPO: dict[TYPE_RUNS, str] = {
+RUNS_REPO: Dict[TYPE_RUNS, str] = {
     "wilor": "WiLoR-mini",
     "gvhmr": "GVHMR",
     "dynhamr": "Dyn-HaMR",
 }
 
 
-def savez(npz: "str|Path", new_data: dict[str, Any], mode: Literal["w", "a"] = "a"):
+def savez(
+    npz: Union[str, Path], new_data: Dict[str, Any], mode: Literal["w", "a"] = "a"
+):
     if mode == "a" and os.path.exists(npz):
         new_data = {**np.load(npz, allow_pickle=True), **new_data}
     np.savez_compressed(npz, **new_data)
@@ -69,7 +71,7 @@ def free_ram(torch):
 
 
 def run(
-    cmd: Sequence[str] | str, Print=True, **kwargs
+    cmd: Union[Sequence[str], str], Print=True, **kwargs
 ) -> subprocess.CompletedProcess[str]:
     """⚠️ Strongly recommended use list[str] instead of str to pass commands,
     to avoid shell injection risks for online service."""

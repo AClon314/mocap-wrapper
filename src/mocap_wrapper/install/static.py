@@ -17,7 +17,7 @@ from ..lib import (
     TYPE_RUNS,
     Env,
 )
-from typing import Coroutine, Generator, Sequence, Any
+from typing import Coroutine, Generator, Sequence, Any, Union, Optional, List
 
 Log = getLogger(__name__)
 IS_DEBUG = is_debug(Log)
@@ -61,7 +61,7 @@ async def install(runs: Sequence[TYPE_RUNS], **kwargs):
 
 
 async def i_python_env(
-    Dir: str | Path,
+    Dir: Union[str, Path],
     pixi_toml="gvhmr.toml",
     env=["default"],
     use_mirror: bool | None = None,
@@ -98,7 +98,10 @@ async def i_python_env(
 
 
 async def Git(
-    cmd: Sequence[str], timeout: float | None = TIMEOUT_MINUTE, retry=True, Raise=True
+    cmd: Sequence[str],
+    timeout: Optional[float] = TIMEOUT_MINUTE,
+    retry=True,
+    Raise=True,
 ):
     """with mirror_cn"""
     Log.debug(f"Git {cmd=}")
@@ -117,7 +120,7 @@ async def Git(
     return p
 
 
-async def git_pull(Dir: str | Path = "", **kwargs):
+async def git_pull(Dir: Union[str, Path] = "", **kwargs):
     """
     git fetch --all
     git pull
@@ -151,7 +154,7 @@ async def gather(coros: Sequence[Coroutine], success_msg="", Raise=False):
     return _results, results, exceptions
 
 
-async def run_1by1(coros: list[Coroutine], raise_if_none=True, raise_if_return0=True):
+async def run_1by1(coros: List[Coroutine], raise_if_none=True, raise_if_return0=True):
     results: list[Any] = []
     exception = None
     for coro in coros:

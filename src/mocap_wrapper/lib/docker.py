@@ -33,6 +33,7 @@ udocker --allow-root run --rm busybox sh -c "cat /proc/1/cgroup"
 """
 
 import os
+from typing import List, Optional
 from .static import is_linux
 from .logger import getLogger
 from .process import run_tail
@@ -72,9 +73,9 @@ def _nameOfImage(image: str) -> str:
 
 def podman(
     image="ghcr.io/containerd/busybox:latest",
-    cmd: list[str] = [],
-    args: list[str] = [],
-    name: str | None = None,
+    cmd: List[str] = [],
+    args: List[str] = [],
+    name: Optional[str] = None,
 ):
     """
     Args:
@@ -124,9 +125,9 @@ def podman(
 
 def udocker(
     image="ghcr.io/containerd/busybox:latest",
-    cmd: list[str] = [],
-    args: list[str] = [],
-    name: str | None = None,
+    cmd: List[str] = [],
+    args: List[str] = [],
+    name: Optional[str] = None,
 ):
     if name is None:
         name = _nameOfImage(image)

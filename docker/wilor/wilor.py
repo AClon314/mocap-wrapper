@@ -8,22 +8,37 @@
 https://github.com/warmshao/WiLoR-mini/blob/main/tests/test_pipelines.py
 """
 IS_RENDER = IS_RAW = IS_EXPORT_OBJ = False
-OUTDIR = 'output'
+OUTDIR = "output"
 LIGHT_PURPLE = (0.25098039, 0.274117647, 0.65882353)
 import os
 import argparse
 import numpy as np
-from typing import Literal, Sequence, get_args
+from typing import Literal, Sequence, get_args, Union, Tuple, List, Dict, Optional, Set
 from lib import quat_rotAxis, savez, squeeze, VIDEO_EXT, tqdm  # type: ignore
 from sys import platform
+
 is_win = platform == "win32"
 is_linux = platform == "linux"
 if not is_win:
-    os.environ['PYOPENGL_PLATFORM'] = 'egl'  # linux fix
-_PREFIX = '_out_'
-_TYPE_WILOR = Literal['bbox', 'betas', 'global_orient', 'hand_pose', 'pred_cam', 'pred_cam_t_full', 'pred_keypoints_2d', 'pred_keypoints_3d', 'pred_vertices', 'scaled_focal_length', ]
-_WILOR_KEYS: tuple[str] = get_args(_TYPE_WILOR)
-def no_ext_filename(path) -> str: return os.path.splitext(os.path.basename(path))[0]
+    os.environ["PYOPENGL_PLATFORM"] = "egl"  # linux fix
+_PREFIX = "_out_"
+_TYPE_WILOR = Literal[
+    "bbox",
+    "betas",
+    "global_orient",
+    "hand_pose",
+    "pred_cam",
+    "pred_cam_t_full",
+    "pred_keypoints_2d",
+    "pred_keypoints_3d",
+    "pred_vertices",
+    "scaled_focal_length",
+]
+_WILOR_KEYS: Tuple[str, ...] = get_args(_TYPE_WILOR)
+
+
+def no_ext_filename(path) -> str:
+    return os.path.splitext(os.path.basename(path))[0]
 
 
 def create_raymond_lights():
@@ -50,10 +65,12 @@ def create_raymond_lights():
 
         matrix = np.eye(4)
         matrix[:3, :3] = np.c_[x, y, z]
-        nodes.append(pyrender.Node(
-            light=pyrender.DirectionalLight(color=np.ones(3), intensity=1.0),
-            matrix=matrix
-        ))
+        nodes.append(
+            pyrender.Node(
+                light=pyrender.DirectionalLight(color=np.ones(3), intensity=1.0),
+                matrix=matrix,
+            )
+        )
 
     return nodes
 
@@ -154,26 +171,36 @@ class Renderer:
 
         # add faces that make the hand mesh watertight
         faces_new = np.array(
-            [[92, 38, 234],
-             [234, 38, 239],
-             [38, 122, 239],
-             [239, 122, 279],
-             [122, 118, 279],
-             [279, 118, 215],
-             [118, 117, 215],
-             [215, 117, 214],
-             [117, 119, 214],
-             [214, 119, 121],
-             [119, 120, 121],
-             [121, 120, 78],
-             [120, 108, 78],
-             [78, 108, 79]])
+            [
+                [92, 38, 234],
+                [234, 38, 239],
+                [38, 122, 239],
+                [239, 122, 279],
+                [122, 118, 279],
+                [279, 118, 215],
+                [118, 117, 215],
+                [215, 117, 214],
+                [117, 119, 214],
+                [214, 119, 121],
+                [119, 120, 121],
+                [121, 120, 78],
+                [120, 108, 78],
+                [78, 108, 79],
+            ]
+        )
         faces = np.concatenate([faces, faces_new], axis=0)
         self.faces = faces
         self.faces_left = self.faces[:, [0, 2, 1]]
 
-    def vertices_to_trimesh(self, vertices, camera_translation, mesh_base_color=(1.0, 1.0, 0.9),
-                            rot_axis=[1, 0, 0], rot_angle=0, is_right=1):
+    def vertices_to_trimesh(
+        self,
+        vertices,
+        camera_translation,
+        mesh_base_color=(1.0, 1.0, 0.9),
+        rot_axis=[1, 0, 0],
+        rot_angle=0,
+        is_right=1,
+    ):
         # material = pyrender.MetallicRoughnessMaterial(
         #     metallicFactor=0.0,
         #     alphaMode='OPAQUE',
@@ -183,38 +210,37 @@ class Renderer:
             faces = self.faces.copy()
         else:
             faces = self.faces_left.copy()
-        mesh = trimesh.Trimesh(vertices.copy() + camera_translation, faces, vertex_colors=vertex_colors)
+        mesh = trimesh.Trimesh(
+            vertices.copy() + camera_translation, faces, vertex_colors=vertex_colors
+        )
         # mesh = trimesh.Trimesh(vertices.copy(), self.faces.copy())
 
-        rot = trimesh.transformations.rotation_matrix(
-            np.radians(rot_angle), rot_axis)
+        rot = trimesh.transformations.rotation_matrix(np.radians(rot_angle), rot_axis)
         mesh.apply_transform(rot)
 
-        rot = trimesh.transformations.rotation_matrix(
-            np.radians(180), [1, 0, 0])
+        rot = trimesh.transformations.rotation_matrix(np.radians(180), [1, 0, 0])
         mesh.apply_transform(rot)
         return mesh
 
     def render_rgba(
-            self,
-            vertices: np.ndarray,
-            cam_t=None,
-            rot=None,
-            rot_axis=[1, 0, 0],
-            rot_angle=0,
-            camera_z=3,
-            # camera_translation: np.array,
-            mesh_base_color=(1.0, 1.0, 0.9),
-            scene_bg_color=(0, 0, 0),
-            render_res=[256, 256],
-            focal_length=None,
-            is_right=None,
+        self,
+        vertices: np.ndarray,
+        cam_t=None,
+        rot=None,
+        rot_axis=[1, 0, 0],
+        rot_angle=0,
+        camera_z=3,
+        # camera_translation: np.array,
+        mesh_base_color=(1.0, 1.0, 0.9),
+        scene_bg_color=(0, 0, 0),
+        render_res=[256, 256],
+        focal_length=None,
+        is_right=None,
     ):
 
         renderer = pyrender.OffscreenRenderer(
-            viewport_width=render_res[0],
-            viewport_height=render_res[1],
-            point_size=1.0)
+            viewport_width=render_res[0], viewport_height=render_res[1], point_size=1.0
+        )
         # material = pyrender.MetallicRoughnessMaterial(
         #     metallicFactor=0.0,
         #     alphaMode='OPAQUE',
@@ -222,26 +248,39 @@ class Renderer:
 
         if cam_t is not None:
             camera_translation = cam_t.copy()
-            camera_translation[0] *= -1.
+            camera_translation[0] *= -1.0
         else:
-            camera_translation = np.array([0, 0, camera_z * focal_length / render_res[1]])
+            camera_translation = np.array(
+                [0, 0, camera_z * focal_length / render_res[1]]
+            )
         if is_right:
             mesh_base_color = mesh_base_color[::-1]
         mesh = self.vertices_to_trimesh(
-            vertices, np.array([0, 0, 0]), mesh_base_color,
-            rot_axis, rot_angle, is_right=is_right)
+            vertices,
+            np.array([0, 0, 0]),
+            mesh_base_color,
+            rot_axis,
+            rot_angle,
+            is_right=is_right,
+        )
         mesh = pyrender.Mesh.from_trimesh(mesh)
         # mesh = pyrender.Mesh.from_trimesh(mesh, material=material)
 
-        scene = pyrender.Scene(bg_color=[*scene_bg_color, 0.0], ambient_light=(0.3, 0.3, 0.3))
-        scene.add(mesh, 'mesh')
+        scene = pyrender.Scene(
+            bg_color=[*scene_bg_color, 0.0], ambient_light=(0.3, 0.3, 0.3)
+        )
+        scene.add(mesh, "mesh")
 
         camera_pose = np.eye(4)
         camera_pose[:3, 3] = camera_translation
-        camera_center = [render_res[0] / 2., render_res[1] / 2.]
+        camera_center = [render_res[0] / 2.0, render_res[1] / 2.0]
         camera = pyrender.IntrinsicsCamera(
-            fx=focal_length, fy=focal_length,
-            cx=camera_center[0], cy=camera_center[1], zfar=1e12)
+            fx=focal_length,
+            fy=focal_length,
+            cx=camera_center[0],
+            cy=camera_center[1],
+            zfar=1e12,
+        )
 
         # Create camera node and add it to pyRender scene
         camera_node = pyrender.Node(camera=camera, matrix=camera_pose)
@@ -298,8 +337,8 @@ class Renderer:
 
 
 def export(
-    preds: list[dict[str, np.ndarray | float | int]],
-    file='mocap_wilor.npz',
+    preds: List[Dict[str, Union[np.ndarray, float, int]]],
+    file="mocap_wilor.npz",
 ):
     """
     save `.npz` to file.
@@ -307,15 +346,15 @@ def export(
     keyname = 'smplx;wilor;hand{ID};prop[0];prop[1];...;props[n]'
     """
     data = {}
-    prefix = 'smplx;wilor'
+    prefix = "smplx;wilor"
 
     for i, hand in enumerate(preds):
-        LR = 'R' if hand.pop('is_right') > 0.5 else 'L'
-        begin = hand.pop('begin')
+        LR = "R" if hand.pop("is_right") > 0.5 else "L"
+        begin = hand.pop("begin")
         for k, v in hand.items():
-            key = ';'.join([prefix, f'hand{i}{LR}', f'{begin}', k])
+            key = ";".join([prefix, f"hand{i}{LR}", f"{begin}", k])
 
-            if not IS_RAW and k in ['global_orient', 'hand_pose']:
+            if not IS_RAW and k in ["global_orient", "hand_pose"]:
                 v = quat_rotAxis(v)
 
             if not isinstance(v, np.ndarray):
@@ -326,7 +365,7 @@ def export(
     savez(file, data)
 
 
-def data_remap(From: list[dict], to: list[dict], frame=0):
+def data_remap(From: List[Dict], to: List[Dict], frame=0):
     """
     remap preds data for `export()` per frame
 
@@ -346,7 +385,7 @@ def data_remap(From: list[dict], to: list[dict], frame=0):
     _len = len(From)
     lens = len(to)
     print(f"⚠️ Changed: {_len} hands @ {frame=}") if _len != lens else None
-    BLACKLIST = ['pred_vertices', 'scaled_focal_length']    # won't save these
+    BLACKLIST = ["pred_vertices", "scaled_focal_length"]  # won't save these
     TO_I = set()
     # print(f'{frame=}{_FROM_I=}')
     for _i, _hand in enumerate(From):
@@ -357,32 +396,46 @@ def data_remap(From: list[dict], to: list[dict], frame=0):
             to.append({})
         hand = to[i_to]
         TO_I.add(i_to)
-        wilor_preds: dict[str, np.ndarray] = _hand["wilor_preds"]
-        wilor_preds['bbox'] = _hand['hand_bbox']
-        wilor_preds = {K: np.expand_dims(squeeze(v, key=K), axis=0) for K, v in wilor_preds.items() if K not in BLACKLIST}
+        wilor_preds: Dict[str, np.ndarray] = _hand["wilor_preds"]
+        wilor_preds["bbox"] = _hand["hand_bbox"]
+        wilor_preds = {
+            K: np.expand_dims(squeeze(v, key=K), axis=0)
+            for K, v in wilor_preds.items()
+            if K not in BLACKLIST
+        }
 
-        print(f'{i_to is None=}\t{len(hand) == 0=}') if (i_to is None) != (len(hand) == 0) else None
+        (
+            print(f"{i_to is None=}\t{len(hand) == 0=}")
+            if (i_to is None) != (len(hand) == 0)
+            else None
+        )
 
         if len(hand) == 0:
             print(f"➕ hand{i_to} created @ {frame=}")
             __hand = {
-                'begin': frame,
-                'is_right': _hand['is_right'],
-                'scaled_focal_length': _hand['wilor_preds']['scaled_focal_length'],
-                **wilor_preds
+                "begin": frame,
+                "is_right": _hand["is_right"],
+                "scaled_focal_length": _hand["wilor_preds"]["scaled_focal_length"],
+                **wilor_preds,
             }
             to[i_to] = __hand
         else:
-            if _hand['is_right'] != hand['is_right']:
-                print(f"❌ hand{_i} is_right changed @ {frame=}")   # this shouldn't happen
+            if _hand["is_right"] != hand["is_right"]:
+                print(
+                    f"❌ hand{_i} is_right changed @ {frame=}"
+                )  # this shouldn't happen
             for K in _WILOR_KEYS:
                 if K in hand.keys() and K in wilor_preds.keys():
                     hand[K] = np.concatenate((hand[K], wilor_preds[K]), axis=0)
                 elif K not in BLACKLIST:
-                    print(f"hand{_i} {K} not in pred @ {frame=}, {hand.keys()}")  # this shouldn't happen
+                    print(
+                        f"hand{_i} {K} not in pred @ {frame=}, {hand.keys()}"
+                    )  # this shouldn't happen
 
 
-def match_nearest_hand(_hand: dict, to: list[dict], frame: int, done_idx: set[int] = set(), max_error=50.0) -> int | None:
+def match_nearest_hand(
+    _hand: Dict, to: List[Dict], frame: int, done_idx: Set[int] = set(), max_error=50.0
+) -> Optional[int]:
     """
     根据bbox和is_right找到最佳匹配的手部索引
 
@@ -395,9 +448,9 @@ def match_nearest_hand(_hand: dict, to: list[dict], frame: int, done_idx: set[in
     Returns:
         最佳匹配的索引，如果没有找到则返回None
     """
-    _bbox = np.array(_hand['hand_bbox'])
-    _is_right = _hand['is_right']
-    min_distance = float('inf')
+    _bbox = np.array(_hand["hand_bbox"])
+    _is_right = _hand["is_right"]
+    min_distance = float("inf")
     index = None
 
     for i, hand in enumerate(to):
@@ -406,26 +459,27 @@ def match_nearest_hand(_hand: dict, to: list[dict], frame: int, done_idx: set[in
             continue
 
         # 优先匹配相同的左右手标识
-        if hand.get('is_right') == _is_right and 'bbox' in hand:
-            bbox = hand['bbox'][max(0, min(frame, len(hand['bbox'])) - 1)]
+        if hand.get("is_right") == _is_right and "bbox" in hand:
+            bbox = hand["bbox"][max(0, min(frame, len(hand["bbox"])) - 1)]
             if bbox.shape == _bbox.shape:
                 # 计算bbox中心点距离
-                from_center = np.array([
-                    (_bbox[0] + _bbox[2]) / 2,
-                    (_bbox[1] + _bbox[3]) / 2])
-                to_center = np.array([
-                    (bbox[0] + bbox[2]) / 2,
-                    (bbox[1] + bbox[3]) / 2])
+                from_center = np.array(
+                    [(_bbox[0] + _bbox[2]) / 2, (_bbox[1] + _bbox[3]) / 2]
+                )
+                to_center = np.array([(bbox[0] + bbox[2]) / 2, (bbox[1] + bbox[3]) / 2])
                 distance = np.linalg.norm(from_center - to_center)
                 if distance < min_distance:
                     min_distance = distance
                     index = i
-    print(f'{min_distance=} @ {frame=}') if min_distance > max_error else None
+    print(f"{min_distance=} @ {frame=}") if min_distance > max_error else None
     return index
 
 
 def Import():
-    from wilor_mini.pipelines.wilor_hand_pose3d_estimation_pipeline import WiLorHandPose3dEstimationPipeline, get_logger
+    from wilor_mini.pipelines.wilor_hand_pose3d_estimation_pipeline import (
+        WiLorHandPose3dEstimationPipeline,
+        get_logger,
+    )
 
     def __init__patch(self, **kwargs):
         self.verbose = kwargs.get("verbose", False)
@@ -434,11 +488,12 @@ def Import():
         else:
             self.logger = get_logger(self.__class__.__name__, lv=40)
         self.init_models(**kwargs)
+
     WiLorHandPose3dEstimationPipeline.__init__ = __init__patch
     return WiLorHandPose3dEstimationPipeline
 
 
-def image_wilor(input='img.png', out_dir=OUTDIR):
+def image_wilor(input="img.png", out_dir=OUTDIR):
     WiLorHandPose3dEstimationPipeline = Import()
     device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
     dtype = torch.float16
@@ -451,7 +506,7 @@ def image_wilor(input='img.png', out_dir=OUTDIR):
     os.makedirs(out_dir, exist_ok=True)
     preds = []
     data_remap(pred, preds)
-    export(preds, os.path.join(out_dir, f'{filename}.mocap.npz'))
+    export(preds, os.path.join(out_dir, f"{filename}.mocap.npz"))
     if IS_RENDER:
         renderer = Renderer(pipe.wilor_model.mano.faces)
 
@@ -460,10 +515,10 @@ def image_wilor(input='img.png', out_dir=OUTDIR):
         pred_keypoints_2d_all = []
         for i, out in enumerate(pred):
             wilor_preds = out["wilor_preds"]
-            is_right = out['is_right']
-            verts = wilor_preds['pred_vertices'][0]
-            cam_t = wilor_preds['pred_cam_t_full'][0]
-            scaled_focal_length = wilor_preds['scaled_focal_length']
+            is_right = out["is_right"]
+            verts = wilor_preds["pred_vertices"][0]
+            cam_t = wilor_preds["pred_cam_t_full"][0]
+            scaled_focal_length = wilor_preds["scaled_focal_length"]
             pred_keypoints_2d = wilor_preds["pred_keypoints_2d"]
             pred_keypoints_2d_all.append(pred_keypoints_2d)
             misc_args = dict(
@@ -471,16 +526,26 @@ def image_wilor(input='img.png', out_dir=OUTDIR):
                 scene_bg_color=(1, 1, 1),
                 focal_length=scaled_focal_length,
             )
-            export_obj(renderer, verts, cam_t, is_right,
-                       os.path.join(out_dir, f'{filename}_hand{i:02d}.obj'))
+            export_obj(
+                renderer,
+                verts,
+                cam_t,
+                is_right,
+                os.path.join(out_dir, f"{filename}_hand{i:02d}.obj"),
+            )
             cam_view = renderer.render_rgba(
-                verts, cam_t=cam_t,
+                verts,
+                cam_t=cam_t,
                 render_res=[image.shape[1], image.shape[0]],
                 is_right=is_right,
-                **misc_args)
+                **misc_args,
+            )
 
             # Overlay image
-            render_image = render_image[:, :, :3] * (1 - cam_view[:, :, 3:]) + cam_view[:, :, :3] * cam_view[:, :, 3:]
+            render_image = (
+                render_image[:, :, :3] * (1 - cam_view[:, :, 3:])
+                + cam_view[:, :, :3] * cam_view[:, :, 3:]
+            )
 
         render_image = (255 * render_image).astype(np.uint8)
         for pred_keypoints_2d in pred_keypoints_2d_all:
@@ -489,16 +554,17 @@ def image_wilor(input='img.png', out_dir=OUTDIR):
                 radius = 3
                 x, y = pred_keypoints_2d[0][j]
                 cv2.circle(render_image, (int(x), int(y)), radius, color, -1)
-        cv2.imwrite(os.path.join(out_dir, _PREFIX + filename + '.webp'), render_image)
+        cv2.imwrite(os.path.join(out_dir, _PREFIX + filename + ".webp"), render_image)
 
 
-def export_obj(renderer, verts, cam_t, is_right, out='{filename}_hand{idx:02d}.obj'):
+def export_obj(renderer, verts, cam_t, is_right, out="{filename}_hand{idx:02d}.obj"):
     tmesh = renderer.vertices_to_trimesh(
-        verts, cam_t.copy(), LIGHT_PURPLE, is_right=is_right)
+        verts, cam_t.copy(), LIGHT_PURPLE, is_right=is_right
+    )
     tmesh.export(out)
 
 
-def video_wilor(input='video.mp4', out_dir=OUTDIR):
+def video_wilor(input="video.mp4", out_dir=OUTDIR):
     WiLorHandPose3dEstimationPipeline = Import()
     device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
     dtype = torch.float16
@@ -516,16 +582,20 @@ def video_wilor(input='video.mp4', out_dir=OUTDIR):
     height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
     total = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
     filename = no_ext_filename(input)
-    file = filename + '.mp4'
+    file = filename + ".mp4"
     progress = tqdm(total=total, desc=f"👋←📹 {file}", unit="frame")
 
     # Create VideoWriter object
     output_path = os.path.join(out_dir, _PREFIX + file)  # tmp
-    fourcc = cv2.VideoWriter_fourcc(*'mp4v')  # type:ignore
-    vout = cv2.VideoWriter(output_path, fourcc, fps, (width, height)) if IS_RENDER else None
+    fourcc = cv2.VideoWriter_fourcc(*"mp4v")  # type:ignore
+    vout = (
+        cv2.VideoWriter(output_path, fourcc, fps, (width, height))
+        if IS_RENDER
+        else None
+    )
 
     if IS_EXPORT_OBJ:
-        output_path_obj = os.path.join(out_dir, 'obj')
+        output_path_obj = os.path.join(out_dir, "obj")
         os.makedirs(output_path_obj, exist_ok=True)
     else:
         output_path_obj = None
@@ -544,11 +614,18 @@ def video_wilor(input='video.mp4', out_dir=OUTDIR):
         if output_path_obj:
             for i, out in enumerate(_pred):
                 wilor_preds = out["wilor_preds"]
-                is_right = out['is_right']
-                verts = wilor_preds['pred_vertices'][0]
-                cam_t = wilor_preds['pred_cam_t_full'][0]
-                export_obj(renderer, verts, cam_t, is_right,
-                           os.path.join(output_path_obj, f'{filename}_hand{i:02d}_{frame_count}.obj'))
+                is_right = out["is_right"]
+                verts = wilor_preds["pred_vertices"][0]
+                cam_t = wilor_preds["pred_cam_t_full"][0]
+                export_obj(
+                    renderer,
+                    verts,
+                    cam_t,
+                    is_right,
+                    os.path.join(
+                        output_path_obj, f"{filename}_hand{i:02d}_{frame_count}.obj"
+                    ),
+                )
 
         if IS_RENDER:
             render_image = image.copy()
@@ -556,10 +633,10 @@ def video_wilor(input='video.mp4', out_dir=OUTDIR):
 
             for i, out in enumerate(_pred):
                 wilor_preds = out["wilor_preds"]
-                is_right = out['is_right']
-                verts = wilor_preds['pred_vertices'][0]
-                cam_t = wilor_preds['pred_cam_t_full'][0]
-                scaled_focal_length = wilor_preds['scaled_focal_length']
+                is_right = out["is_right"]
+                verts = wilor_preds["pred_vertices"][0]
+                cam_t = wilor_preds["pred_cam_t_full"][0]
+                scaled_focal_length = wilor_preds["scaled_focal_length"]
 
                 misc_args = dict(
                     mesh_base_color=LIGHT_PURPLE,
@@ -567,13 +644,18 @@ def video_wilor(input='video.mp4', out_dir=OUTDIR):
                     focal_length=scaled_focal_length,
                 )
                 cam_view = renderer.render_rgba(
-                    verts, cam_t=cam_t,
+                    verts,
+                    cam_t=cam_t,
                     render_res=[image.shape[1], image.shape[0]],
                     is_right=is_right,
-                    **misc_args)
+                    **misc_args,
+                )
 
                 # Overlay image
-                render_image = render_image[:, :, :3] * (1 - cam_view[:, :, 3:]) + cam_view[:, :, :3] * cam_view[:, :, 3:]
+                render_image = (
+                    render_image[:, :, :3] * (1 - cam_view[:, :, 3:])
+                    + cam_view[:, :, :3] * cam_view[:, :, 3:]
+                )
 
             render_image = (255 * render_image).astype(np.uint8)
 
@@ -589,16 +671,18 @@ def video_wilor(input='video.mp4', out_dir=OUTDIR):
     vout.release() if vout else None
     cv2.destroyAllWindows()
 
-    export(preds, os.path.join(out_dir, f'{filename}.mocap.npz'))
+    export(preds, os.path.join(out_dir, f"{filename}.mocap.npz"))
 
 
 def argParse():
     arg = argparse.ArgumentParser()
-    arg.add_argument('-i', '--input', metavar='in.mp4')
-    arg.add_argument('-o', '--outdir', metavar=OUTDIR, default=OUTDIR)
-    arg.add_argument('--raw', action='store_true', help='raw data, NO axis angle to quaternion')
-    arg.add_argument('--render', action='store_true', help='render hands mesh to video')
-    arg.add_argument('--obj', action='store_true', help='export hands mesh to .obj')
+    arg.add_argument("-i", "--input", metavar="in.mp4")
+    arg.add_argument("-o", "--outdir", metavar=OUTDIR, default=OUTDIR)
+    arg.add_argument(
+        "--raw", action="store_true", help="raw data, NO axis angle to quaternion"
+    )
+    arg.add_argument("--render", action="store_true", help="render hands mesh to video")
+    arg.add_argument("--obj", action="store_true", help="export hands mesh to .obj")
     args, _args = arg.parse_known_args()
     if args.render:
         global IS_RENDER
@@ -618,7 +702,7 @@ def argParse():
 def wilor(args: argparse.Namespace, arg: argparse.ArgumentParser):
     if args.input:
         outdir = os.path.join(args.outdir, no_ext_filename(args.input))
-        if args.input.split('.')[-1].lower() not in VIDEO_EXT:
+        if args.input.split(".")[-1].lower() not in VIDEO_EXT:
             image_wilor(input=args.input, out_dir=outdir)
         else:
             video_wilor(input=args.input, out_dir=outdir)
@@ -626,11 +710,12 @@ def wilor(args: argparse.Namespace, arg: argparse.ArgumentParser):
         arg.print_help()
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     args, _, arg = argParse()
 import cv2
 import torch
 import pyrender
 import trimesh
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     wilor(args, arg)

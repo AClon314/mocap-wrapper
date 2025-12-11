@@ -7,23 +7,23 @@ from .static import TIMEOUT_MINUTE, TIMEOUT_QUATER, Env, get_cmds, is_win
 from .logger import getLogger
 from .process import run_tail
 from .docker import inContainer
-from typing import Literal, get_args
+from typing import Literal, get_args, Union, Dict, List
 
 Log = getLogger(__name__)
 TYPE_BINS = Literal["aria2c", "7z", "git", "ffmpeg", "podman", "udocker"]
 BINS = list(get_args(TYPE_BINS))
 BINS.remove("podman") if inContainer() else BINS.remove("udocker")
 BIN_PKG = {v: v for v in get_args(TYPE_BINS)}
-BIN_PKG: dict[TYPE_BINS, str] = {
+BIN_PKG: Dict[TYPE_BINS, str] = {
     **BIN_PKG,
     "aria2c": "aria2",  # use winget to install aria2.aria2
     "7z": "7zip" if is_win else "p7zip",
 }
 
 
-async def i_pkgs(*bin: TYPE_BINS | str, bin_pkg: dict[str, str] = {}):
+async def i_pkgs(*bin: Union[TYPE_BINS, str], bin_pkg: Dict[str, str] = {}):
     """pixi global install bin"""
-    bins: list[str] = list(bin if bin and bin[0] else []) + list(
+    bins: List[str] = list(bin if bin and bin[0] else []) + list(
         bin_pkg.keys()
     ) or list(
         BINS

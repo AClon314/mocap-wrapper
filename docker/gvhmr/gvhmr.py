@@ -21,6 +21,8 @@ from the source form of this work.
 For commercial uses of this software, please send email to xwzhou@zju.edu.cn
 """
 import argparse
+from pathlib import Path
+from typing import Union
 
 CRF = 23  # 17 is lossless, every +6 halves the mp4 size
 person_count = None
@@ -491,7 +493,7 @@ def render_global(cfg):
 
 def export(
     pred: dict,
-    file: Path | str = "gvhmr.mocap.npz",
+    file: Union[Path, str] = "gvhmr.mocap.npz",
     who=0,
 ):
     """
