@@ -1,7 +1,7 @@
 name: "Check Disk and Cleanup🧹"
 description: "Check disk space and cleanup if low"
 inputs:
-  remain_gb:
+  remainGB:
     description: "At least remain ? GB of disk space"
     required: false
     default: "7"
@@ -13,7 +13,7 @@ runs:
       run: |
         available=$(df / | tail -1 | awk '{print $4}')  # 获取可用块数（1K 块）
         available_gb=$((available / 1024 / 1024))  # 转换为 GB
-        threshold=${{ inputs.remain_gb }}
+        threshold=${{ inputs.remainGB }}
         if [ $available_gb -lt $threshold ]; then
           echo "low_space=true" >> $GITHUB_OUTPUT
         else

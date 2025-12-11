@@ -1,7 +1,7 @@
 name: pre-process
 description: checkout, lowercase, setup-buildx, login GHCR, run if_clean
 inputs:
-  remain_gb:
+  remainGB:
     description: remain disk space in GB
     required: false
     default: "7"
@@ -50,4 +50,4 @@ runs:
 
     - uses: ./.github/actions/if_clean
       with:
-        remain_gb: ${{ inputs.remain_gb }}
+        remainGB: ${{ inputs.remainGB }}
