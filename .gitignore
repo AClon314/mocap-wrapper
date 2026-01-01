@@ -1,3 +1,9 @@
+node_modules/
+
+# build in CI / manually
+src/mocap_wrapper/api
+web/src/api
+
 **/.idea/
 **/__pycache__/
 **/.pytest_cache/
@@ -12,3 +18,6 @@ output/
 out/
 ./test*.py
 *.egg-info
+
+gitleaks*.json
+.env.*

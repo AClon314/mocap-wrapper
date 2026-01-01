@@ -117,7 +117,7 @@ mocap -i input.mp4 -b gvhmr,wilor -o outdir
 
 ### [data_viewer.ipynb](tests/data_viewer.ipynb)
 
-A useful data visualize tool to expand .pt/.npy/.npz
+A useful data visualize tool for .pt/.npy/.npz
 
 ![vscode data wrangler](https://code.visualstudio.com/assets/docs/datascience/data-wrangler/full-dw-loop.gif)
 
@@ -126,6 +126,32 @@ You have to read these if you want to modify code.
 
 ```sh
 LOG=debug mocap -I
+```
+
+```
+❯ tree -L 2 --gitignore
+.
+├── api  # connect-rpc api convention & code generation from
+├── docker  # github action CI build docker image
+├── pyproject.toml
+├── pytest.ini
+├── setup.py
+├── src
+│   └── mocap_wrapper # python backend package
+├── tests
+│   ├── bbox_yolo_viewer.js # TODO
+│   ├── data_viewer.ipynb # mentioned above
+│   ├── docker.sh
+│   ├── test_install.py
+│   ├── test_lib.py
+│   └── test_script.py
+└── web # frontend web UI dashboard panel
+    ├── astro.config.mjs
+    ├── package.json
+    ├── public
+    ├── README.md
+    ├── src
+    └── tsconfig.json
 ```
 
 ### [docker](container/Dockerfile)

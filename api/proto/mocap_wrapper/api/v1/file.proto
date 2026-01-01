@@ -1,0 +1,6 @@
+/** upload/download file (stream), for *.mp4/*.mocap.npz files */
+syntax = "proto3";
+
+package mocap_wrapper.api.v1;
+
+// import "buf/validate/validate.proto";

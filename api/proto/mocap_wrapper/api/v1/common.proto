@@ -1,0 +1,19 @@
+/** server response with these fields by default */
+// proto syntax: https://protobuf.com/programming-guides/proto3/
+// ts client: https://connectrpc.com/docs/node/using-clients
+// python server: https://github.com/connectrpc/connect-python/blob/main/docs/usage.md#server-implementation
+syntax = "proto3";
+
+package mocap_wrapper.api.v1;
+
+// import "buf/validate/validate.proto";
+
+message CommonRequest {}
+
+message CommonResponse {
+  string timestamp = 1;
+}
+
+service CommonService {
+  rpc Common(CommonRequest) returns (CommonResponse) {}
+}

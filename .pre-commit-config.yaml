@@ -1,0 +1,10 @@
+repos:
+  - repo: https://github.com/gitleaks/gitleaks
+    rev: v8.30.0
+    hooks:
+      - id: gitleaks
+      - id: gitleaks
+        name: 'gitleaks.toml '
+        entry: gitleaks git --pre-commit --staged --config gitleaks.toml --verbose
+        language: golang
+        pass_filenames: false

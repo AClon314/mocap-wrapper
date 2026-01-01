@@ -1,0 +1,17 @@
+version: v2
+plugins:
+  - local: protoc-gen-es
+    out: ../web/src/api
+    # Also generate any imported dependencies
+    include_imports: true
+    opt: target=ts
+  - remote: buf.build/protocolbuffers/pyi
+    out: ../src
+  - remote: buf.build/protocolbuffers/python
+    out: ../src
+    include_imports: true
+  - remote: buf.build/connectrpc/python
+    out: ../src
+  # Seems included in buf.build/connectrpc/python:
+  # - local: protoc-gen-connect-python # .venv/bin/protoc-gen-connect-python
+  #   out: ../src/mocap_wrapper/api

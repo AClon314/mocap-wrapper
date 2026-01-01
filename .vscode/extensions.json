@@ -1,5 +1,6 @@
 {
     "recommendations": [
-        "ms-toolsai.datawrangler"
+        "ms-toolsai.datawrangler",
+        "astro-build.astro-vscode"
     ]
 }

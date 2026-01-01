@@ -1,0 +1,24 @@
+---
+import TaskTable from "../components/TaskTable.vue";
+
+// Full Astro Component Syntax:
+// https://docs.astro.build/basics/astro-components/
+---
+
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width" />
+    <meta name="generator" content={Astro.generator} />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+  </head>
+  <body>
+    <noscript>
+      Enalbe JS for dynamic controll. hit Alt+J if using chawan.
+    </noscript>
+    <main>
+      <!-- <TaskTable client:only /> -->
+      <TaskTable />
+    </main>
+  </body>
+</html>

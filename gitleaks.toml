@@ -1,0 +1,57 @@
+title = "自定义隐私信息检测规则"
+
+[[rules]]
+description = "检测可能暴露的文件系统绝对路径，包括 Unix/Linux/Mac 路径 (/home/xxx, /Users/xxx) 和 Windows 路径"
+id = "absolute-file-path"
+# 匹配 Unix 绝对路径:  /home/xxx, /usr/xxx, /var/xxx 等
+# 匹配 Mac 路径: /Users/xxx
+# 匹配 Windows 路径: C:/, D:/, E:/ 等
+entropy = 1.0
+keywords = [
+  "/home/",
+  "/Users/",
+]
+regex = '''(?i)/(home|Users|opt|data|mnt)/'''
+tags = ["privacy", "path", "filesystem"]
+
+[[rules.allowlists]]
+# 排除特定文件类型（配置文件、文档等可能需要例外）
+paths = [
+  '''(?i).*\.(md|txt|rst|example|sample|template|dockerfile)$''',
+]
+
+[[rules]]
+description = "检测 Tailscale 网络域名，可能暴露内网设备地址（格式：xxx.ts.net 或 xxx.tailXXXX.ts.net）"
+entropy = 3.0
+id = "tailscale-domain"
+keywords = [
+  ".ts.net",
+  "tail",
+]
+regex = '''(?i)\b[a-z0-9][-a-z0-9]{0,62}(?:\.tail[a-z0-9]{4,10})?\.ts\.net\b'''
+tags = ["privacy", "network", "tailscale"]
+
+[[rules.allowlists]]
+# 排除示例域名
+paths = [
+  "(?i).*example.*",
+  "(?i).*test.*",
+]
+
+[[rules]]
+description = "检测可能暴露的内网域名，如 . local, .internal, .lan 等"
+entropy = 2.5
+id = "internal-network-domain"
+keywords = [
+  ".local",
+  ".internal",
+  ".lan",
+  ".home",
+]
+regex = '''(?i)\b[a-z0-9][-a-z0-9]{0,62}\.(?:local|internal|lan|home|intranet)\b'''
+tags = ["privacy", "network", "internal"]
+
+[[rules.allowlists]]
+paths = [
+  "(?i).*example.*",
+]

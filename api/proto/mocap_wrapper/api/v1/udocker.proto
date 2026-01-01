@@ -1,0 +1,6 @@
+/** udocker status */
+syntax = "proto3";
+
+package mocap_wrapper.api.v1;
+
+// import "buf/validate/validate.proto";

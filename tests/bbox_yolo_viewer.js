@@ -2,7 +2,7 @@ import path from "path"
 import npyjs from 'npyjs'
 import JSZip from 'jszip'
 import fs from "fs"
-const npz_file = '/home/n/document/code/GVHMR/output/demo/背越式跳高（慢动作）/preprocess/yolo_track.npz'
+const npz_file = 'yolo_track.npz'
 const dataPath = path.resolve(npz_file)
 let contents = fs.readFileSync(npz_file)
 
