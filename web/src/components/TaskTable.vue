@@ -21,8 +21,8 @@
 </template>
 <script lang="ts" setup>
 import { onMounted, reactive, ref } from "vue";
-import { MotionConfig, motion, motionValue } from "motion-v";
-import { useStore } from "../store/settings";
+// import { MotionConfig, motion, motionValue } from "motion-v";
+import { useStore } from "@/store/settings";
 import TaskNew from "./TaskNew.vue";
 const store = ref<ReturnType<typeof useStore>>();
 onMounted(() => {
@@ -30,5 +30,4 @@ onMounted(() => {
 });
 const showTaskNew = ref(true);
 </script>
-<style scoped>
-</style>
+<style scoped></style>

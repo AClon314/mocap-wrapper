@@ -1,0 +1,8 @@
+@import 'tailwindcss';
+
+@media (prefers-color-scheme: dark) {
+  .markstream-vue .bg-\[hsl\(var\(--secondary\)\)\] {
+    /* background-color: hsl(var(--secondary)); */
+    background-color: var(--BG-fg) !important;
+  }
+}

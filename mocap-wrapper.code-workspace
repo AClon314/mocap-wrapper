@@ -1,0 +1,15 @@
+{
+  "folders": [
+    {
+      "path": "./web"
+    },
+    {
+      "path": "."
+    },
+  ],
+  "settings": {
+    "files.exclude": {
+      "**/node_modules": true
+    }
+  }
+}

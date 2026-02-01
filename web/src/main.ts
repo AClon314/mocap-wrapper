@@ -1,13 +1,18 @@
-import type { App } from "vue";
-// Import global Tailwind CSS so it's included in the app entrypoint.
-import "./styles/global.css";
-import { createPinia } from "pinia";
-import piniaPluginPersistedstate from "pinia-plugin-persistedstate";
-// import { vaporInteropPlugin } from "vue";
+import { createApp } from 'vue'
+import { createPinia } from 'pinia'
 
-export default (app: App) => {
-  const pinia = createPinia();
-  pinia.use(piniaPluginPersistedstate);
-  // https://github.com/vuejs/core/blob/minor/CHANGELOG.md#opting-in-to-vapor-mode
-  app.use(pinia);
-};
+import App from './App.vue'
+import router from './router'
+import './style/global.css' // 空文件，引入tailwind编译器
+import { globalVibrate } from './components/vibrate'
+import i18n from './locale'
+
+const app = createApp(App)
+
+globalVibrate()
+
+app.use(createPinia())
+app.use(router)
+app.use(i18n)
+
+app.mount('#app')
