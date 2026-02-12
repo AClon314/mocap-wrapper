@@ -1,12 +1,16 @@
 <template>
-  <div v-bind="api.getRootProps()">
+  <div v-bind="api.getRootProps()" class="h-screen">
     <!-- <a href="#toc" class="absolute z-50">跳至主导航</a>
     <a href="#main" class="absolute z-50">跳至内容</a> -->
 
     <header v-bind="api.getPanelProps({ id: 'toc' })">
       <TOC></TOC>
     </header>
-    <div class="w-1 invert" v-bind="api.getResizeTriggerProps({ id: 'toc:main' })" />
+    <div
+      class="w-1 invert mx-4"
+      style="background-color: var(--bg)"
+      v-bind="api.getResizeTriggerProps({ id: 'toc:main' })"
+    />
     <main v-bind="api.getPanelProps({ id: 'main' })">
       <!-- <section aria-labelledby="form-heading"></section> -->
       <RouterView></RouterView>

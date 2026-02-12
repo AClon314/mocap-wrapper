@@ -7,26 +7,27 @@ authors = [
   {name = "nolca", email = "nolca@qq.com"},
 ]
 dependencies = [
-  "toml",
-  "tqdm",
-  "numpy",
-  "fastapi",
+  # "toml", # TODO config file
+  # "tqdm", # TODO progress bar
+  "numpy",# postprocess matrix calc
+  "fastapi",# TODO connect-python?
   "fastmcp",
-  "mirror_cn @ git+https://github.com/aclon314/mirror-cn.git",
-  "aexpect>=1.8",
-  "platformdirs",
-  "huggingface_hub",
-  "typed-ffmpeg",
-  "pydantic",
-  "pydantic-argparse",
-  "connect-python",
+  # "mirror_cn @ git+https://github.com/aclon314/mirror-cn.git", # TODO
+  "aexpect>=1.8", # interactive multi-process
+  "platformdirs", # user's config path
+  # "huggingface_hub",# TODO
+  "typed-ffmpeg", # input video pre-process
+  "pydantic", # validate
+  "pydantic-argparse",  # expose as argparse
+  "connect-python", # rpc core
+  "enlighten", # progress bar
 ]
 description = "GVHMR, TRAM, WiLoR...mocap install/run with blender/unreal in one command"
 keywords = ["mocap", "pose estimate", "blender", "unreal", "mcp"]
 license = {file = "LICENSE"}
 name = "mocap-wrapper"
 readme = "README.md"
-version = "0.3.20251211"
+version = "0.3.20260208"
 
 classifiers = [
   "License :: OSI Approved :: MIT License",

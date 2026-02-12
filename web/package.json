@@ -37,6 +37,7 @@
     "vue-router": "^4.6.4"
   },
   "devDependencies": {
+    "@iconify/vue": "^5.0.0",
     "@playwright/test": "^1.57.0",
     "@tailwindcss/vite": "^4.1.18",
     "@tsconfig/node24": "^24.0.3",
@@ -59,7 +60,6 @@
     "oxfmt": "^0.23.0",
     "oxlint": "~1.38.0",
     "prettier": "3.7.4",
-    "sass-embedded": "^1.97.2",
     "tailwindcss": "^4.1.18",
     "typescript": "~5.9.3",
     "vite": "beta",

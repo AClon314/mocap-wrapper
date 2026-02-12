@@ -1,9 +1,9 @@
 {
   "dependencies": {
-    "@bufbuild/buf": "^1.61.0",
-    "@bufbuild/protoc-gen-es": "^2.10.2"
+    "@bufbuild/buf": "^1.65.0",
+    "@bufbuild/protoc-gen-es": "^2.11.0"
   },
   "scripts": {
-    "gen-api": "cd api && bunx buf dep update && bunx buf lint && bunx buf generate && python gen.py"
+    "api:gen": "python api/gen.py"
   }
 }

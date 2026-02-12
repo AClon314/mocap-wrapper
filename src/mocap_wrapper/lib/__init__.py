@@ -15,4 +15,4 @@ try:
     from .FFmpeg import *
     from .data_viewer import *
 except ImportError as e:
-    Log.exception(f"\n{__name__=}:", exc_info=e) if IS_DEBUG else None
+    Log.exception(f"\n{__name__=}:", exc_info=e)

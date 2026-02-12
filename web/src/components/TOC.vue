@@ -2,13 +2,16 @@
 <template>
   <nav class="flex flex-col z-30 fixed bottom-0" aria-label="导航目录">
     <RouterLink
-      v-for="route in routes"
-      :key="route.name"
-      :to="route.path"
+      v-for="r in routes"
+      :key="r.name"
+      :to="r.path"
       :aria-current-value="isCurrent ? 'page' : null"
       aria-label="使用中文"
+      tabindex="-1"
     >
-      {{ t((route.meta.title as string) ?? route.name) }}
+      <button :class="{ active: r.path === route.path }">
+        {{ t((r.meta.title as string) ?? r.name) }}
+      </button>
     </RouterLink>
   </nav>
 </template>

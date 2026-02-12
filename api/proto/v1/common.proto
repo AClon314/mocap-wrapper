@@ -4,7 +4,7 @@
 // python server: https://github.com/connectrpc/connect-python/blob/main/docs/usage.md#server-implementation
 syntax = "proto3";
 
-package mocap_wrapper.api.v1;
+package v1;
 
 // import "buf/validate/validate.proto";
 
