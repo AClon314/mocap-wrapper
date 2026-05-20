@@ -1,6 +1,0 @@
-/** udocker status */
-syntax = "proto3";
-
-package v1;
-
-// import "buf/validate/validate.proto";

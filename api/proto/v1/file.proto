@@ -1,6 +1,0 @@
-/** upload/download file (stream), for *.mp4/*.mocap.npz files */
-syntax = "proto3";
-
-package v1;
-
-// import "buf/validate/validate.proto";
