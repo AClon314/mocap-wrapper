@@ -8,10 +8,3 @@ repos:
         entry: gitleaks git --pre-commit --staged --config gitleaks.toml --verbose
         language: golang
         pass_filenames: false
-  - repo: local
-    hooks:
-      - id: lint
-        name: lint
-        entry: python -c "import os; os.chdir('web'); os.environ['PROD']='1'; os.system('bun run lint:eslint')"
-        language: system
-        pass_filenames: false
