@@ -22,8 +22,8 @@ dependencies = [
   "connect-python", # rpc core
   "enlighten", # progress bar
 ]
-description = "GVHMR, TRAM, WiLoR...mocap install/run with blender/unreal in one command"
-keywords = ["mocap", "pose estimate", "blender", "unreal", "mcp"]
+description = "GVHMR, TRAM, WiLoR, Dyn-HaMR...mocap install/run with blender/unreal in one command"
+keywords = ["mocap", "pose estimate", "blender", "unreal", "mcp", "hand tracking"]
 license = {file = "LICENSE"}
 name = "mocap-wrapper"
 readme = "README.md"
